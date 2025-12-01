@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import '../styles/design-system.css';
 
 const Scheduler = () => {
-    const { userProfile } = useAuth();
+    const { userProfile, activeAcademicYear } = useAuth();
     const [viewMode, setViewMode] = useState('horizontal');
     const [selectedDept, setSelectedDept] = useState('CSE');
     const [selectedSem, setSelectedSem] = useState('3rd');
@@ -61,12 +61,19 @@ const Scheduler = () => {
     const fetchSchedule = async () => {
         setLoading(true);
         try {
-            // In a real app, you might filter by Dept/Sem here
-            const q = query(collection(db, 'schedule'));
+            // Filter by Academic Year
+            const q = query(
+                collection(db, 'schedule'),
+                where('academicYear', '==', activeAcademicYear)
+            );
             const querySnapshot = await getDocs(q);
             const items = [];
             querySnapshot.forEach((doc) => {
-                items.push({ id: doc.id, ...doc.data() });
+                const data = doc.data();
+                // Client-side filter for Dept/Sem (Firestore composite index workaround)
+                if (data.dept === selectedDept && data.sem === selectedSem) {
+                    items.push({ id: doc.id, ...data });
+                }
             });
             setSchedule(items);
         } catch (err) {
@@ -77,8 +84,10 @@ const Scheduler = () => {
     };
 
     useEffect(() => {
-        fetchSchedule();
-    }, [selectedDept, selectedSem]);
+        if (activeAcademicYear) {
+            fetchSchedule();
+        }
+    }, [selectedDept, selectedSem, activeAcademicYear]);
 
     const getAssignment = (day, time) => {
         return schedule.find(item => item.day === day && item.time === time);
@@ -127,7 +136,8 @@ const Scheduler = () => {
             await addDoc(collection(db, 'schedule'), {
                 ...formData,
                 dept: selectedDept,
-                sem: selectedSem
+                sem: selectedSem,
+                academicYear: activeAcademicYear // Save with current year
             });
             setIsModalOpen(false);
             setFormData({ ...formData, subject: '', room: '', faculty: '' }); // Reset fields
@@ -169,7 +179,7 @@ const Scheduler = () => {
             {/* Toolbar */}
             <div className="glass-panel" style={{ padding: 'var(--space-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
                 <div style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Weekly Schedule</h2>
+                    <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Weekly Schedule <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>({activeAcademicYear})</span></h2>
                     <div style={{ height: '24px', width: '1px', background: 'var(--glass-border)' }}></div>
                     <select className="glass-input" value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} style={{ padding: 'var(--space-xs) var(--space-sm)', borderRadius: 'var(--radius-sm)', background: 'rgba(0,0,0,0.2)', color: 'white', border: '1px solid var(--glass-border)' }}>
                         <option value="CSE">CSE</option>
@@ -278,6 +288,7 @@ const Scheduler = () => {
                         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <select className="glass-input" value={formData.subject} onChange={e => setFormData({ ...formData, subject: e.target.value })} required>
                                 <option value="">Select Subject</option>
+                                <option value="Lab">Lab</option>
                                 {subjects.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
 

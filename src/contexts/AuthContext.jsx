@@ -6,7 +6,7 @@ import {
     signOut,
     onAuthStateChanged
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -15,6 +15,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
+    const [activeAcademicYear, setActiveAcademicYear] = useState('2024-2025'); // Default
     const [loading, setLoading] = useState(true);
 
     // Helper to convert Emp ID to Email
@@ -45,6 +46,22 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         return signOut(auth);
     };
+
+    // Listen for Academic Year Changes
+    useEffect(() => {
+        const unsubscribe = onSnapshot(doc(db, 'settings', 'config'), (doc) => {
+            if (doc.exists()) {
+                setActiveAcademicYear(doc.data().activeAcademicYear);
+            } else {
+                // Initialize if missing
+                setDoc(doc.ref, {
+                    activeAcademicYear: '2024-2025',
+                    academicYears: ['2024-2025']
+                });
+            }
+        });
+        return unsubscribe;
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -80,6 +97,7 @@ export const AuthProvider = ({ children }) => {
     const value = {
         currentUser,
         userProfile,
+        activeAcademicYear,
         login,
         signup,
         logout,

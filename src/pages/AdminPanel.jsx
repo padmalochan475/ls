@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/design-system.css';
 
 const AdminPanel = () => {
-    const { userProfile } = useAuth();
+    const { userProfile, activeAcademicYear } = useAuth();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // 'all', 'pending', 'approved'
+
+    // Academic Year State
+    const [academicYears, setAcademicYears] = useState([]);
+    const [newYear, setNewYear] = useState('');
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -26,8 +30,20 @@ const AdminPanel = () => {
         }
     };
 
+    const fetchSettings = async () => {
+        try {
+            const docSnap = await getDoc(doc(db, 'settings', 'config'));
+            if (docSnap.exists()) {
+                setAcademicYears(docSnap.data().academicYears || []);
+            }
+        } catch (err) {
+            console.error("Error loading settings:", err);
+        }
+    };
+
     useEffect(() => {
         fetchUsers();
+        fetchSettings();
     }, []);
 
     const handleStatusChange = async (userId, newStatus) => {
@@ -64,6 +80,38 @@ const AdminPanel = () => {
         }
     };
 
+    const handleAddYear = async () => {
+        if (!newYear) return;
+        try {
+            const settingsRef = doc(db, 'settings', 'config');
+            await updateDoc(settingsRef, {
+                academicYears: arrayUnion(newYear),
+                activeAcademicYear: newYear // Auto-switch to new year
+            });
+            setNewYear('');
+            fetchSettings();
+            alert(`New Academic Year ${newYear} Started!`);
+            window.location.reload(); // Reload to apply global context change
+        } catch (err) {
+            console.error("Error adding year:", err);
+            // Handle case where doc doesn't exist yet
+            await setDoc(doc(db, 'settings', 'config'), {
+                academicYears: [newYear],
+                activeAcademicYear: newYear
+            });
+            window.location.reload();
+        }
+    };
+
+    const handleSwitchYear = async (year) => {
+        if (window.confirm(`Switch active year to ${year}?`)) {
+            await updateDoc(doc(db, 'settings', 'config'), {
+                activeAcademicYear: year
+            });
+            window.location.reload();
+        }
+    };
+
     const filteredUsers = users.filter(user => {
         if (filter === 'all') return true;
         return user.status === filter;
@@ -76,6 +124,43 @@ const AdminPanel = () => {
     return (
         <div style={{ paddingBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: 'var(--space-lg)' }}>Admin Panel</h2>
+
+            {/* Academic Year Settings */}
+            <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem', border: '1px solid var(--color-accent)' }}>
+                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    📅 Academic Year Management
+                    <span style={{ fontSize: '0.8rem', background: 'var(--color-accent)', padding: '2px 8px', borderRadius: '12px' }}>Active: {activeAcademicYear}</span>
+                </h3>
+
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'end' }}>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Start New Year</label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <input
+                                className="glass-input"
+                                placeholder="e.g. 2025-2026"
+                                value={newYear}
+                                onChange={(e) => setNewYear(e.target.value)}
+                            />
+                            <button className="btn btn-primary" onClick={handleAddYear}>Start</button>
+                        </div>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Switch Active Year</label>
+                        <select
+                            className="glass-input"
+                            value={activeAcademicYear}
+                            onChange={(e) => handleSwitchYear(e.target.value)}
+                            style={{ width: '100%' }}
+                        >
+                            {academicYears.map(year => (
+                                <option key={year} value={year} style={{ color: 'black' }}>{year}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            </div>
 
             {/* Stats Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
