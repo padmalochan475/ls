@@ -6,7 +6,7 @@ import {
     signOut,
     onAuthStateChanged
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -15,7 +15,9 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
-    const [activeAcademicYear, setActiveAcademicYear] = useState('2024-2025'); // Default
+    const [systemAcademicYear, setSystemAcademicYear] = useState('2024-2025'); // Global System Default
+    const [selectedAcademicYear, setSelectedAcademicYear] = useState(localStorage.getItem('selectedAcademicYear') || null); // User's View Choice
+    const [academicYears, setAcademicYears] = useState(['2024-2025']); // List of all years
     const [loading, setLoading] = useState(true);
 
     // Helper to convert Emp ID to Email
@@ -26,17 +28,22 @@ export const AuthProvider = ({ children }) => {
         return signInWithEmailAndPassword(auth, email, password);
     };
 
-    const signup = async (empId, password, name, recoveryEmail) => {
+    const signup = async (empId, password, name, recoveryEmail, mobileNumber) => {
         const email = getEmail(empId);
         const { user } = await createUserWithEmailAndPassword(auth, email, password);
+
+        // Check if this is the first user
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const isFirstUser = usersSnapshot.empty;
 
         // Create user profile in Firestore
         await setDoc(doc(db, 'users', user.uid), {
             empId,
             name,
             email: recoveryEmail, // Store real email for recovery
-            role: 'user', // Default role
-            status: 'pending', // Pending admin approval
+            mobile: mobileNumber,
+            role: isFirstUser ? 'admin' : 'user', // First user is Admin
+            status: isFirstUser ? 'approved' : 'pending', // First user is Approved
             createdAt: new Date().toISOString()
         });
 
@@ -44,23 +51,50 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
+        localStorage.removeItem('selectedAcademicYear'); // Clear preference on logout
         return signOut(auth);
     };
 
-    // Listen for Academic Year Changes
+    const handleSetSelectedYear = (year) => {
+        console.log("Setting Selected Year:", year);
+        setSelectedAcademicYear(year);
+        localStorage.setItem('selectedAcademicYear', year);
+    };
+    // Listen for Academic Year Changes (Global Config)
     useEffect(() => {
-        const unsubscribe = onSnapshot(doc(db, 'settings', 'config'), (doc) => {
-            if (doc.exists()) {
-                setActiveAcademicYear(doc.data().activeAcademicYear);
+        const unsubscribe = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const fetchedSystemYear = data.activeAcademicYear;
+                const fetchedYears = data.academicYears || [];
+
+                setSystemAcademicYear(fetchedSystemYear);
+                setAcademicYears([...fetchedYears]); // Force new reference
+
+                // Validate User's Selection
+                const storedYear = localStorage.getItem('selectedAcademicYear');
+                if (storedYear) {
+                    if (fetchedYears.includes(storedYear)) {
+                        setSelectedAcademicYear(storedYear);
+                    } else {
+                        // Stored year is invalid (removed from system), reset to default
+                        console.warn("Stored academic year is invalid, resetting to system default.");
+                        localStorage.removeItem('selectedAcademicYear');
+                        setSelectedAcademicYear(fetchedSystemYear);
+                    }
+                } else {
+                    // No selection, use system default
+                    setSelectedAcademicYear(fetchedSystemYear);
+                }
             } else {
                 // Initialize if missing
-                setDoc(doc.ref, {
+                setDoc(doc(db, 'settings', 'config'), {
                     activeAcademicYear: '2024-2025',
                     academicYears: ['2024-2025']
                 });
             }
         });
-        return unsubscribe;
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -97,12 +131,23 @@ export const AuthProvider = ({ children }) => {
     const value = {
         currentUser,
         userProfile,
-        activeAcademicYear,
+        activeAcademicYear: selectedAcademicYear || systemAcademicYear, // Fallback to system if null
+        systemAcademicYear, // Expose system default if needed
+        academicYears,
+        setSelectedAcademicYear: handleSetSelectedYear, // Allow changing view with persistence
         login,
         signup,
         logout,
         loading
     };
+
+    console.log("AuthContext State:", {
+        selected: selectedAcademicYear,
+        system: systemAcademicYear,
+        active: value.activeAcademicYear,
+        localStorage: localStorage.getItem('selectedAcademicYear'),
+        years: academicYears
+    });
 
     return (
         <AuthContext.Provider value={value}>

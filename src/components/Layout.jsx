@@ -20,7 +20,7 @@ const Layout = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const { userProfile, logout } = useAuth();
+    const { userProfile, logout, activeAcademicYear, setSelectedAcademicYear, academicYears } = useAuth();
 
     // Handle Window Resize
     useEffect(() => {
@@ -191,15 +191,20 @@ const Layout = ({ children }) => {
                             justifyContent: 'center',
                             fontSize: '0.875rem',
                             fontWeight: 'bold',
-                            color: 'var(--color-accent)'
+                            color: 'var(--color-accent)',
+                            overflow: 'hidden'
                         }}>
-                            {userProfile ? userProfile.name.charAt(0) : 'G'}
+                            {userProfile && userProfile.photoURL ? (
+                                <img src={userProfile.photoURL} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                                userProfile ? userProfile.name.charAt(0) : 'G'
+                            )}
                         </div>
                         {(isSidebarOpen || isMobile) && (
-                            <div style={{ overflow: 'hidden', flex: 1 }}>
+                            <Link to="/profile" style={{ overflow: 'hidden', flex: 1, textDecoration: 'none', color: 'inherit' }}>
                                 <div style={{ fontSize: '0.875rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userProfile ? userProfile.name : 'Guest'}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{userProfile ? userProfile.role : 'Sign in'}</div>
-                            </div>
+                            </Link>
                         )}
                         {(isSidebarOpen || isMobile) && (
                             <button

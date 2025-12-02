@@ -158,11 +158,30 @@ const MasterData = () => {
         <div style={{ paddingBottom: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
                 <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>Master Data Management</h2>
-                {isAdmin && (
-                    <button className="btn" style={{ background: 'var(--color-accent)', color: 'white' }} onClick={() => openModal()}>
-                        + Add New {activeTab.slice(0, -1)}
-                    </button>
-                )}
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    {isAdmin && (
+                        <button className="btn" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid var(--glass-border)' }} onClick={() => {
+                            if (data.length === 0) return alert('No data to export');
+                            const headers = Object.keys(data[0]).filter(k => k !== 'id').join(',');
+                            const rows = data.map(row => Object.keys(row).filter(k => k !== 'id').map(k => row[k]).join(',')).join('\n');
+                            const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + rows;
+                            const encodedUri = encodeURI(csvContent);
+                            const link = document.createElement("a");
+                            link.setAttribute("href", encodedUri);
+                            link.setAttribute("download", `${activeTab}_data.csv`);
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }}>
+                            📤 Export CSV
+                        </button>
+                    )}
+                    {isAdmin && (
+                        <button className="btn" style={{ background: 'var(--color-accent)', color: 'white' }} onClick={() => openModal()}>
+                            + Add New {activeTab.slice(0, -1)}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Tabs */}

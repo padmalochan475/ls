@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { Eye, EyeOff } from 'lucide-react';
+import emailjs from '@emailjs/browser';
 import '../styles/design-system.css';
 
 const Login = () => {
@@ -11,9 +13,21 @@ const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({ empId: '', password: '', name: '', recoveryEmail: '' });
+
+  // Signup Flow State
+  const [signupStep, setSignupStep] = useState(1); // 1: Details, 2: OTP
+  const [signupOtp, setSignupOtp] = useState('');
+  const [generatedSignupOtp, setGeneratedSignupOtp] = useState(null);
+
+  const [formData, setFormData] = useState({ empId: '', password: '', name: '', recoveryEmail: '', mobileNumber: '' });
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // EmailJS Configuration
+  const EMAILJS_SERVICE_ID = "service_xoq8zys";
+  const EMAILJS_TEMPLATE_ID = "template_ag70wm8";
+  const EMAILJS_PUBLIC_KEY = "OLfq9wSgarnn9O5z-";
 
   // Redirect if already logged in
   useEffect(() => {
@@ -29,33 +43,94 @@ const Login = () => {
   const [generatedOtp, setGeneratedOtp] = useState(null);
   const [newPassword, setNewPassword] = useState('');
 
+  const sendEmailOtp = async (email, name, otpCode) => {
+    const templateParams = {
+      to_name: name,
+      passcode: otpCode,
+      time: new Date(Date.now() + 15 * 60 * 1000).toLocaleString(),
+      to_email: email,
+      email: email, // Adding this as a backup variable name
+    };
+
+    try {
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
+      return { success: true };
+    } catch (error) {
+      console.error("EmailJS Error:", error);
+      return { success: false, error: error };
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setStatusMessage('');
-    setIsLoading(true);
 
-    try {
-      if (isLogin) {
+    if (isLogin) {
+      setIsLoading(true);
+      try {
         await login(formData.empId, formData.password);
-        // Navigation is handled by App.jsx based on auth state
-      } else {
-        await signup(formData.empId, formData.password, formData.name, formData.recoveryEmail);
-        // Auto-redirect will happen via useEffect
+      } catch (err) {
+        console.error(err);
+        handleAuthError(err);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      console.error(err);
-      setError(`Failed: ${err.message} (${err.code})`);
+    } else {
+      // Signup Flow
+      if (signupStep === 1) {
+        // Step 1: Validate and Send OTP
+        if (formData.password.length < 6) {
+          setError('Password should be at least 6 characters.');
+          return;
+        }
 
-      if (err.code === 'auth/invalid-credential') {
-        setError('Invalid Employee ID or Password.');
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError('This Employee ID is already registered.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('Password should be at least 6 characters.');
+        setIsLoading(true);
+
+        // Generate OTP
+        const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedSignupOtp(newOtp);
+
+        // Send Real Email
+        const result = await sendEmailOtp(formData.recoveryEmail, formData.name, newOtp);
+
+        if (result.success) {
+          setStatusMessage(`OTP sent to ${formData.recoveryEmail}`);
+          setSignupStep(2);
+        } else {
+          const errorMsg = result.error?.text || result.error?.message || "Unknown error";
+          setError(`Failed to send OTP: ${errorMsg}`);
+        }
+        setIsLoading(false);
+      } else {
+        // Step 2: Verify OTP and Create Account
+        if (signupOtp !== generatedSignupOtp) {
+          setError('Invalid OTP. Please try again.');
+          return;
+        }
+
+        setIsLoading(true);
+        try {
+          await signup(formData.empId, formData.password, formData.name, formData.recoveryEmail, formData.mobileNumber);
+          // Auto-redirect will happen via useEffect
+        } catch (err) {
+          console.error(err);
+          handleAuthError(err);
+          setIsLoading(false);
+        }
       }
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  const handleAuthError = (err) => {
+    if (err.code === 'auth/invalid-credential') {
+      setError('Invalid Employee ID or Password.');
+    } else if (err.code === 'auth/email-already-in-use') {
+      setError('This Employee ID is already registered.');
+    } else if (err.code === 'auth/weak-password') {
+      setError('Password should be at least 6 characters.');
+    } else {
+      setError(`Failed: ${err.message}`);
     }
   };
 
@@ -84,16 +159,21 @@ const Login = () => {
           return;
         }
 
-        // Simulate sending OTP
+        // Generate OTP
         const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
         setGeneratedOtp(newOtp);
 
-        // In a real app, this would be: await sendEmail(userData.email, newOtp);
-        alert(`[SIMULATION] OTP sent to ${userData.email}: ${newOtp}`);
-        console.log(`OTP for ${userData.email}: ${newOtp}`);
+        // Send Real Email
+        const result = await sendEmailOtp(userData.email, userData.name || 'User', newOtp);
 
-        setStatusMessage(`OTP sent to ${userData.email}`);
-        setResetStep(2);
+        if (result.success) {
+          setStatusMessage(`OTP sent to ${userData.email}`);
+          setResetStep(2);
+        } else {
+          const errorMsg = result.error?.text || result.error?.message || "Unknown error";
+          setError(`Failed to send OTP: ${errorMsg}`);
+        }
+
       } else if (resetStep === 2) {
         // Step 2: Verify OTP
         if (otp === generatedOtp) {
@@ -246,7 +326,7 @@ const Login = () => {
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-          {!isLogin && (
+          {!isLogin && signupStep === 1 && (
             <>
               <input
                 type="text"
@@ -266,26 +346,81 @@ const Login = () => {
                 required
                 style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
               />
+              <input
+                type="tel"
+                placeholder="Mobile Number"
+                className="glass-input"
+                value={formData.mobileNumber || ''}
+                onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                required
+                style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+              />
             </>
           )}
-          <input
-            type="text"
-            placeholder="Employee ID"
-            className="glass-input"
-            value={formData.empId}
-            onChange={(e) => setFormData({ ...formData, empId: e.target.value })}
-            required
-            style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            className="glass-input"
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            required
-            style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
-          />
+
+          {(!isLogin && signupStep === 2) ? (
+            <input
+              type="text"
+              placeholder="Enter OTP sent to email"
+              className="glass-input"
+              value={signupOtp}
+              onChange={(e) => setSignupOtp(e.target.value)}
+              required
+              style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', textAlign: 'center', letterSpacing: '2px' }}
+            />
+          ) : (
+            <>
+              <input
+                type="text"
+                placeholder="Employee ID"
+                className="glass-input"
+                value={formData.empId}
+                onChange={(e) => setFormData({ ...formData, empId: e.target.value })}
+                required
+                style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+              />
+
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  className="glass-input"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                  style={{
+                    padding: 'var(--space-md)',
+                    paddingRight: '40px', // Space for icon
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--glass-border)',
+                    background: 'rgba(0,0,0,0.2)',
+                    color: 'white',
+                    outline: 'none',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </>
+          )}
 
           <button
             type="submit"
@@ -301,7 +436,7 @@ const Login = () => {
               opacity: isLoading ? 0.7 : 1
             }}
           >
-            {isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
+            {isLoading ? 'Processing...' : (isLogin ? 'Sign In' : (signupStep === 1 ? 'Send OTP' : 'Verify & Sign Up'))}
           </button>
         </form>
 
@@ -318,7 +453,13 @@ const Login = () => {
           )}
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button
-            onClick={() => { setIsLogin(!isLogin); setError(''); setStatusMessage(''); }}
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+              setStatusMessage('');
+              setSignupStep(1);
+              setFormData({ empId: '', password: '', name: '', recoveryEmail: '', mobileNumber: '' });
+            }}
             style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', textDecoration: 'underline' }}
           >
             {isLogin ? 'Sign Up' : 'Sign In'}

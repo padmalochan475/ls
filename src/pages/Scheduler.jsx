@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
 import { collection, getDocs, addDoc, query, where, deleteDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/design-system.css';
 
 const Scheduler = () => {
-    const { userProfile, activeAcademicYear } = useAuth();
+    const auth = useAuth();
+    console.log("Scheduler Render. Auth Context:", auth);
+    const { userProfile, activeAcademicYear } = auth || {};
+
     const [viewMode, setViewMode] = useState('horizontal');
     const [selectedDept, setSelectedDept] = useState('CSE');
     const [selectedSem, setSelectedSem] = useState('3rd');
@@ -59,8 +63,14 @@ const Scheduler = () => {
 
     // Fetch Schedule
     const fetchSchedule = async () => {
+        console.log("Fetching schedule for year:", activeAcademicYear);
         setLoading(true);
         try {
+            if (!activeAcademicYear) {
+                console.warn("No active academic year, skipping fetch.");
+                setSchedule([]);
+                return;
+            }
             // Filter by Academic Year
             const q = query(
                 collection(db, 'schedule'),
@@ -75,6 +85,7 @@ const Scheduler = () => {
                     items.push({ id: doc.id, ...data });
                 }
             });
+            console.log("Fetched schedule items:", items.length);
             setSchedule(items);
         } catch (err) {
             console.error("Error loading schedule:", err);
@@ -84,18 +95,16 @@ const Scheduler = () => {
     };
 
     useEffect(() => {
+        console.log("Scheduler: activeAcademicYear changed to:", activeAcademicYear);
         if (activeAcademicYear) {
             fetchSchedule();
         }
     }, [selectedDept, selectedSem, activeAcademicYear]);
 
-    const getAssignment = (day, time) => {
-        return schedule.find(item => item.day === day && item.time === time);
-    };
-
     const checkConflict = async (newBooking) => {
+        if (!schedule || !Array.isArray(schedule)) return null;
+
         // 1. Check Room Conflict
-        // Is there already a booking for this Room at this Day & Time?
         const roomConflict = schedule.find(item =>
             item.day === newBooking.day &&
             item.time === newBooking.time &&
@@ -107,7 +116,6 @@ const Scheduler = () => {
         }
 
         // 2. Check Faculty Conflict
-        // Is this Faculty member already teaching somewhere else at this Day & Time?
         const facultyConflict = schedule.find(item =>
             item.day === newBooking.day &&
             item.time === newBooking.time &&
@@ -123,28 +131,32 @@ const Scheduler = () => {
 
     const handleSave = async (e) => {
         e.preventDefault();
+        console.log("handleSave called", formData);
         setError('');
 
-        // Run Conflict Detection
-        const conflictError = await checkConflict(formData);
-        if (conflictError) {
-            setError(conflictError);
-            return;
-        }
-
         try {
+            // Run Conflict Detection
+            const conflictError = await checkConflict(formData);
+            if (conflictError) {
+                console.warn("Conflict detected:", conflictError);
+                setError(conflictError);
+                return;
+            }
+
+            console.log("Saving schedule item...");
             await addDoc(collection(db, 'schedule'), {
                 ...formData,
                 dept: selectedDept,
                 sem: selectedSem,
                 academicYear: activeAcademicYear // Save with current year
             });
+            console.log("Schedule item saved successfully.");
             setIsModalOpen(false);
             setFormData({ ...formData, subject: '', room: '', faculty: '' }); // Reset fields
             fetchSchedule();
         } catch (err) {
             console.error("Error saving schedule:", err);
-            setError("Failed to save schedule.");
+            setError("Failed to save schedule. Check console.");
         }
     };
 
@@ -170,6 +182,11 @@ const Scheduler = () => {
         });
         setError('');
         setIsModalOpen(true);
+    };
+
+    const getAssignment = (day, time) => {
+        if (!schedule || !Array.isArray(schedule)) return null;
+        return schedule.find(item => item.day === day && item.time === time);
     };
 
     const isAdmin = userProfile && userProfile.role === 'admin';
@@ -269,11 +286,11 @@ const Scheduler = () => {
             </div>
 
             {/* Booking Modal */}
-            {isModalOpen && (
+            {isModalOpen && createPortal(
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
                     background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
-                    display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+                    display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999
                 }}>
                     <div className="glass-panel" style={{ width: '400px', padding: '2rem' }}>
                         <h3 style={{ marginBottom: '1.5rem' }}>Add Class</h3>
@@ -315,7 +332,8 @@ const Scheduler = () => {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

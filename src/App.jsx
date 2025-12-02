@@ -6,9 +6,10 @@ import Login from './pages/Login';
 import Scheduler from './pages/Scheduler';
 import AdminPanel from './pages/AdminPanel';
 import MasterData from './pages/MasterData';
+import Profile from './pages/Profile';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
-  const { currentUser, userProfile, loading } = useAuth();
+  const { currentUser, userProfile, loading, logout } = useAuth();
 
   if (loading) return <div style={{ color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
 
@@ -22,7 +23,10 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       <div className="glass-panel" style={{ margin: '2rem', padding: '2rem', textAlign: 'center', color: 'white' }}>
         <h1>Account Pending</h1>
         <p>Your account is waiting for admin approval. Please check back later.</p>
-        <button className="btn" onClick={() => window.location.reload()} style={{ marginTop: '1rem', background: 'var(--color-accent)' }}>Check Status</button>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
+          <button className="btn" onClick={() => window.location.reload()} style={{ background: 'var(--color-accent)' }}>Check Status</button>
+          <button className="btn" onClick={logout} style={{ background: 'rgba(255,255,255,0.1)' }}>Logout</button>
+        </div>
       </div>
     );
   }
@@ -86,6 +90,14 @@ function App() {
             <ProtectedRoute requiredRole="admin">
               <Layout>
                 <AdminPanel />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Layout>
+                <Profile />
               </Layout>
             </ProtectedRoute>
           } />
