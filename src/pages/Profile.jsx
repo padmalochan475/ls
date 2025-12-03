@@ -63,13 +63,37 @@ const Profile = () => {
             return;
         }
 
-        const reader = new FileReader();
-        reader.addEventListener('load', () => {
-            setImageSrc(reader.result);
-            setIsCropping(true);
-        });
-        reader.readAsDataURL(file);
-        e.target.value = null; // Reset input
+        // DIRECT UPLOAD (Bypassing Cropper for Debugging)
+        setUploading(true);
+        setMessage({ type: 'info', text: 'Uploading image directly...' });
+
+        try {
+            const storageRef = ref(storage, `profile_pictures/${currentUser.uid}`);
+            console.log("Uploading direct file:", file.name);
+
+            await uploadBytes(storageRef, file);
+            console.log("Direct upload complete.");
+
+            const photoURL = await getDownloadURL(storageRef);
+            console.log("Got URL:", photoURL);
+
+            // Update Firestore
+            const userRef = doc(db, 'users', currentUser.uid);
+            await updateDoc(userRef, { photoURL });
+
+            setMessage({ type: 'success', text: 'Profile picture updated!' });
+            setTimeout(() => window.location.reload(), 1000);
+        } catch (error) {
+            console.error("Error uploading image:", error);
+            let errorMsg = 'Failed to upload image.';
+            if (error.code === 'storage/unauthorized') {
+                errorMsg = 'Permission denied. Check storage rules.';
+            }
+            setMessage({ type: 'error', text: errorMsg + ' ' + error.message });
+        } finally {
+            setUploading(false);
+            e.target.value = null; // Reset input
+        }
     };
 
     const handleSaveCrop = async () => {
