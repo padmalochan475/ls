@@ -73,14 +73,28 @@ const Profile = () => {
     };
 
     const handleSaveCrop = async () => {
+        console.log("handleSaveCrop started");
+        if (!imageSrc || !croppedAreaPixels) {
+            console.error("Missing image source or crop data");
+            return;
+        }
+
         setUploading(true);
-        setMessage({ type: '', text: '' });
+        setMessage({ type: '', text: 'Processing image...' });
 
         try {
+            console.log("Calling getCroppedImg...");
             const croppedImageBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+            console.log("Image cropped successfully, blob size:", croppedImageBlob.size);
+
             const storageRef = ref(storage, `profile_pictures/${currentUser.uid}`);
+            console.log("Uploading to:", storageRef.fullPath);
+
             await uploadBytes(storageRef, croppedImageBlob);
+            console.log("Upload complete, getting URL...");
+
             const photoURL = await getDownloadURL(storageRef);
+            console.log("Got URL:", photoURL);
 
             // Update Firestore
             const userRef = doc(db, 'users', currentUser.uid);
