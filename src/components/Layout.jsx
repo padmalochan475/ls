@@ -237,8 +237,14 @@ const Layout = ({ children }) => {
             }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-xl)', marginTop: isMobile ? 'var(--space-xl)' : 0 }}>
                     <div>
-                        <h2 style={{ fontSize: '1.5rem', margin: 0 }}>{navItems.find(i => i.path === location.pathname)?.label || (location.pathname === '/admin' ? 'Admin Panel' : 'Dashboard')}</h2>
-                        <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>Welcome back to your lab management workspace</p>
+                        <h2 style={{ fontSize: '1.5rem', margin: 0 }}>
+                            {navItems.find(i => i.path === location.pathname)?.label ||
+                                (location.pathname === '/admin' ? 'Admin Panel' :
+                                    location.pathname === '/profile' ? 'My Profile' : 'Dashboard')}
+                        </h2>
+                        {location.pathname === '/' && (
+                            <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>Welcome back to your lab management workspace</p>
+                        )}
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
                         {!isMobile && (
