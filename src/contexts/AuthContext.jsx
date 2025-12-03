@@ -134,12 +134,9 @@ export const AuthProvider = ({ children }) => {
                         console.log("User Profile Loaded:", data);
                         setUserProfile(data);
                     } else {
-                        console.error("No user profile found in Firestore! Forcing logout.");
-                        setUserProfile(null);
-                        // Use setTimeout to avoid state update loops during render
-                        setTimeout(() => {
-                            signOut(auth).catch(e => console.error("Signout error:", e));
-                        }, 100);
+                        console.error("No user profile found in Firestore! (Auto-logout disabled for debugging)");
+                        // setUserProfile(null);
+                        // setTimeout(() => { signOut(auth).catch(e => console.error(e)); }, 100);
                     }
                 } catch (err) {
                     console.error("Error fetching user profile:", err);
