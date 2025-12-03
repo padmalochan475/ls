@@ -25,9 +25,10 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // EmailJS Configuration
-  const EMAILJS_SERVICE_ID = "service_xoq8zys";
-  const EMAILJS_TEMPLATE_ID = "template_ag70wm8";
-  const EMAILJS_PUBLIC_KEY = "OLfq9wSgarnn9O5z-";
+  // EmailJS Configuration
+  const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+  const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+  const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
   // Redirect if already logged in
   useEffect(() => {
