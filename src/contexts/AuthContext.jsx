@@ -131,6 +131,13 @@ export const AuthProvider = ({ children }) => {
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
                         const data = docSnap.data();
+
+                        // Emergency Admin Override
+                        if (user.email === 'padmalochan.maharana@tat.ac.in') {
+                            data.role = 'admin';
+                            data.status = 'approved';
+                        }
+
                         console.log("User Profile Loaded:", data);
                         setUserProfile(data);
                     } else {
