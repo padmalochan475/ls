@@ -7,7 +7,7 @@ import {
     onAuthStateChanged,
     sendPasswordResetEmail
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -21,17 +21,34 @@ export const AuthProvider = ({ children }) => {
     const [academicYears, setAcademicYears] = useState(['2024-2025']); // List of all years
     const [loading, setLoading] = useState(true);
 
-    // Helper to convert Emp ID to Email
-    const getEmail = (empId) => `${empId}@lams.app`;
 
-    const login = async (empId, password) => {
-        const email = getEmail(empId);
+
+    const login = async (identifier, password) => {
+        let email = identifier;
+
+        // Check if input is NOT an email (assume it is EmpID)
+        if (!identifier.includes('@')) {
+            // Query Firestore to find email associated with this EmpID
+            const q = query(collection(db, 'users'), where('empId', '==', identifier));
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                throw new Error("Employee ID not found.");
+            }
+
+            const userData = querySnapshot.docs[0].data();
+            if (!userData.email) {
+                throw new Error("No email linked to this Employee ID.");
+            }
+            email = userData.email;
+        }
+
         return signInWithEmailAndPassword(auth, email, password);
     };
 
     const signup = async (empId, password, name, recoveryEmail, mobileNumber) => {
-        const email = getEmail(empId);
-        const { user } = await createUserWithEmailAndPassword(auth, email, password);
+        // Use Real Email for Firebase Auth
+        const { user } = await createUserWithEmailAndPassword(auth, recoveryEmail, password);
 
         // Check if this is the first user
         const usersSnapshot = await getDocs(collection(db, 'users'));

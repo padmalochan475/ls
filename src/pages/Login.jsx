@@ -326,7 +326,7 @@ const Login = () => {
             <>
               <input
                 type="text"
-                placeholder="Employee ID"
+                placeholder="Employee ID or Email"
                 className="glass-input"
                 value={formData.empId}
                 onChange={(e) => setFormData({ ...formData, empId: e.target.value })}
