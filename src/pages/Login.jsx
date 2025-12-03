@@ -163,8 +163,8 @@ const Login = () => {
       setResetEmpId('');
 
     } catch (err) {
-      console.error(err);
-      setError('Failed to send reset email. Please try again.');
+      console.error("Reset Password Error:", err);
+      setError(`Failed: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
