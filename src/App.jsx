@@ -17,6 +17,11 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // Wait for profile to load if user is logged in
+  if (!userProfile) {
+    return <div style={{ color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading Profile...</div>;
+  }
+
   // Check for pending status
   if (userProfile && userProfile.status === 'pending') {
     return (
