@@ -293,7 +293,7 @@ const Login = () => {
               />
               <input
                 type="email"
-                placeholder="Recovery Email"
+                placeholder="Email ID"
                 className="glass-input"
                 value={formData.recoveryEmail}
                 onChange={(e) => setFormData({ ...formData, recoveryEmail: e.target.value })}
@@ -306,6 +306,33 @@ const Login = () => {
                 className="glass-input"
                 value={formData.mobileNumber || ''}
                 onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                required
+                style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+              />
+              <input
+                type="text"
+                placeholder="Employee ID"
+                className="glass-input"
+                value={formData.empId}
+                onChange={(e) => setFormData({ ...formData, empId: e.target.value })}
+                required
+                style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                className="glass-input"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+                style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+              />
+              <input
+                type="password"
+                placeholder="Re-enter Password"
+                className="glass-input"
+                value={formData.confirmPassword || ''}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
                 style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
               />
@@ -323,57 +350,59 @@ const Login = () => {
               style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', textAlign: 'center', letterSpacing: '2px' }}
             />
           ) : (
-            <>
-              <input
-                type="text"
-                placeholder="Employee ID or Email"
-                className="glass-input"
-                value={formData.empId}
-                onChange={(e) => setFormData({ ...formData, empId: e.target.value })}
-                required
-                style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
-              />
-
-              <div style={{ position: 'relative' }}>
+            isLogin && (
+              <>
                 <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
+                  type="text"
+                  placeholder="Employee ID or Email"
                   className="glass-input"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  value={formData.empId}
+                  onChange={(e) => setFormData({ ...formData, empId: e.target.value })}
                   required
-                  style={{
-                    padding: 'var(--space-md)',
-                    paddingRight: '40px', // Space for icon
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--glass-border)',
-                    background: 'rgba(0,0,0,0.2)',
-                    color: 'white',
-                    outline: 'none',
-                    width: '100%',
-                    boxSizing: 'border-box'
-                  }}
+                  style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--color-text-muted)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-            </>
+
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Password"
+                    className="glass-input"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                    style={{
+                      padding: 'var(--space-md)',
+                      paddingRight: '40px', // Space for icon
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--glass-border)',
+                      background: 'rgba(0,0,0,0.2)',
+                      color: 'white',
+                      outline: 'none',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--color-text-muted)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </>
+            )
           )}
 
           <button
