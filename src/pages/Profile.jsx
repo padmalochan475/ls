@@ -80,7 +80,7 @@ const Profile = () => {
         }
 
         setUploading(true);
-        setMessage({ type: '', text: 'Processing image...' });
+        setMessage({ type: 'info', text: 'Processing image...' });
 
         try {
             console.log("Calling getCroppedImg...");
@@ -198,9 +198,9 @@ const Profile = () => {
                 <div style={{
                     padding: '1rem',
                     borderRadius: '8px',
-                    background: message.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                    color: message.type === 'success' ? '#6ee7b7' : '#fca5a5',
-                    border: `1px solid ${message.type === 'success' ? '#10b981' : '#ef4444'}`
+                    background: message.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : message.type === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                    color: message.type === 'success' ? '#6ee7b7' : message.type === 'error' ? '#fca5a5' : '#93c5fd',
+                    border: `1px solid ${message.type === 'success' ? '#10b981' : message.type === 'error' ? '#ef4444' : '#3b82f6'}`
                 }}>
                     {message.text}
                 </div>
