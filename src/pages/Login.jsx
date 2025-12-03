@@ -8,7 +8,7 @@ import emailjs from '@emailjs/browser';
 import '../styles/design-system.css';
 
 const Login = () => {
-  const { login, signup, currentUser } = useAuth();
+  const { login, signup, resetPassword, currentUser } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -37,11 +37,7 @@ const Login = () => {
   }, [currentUser, navigate]);
 
   // Forgot Password States
-  const [resetStep, setResetStep] = useState(1); // 1: EmpID, 2: OTP, 3: New Password
   const [resetEmpId, setResetEmpId] = useState('');
-  const [otp, setOtp] = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState(null);
-  const [newPassword, setNewPassword] = useState('');
 
   const sendEmailOtp = async (email, name, otpCode) => {
     const templateParams = {
@@ -141,62 +137,33 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      if (resetStep === 1) {
-        // Step 1: Verify Emp ID and send OTP
-        const q = query(collection(db, 'users'), where('empId', '==', resetEmpId));
-        const querySnapshot = await getDocs(q);
+      // Step 1: Verify Emp ID and get Email
+      const q = query(collection(db, 'users'), where('empId', '==', resetEmpId));
+      const querySnapshot = await getDocs(q);
 
-        if (querySnapshot.empty) {
-          setError('Employee ID not found.');
-          setIsLoading(false);
-          return;
-        }
-
-        const userData = querySnapshot.docs[0].data();
-        if (!userData.email) {
-          setError('No recovery email found for this user. Contact Admin.');
-          setIsLoading(false);
-          return;
-        }
-
-        // Generate OTP
-        const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        setGeneratedOtp(newOtp);
-
-        // Send Real Email
-        const result = await sendEmailOtp(userData.email, userData.name || 'User', newOtp);
-
-        if (result.success) {
-          setStatusMessage(`OTP sent to ${userData.email}`);
-          setResetStep(2);
-        } else {
-          const errorMsg = result.error?.text || result.error?.message || "Unknown error";
-          setError(`Failed to send OTP: ${errorMsg}`);
-        }
-
-      } else if (resetStep === 2) {
-        // Step 2: Verify OTP
-        if (otp === generatedOtp) {
-          setResetStep(3);
-          setStatusMessage('OTP Verified. Enter new password.');
-        } else {
-          setError('Invalid OTP.');
-        }
-      } else if (resetStep === 3) {
-        // Step 3: Reset Password (Simulated)
-        // Note: We cannot actually reset the password here without Admin SDK or re-auth.
-        // For this demo, we will just show success.
-        alert('Password Reset Successfully! (Simulated - In a real app, this would update Auth)');
-        setIsForgotPassword(false);
-        setResetStep(1);
-        setResetEmpId('');
-        setOtp('');
-        setNewPassword('');
-        setStatusMessage('Password reset successful. Please login with your new password.');
+      if (querySnapshot.empty) {
+        setError('Employee ID not found.');
+        setIsLoading(false);
+        return;
       }
+
+      const userData = querySnapshot.docs[0].data();
+      if (!userData.email) {
+        setError('No recovery email found for this user. Contact Admin.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Step 2: Send Firebase Password Reset Email
+      await resetPassword(userData.email);
+      setStatusMessage(`Password reset link sent to ${userData.email}. Please check your inbox.`);
+
+      // Clear form after success
+      setResetEmpId('');
+
     } catch (err) {
       console.error(err);
-      setError('An error occurred. Please try again.');
+      setError('Failed to send reset email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -215,27 +182,13 @@ const Login = () => {
           {error && <div style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
           <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {resetStep === 1 && (
-              <input
-                type="text" placeholder="Enter Employee ID" className="glass-input"
-                value={resetEmpId} onChange={(e) => setResetEmpId(e.target.value)} required
-              />
-            )}
-            {resetStep === 2 && (
-              <input
-                type="text" placeholder="Enter OTP" className="glass-input"
-                value={otp} onChange={(e) => setOtp(e.target.value)} required
-              />
-            )}
-            {resetStep === 3 && (
-              <input
-                type="password" placeholder="New Password" className="glass-input"
-                value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required
-              />
-            )}
+            <input
+              type="text" placeholder="Enter Employee ID" className="glass-input"
+              value={resetEmpId} onChange={(e) => setResetEmpId(e.target.value)} required
+            />
 
             <button type="submit" className="btn" style={{ background: 'var(--color-accent)', color: 'white' }}>
-              {resetStep === 1 ? 'Send OTP' : resetStep === 2 ? 'Verify OTP' : 'Reset Password'}
+              Send Reset Link
             </button>
 
             <button type="button" onClick={() => setIsForgotPassword(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', marginTop: '1rem' }}>

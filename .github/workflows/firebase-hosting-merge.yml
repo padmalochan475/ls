@@ -10,6 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: npm ci
       - run: npm run build
+      - run: ls -R dist # Debug: List build output
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'

@@ -4,7 +4,8 @@ import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     signOut,
-    onAuthStateChanged
+    onAuthStateChanged,
+    sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 
@@ -48,6 +49,10 @@ export const AuthProvider = ({ children }) => {
         });
 
         return user;
+    };
+
+    const resetPassword = (email) => {
+        return sendPasswordResetEmail(auth, email);
     };
 
     const logout = () => {
@@ -137,6 +142,7 @@ export const AuthProvider = ({ children }) => {
         setSelectedAcademicYear: handleSetSelectedYear, // Allow changing view with persistence
         login,
         signup,
+        resetPassword,
         logout,
         loading
     };
