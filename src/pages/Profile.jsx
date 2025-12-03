@@ -92,7 +92,15 @@ const Profile = () => {
             setTimeout(() => window.location.reload(), 1000); // Reload to refresh context
         } catch (error) {
             console.error("Error uploading image:", error);
-            setMessage({ type: 'error', text: 'Failed to upload image.' });
+            let errorMsg = 'Failed to upload image.';
+            if (error.code === 'storage/unauthorized') {
+                errorMsg = 'Permission denied. Check storage rules.';
+            } else if (error.code === 'storage/canceled') {
+                errorMsg = 'Upload canceled.';
+            } else if (error.code === 'storage/unknown') {
+                errorMsg = 'Unknown error occurred during upload.';
+            }
+            setMessage({ type: 'error', text: errorMsg + ' ' + error.message });
         } finally {
             setUploading(false);
         }
