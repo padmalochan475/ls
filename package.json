@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://padmalochan475.github.io/ls",
+  "type": "module",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
