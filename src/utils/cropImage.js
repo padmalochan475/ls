@@ -80,14 +80,27 @@ export default async function getCroppedImg(
     // paste generated rotate image at the top left corner
     ctx.putImageData(data, 0, 0)
 
+    // Resize for upload optimization (Max 500x500)
+    const maxSize = 500;
+    let finalCanvas = canvas;
+
+    if (pixelCrop.width > maxSize || pixelCrop.height > maxSize) {
+        finalCanvas = document.createElement('canvas');
+        const ratio = Math.min(maxSize / pixelCrop.width, maxSize / pixelCrop.height);
+        finalCanvas.width = pixelCrop.width * ratio;
+        finalCanvas.height = pixelCrop.height * ratio;
+        const finalCtx = finalCanvas.getContext('2d');
+        finalCtx.drawImage(canvas, 0, 0, finalCanvas.width, finalCanvas.height);
+    }
+
     // As Blob
     return new Promise((resolve, reject) => {
-        canvas.toBlob((file) => {
+        finalCanvas.toBlob((file) => {
             if (file) {
                 resolve(file)
             } else {
                 reject(new Error('Canvas is empty'));
             }
-        }, 'image/jpeg', 0.9) // Added quality parameter
+        }, 'image/jpeg', 0.8) // Compressed quality
     })
 }
