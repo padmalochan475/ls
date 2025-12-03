@@ -119,8 +119,10 @@ export const AuthProvider = ({ children }) => {
                     } else {
                         console.error("No user profile found in Firestore! Forcing logout.");
                         setUserProfile(null);
-                        await signOut(auth);
-                        // alert("Your account has been deactivated."); // Removed to prevent blocking
+                        // Use setTimeout to avoid state update loops during render
+                        setTimeout(() => {
+                            signOut(auth).catch(e => console.error("Signout error:", e));
+                        }, 100);
                     }
                 } catch (err) {
                     console.error("Error fetching user profile:", err);
