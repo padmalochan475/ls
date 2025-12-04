@@ -1,58 +1,437 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
-import { collection, getDocs, addDoc, query, where, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/design-system.css';
+import { ChevronDown, Check, LayoutGrid, List, Zap, Printer, Filter, Users, BookOpen, FlaskConical, Layers, X } from 'lucide-react';
+
+const MultiSelectDropdown = ({ options, selected, onChange, label, icon: Icon }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
+    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+
+    // Close on click outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                // Check if click is inside the portal
+                const portal = document.getElementById(`multiselect-portal-${label}`);
+                if (portal && portal.contains(event.target)) return;
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [label]);
+
+    // Update coords on open and scroll
+    useEffect(() => {
+        const updateCoords = () => {
+            if (dropdownRef.current) {
+                const rect = dropdownRef.current.getBoundingClientRect();
+                setCoords({
+                    top: rect.bottom + 6,
+                    left: rect.left,
+                    width: rect.width
+                });
+            }
+        };
+
+        if (isOpen) {
+            updateCoords();
+            window.addEventListener('scroll', updateCoords, true);
+            window.addEventListener('resize', updateCoords);
+        }
+
+        return () => {
+            window.removeEventListener('scroll', updateCoords, true);
+            window.removeEventListener('resize', updateCoords);
+        };
+    }, [isOpen]);
+
+    const toggleOption = (option) => {
+        if (selected.includes(option)) {
+            onChange(selected.filter(item => item !== option));
+        } else {
+            onChange([...selected, option]);
+        }
+    };
+
+    return (
+        <div ref={dropdownRef} style={{ position: 'relative', minWidth: '220px' }}>
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className="glass-input"
+                style={{
+                    padding: '10px 16px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isOpen ? '0 0 0 2px rgba(59, 130, 246, 0.5)' : 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 500
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {Icon && <Icon size={16} style={{ color: '#94a3b8' }} />}
+                    <span style={{ color: selected.length > 0 ? 'white' : '#94a3b8' }}>
+                        {selected.length > 0 ? `${selected.length} Selected` : label}
+                    </span>
+                </div>
+                <ChevronDown size={16} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+            </div>
+            {isOpen && createPortal(
+                <div
+                    id={`multiselect-portal-${label}`}
+                    className="animate-fade-in"
+                    style={{
+                        position: 'fixed',
+                        top: coords.top,
+                        left: coords.left,
+                        width: coords.width,
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        background: '#1e293b',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '12px',
+                        zIndex: 9999,
+                        padding: '6px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)'
+                    }}
+                >
+                    <div
+                        onClick={() => onChange(selected.length === options.length ? [] : options)}
+                        style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid rgba(255,255,255,0.1)',
+                            marginBottom: '4px',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            color: '#60a5fa',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}
+                    >
+                        {selected.length === options.length ? 'Unselect All' : 'Select All'}
+                    </div>
+                    {options.map(opt => (
+                        <div
+                            key={opt}
+                            onClick={() => toggleOption(opt)}
+                            style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                background: selected.includes(opt) ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                borderRadius: '8px',
+                                marginBottom: '2px',
+                                fontSize: '0.9rem',
+                                transition: 'background 0.15s',
+                                color: selected.includes(opt) ? 'white' : '#cbd5e1'
+                            }}
+                            onMouseEnter={(e) => !selected.includes(opt) && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+                            onMouseLeave={(e) => !selected.includes(opt) && (e.currentTarget.style.background = 'transparent')}
+                        >
+                            <div style={{
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '4px',
+                                border: selected.includes(opt) ? 'none' : '2px solid #475569',
+                                background: selected.includes(opt) ? '#3b82f6' : 'transparent',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s'
+                            }}>
+                                {selected.includes(opt) && <Check size={12} color="white" strokeWidth={3} />}
+                            </div>
+                            {opt}
+                        </div>
+                    ))}
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+};
+
+const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = false, style }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
+    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+
+    // Close on click outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                // Check if click is inside the portal
+                const portal = document.getElementById(`select-portal-${placeholder}`);
+                if (portal && portal.contains(event.target)) return;
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [placeholder]);
+
+    // Update coords on open and scroll
+    useEffect(() => {
+        const updateCoords = () => {
+            if (dropdownRef.current) {
+                const rect = dropdownRef.current.getBoundingClientRect();
+                setCoords({
+                    top: rect.bottom + 6,
+                    left: rect.left,
+                    width: rect.width
+                });
+            }
+        };
+
+        if (isOpen) {
+            updateCoords();
+            window.addEventListener('scroll', updateCoords, true);
+            window.addEventListener('resize', updateCoords);
+        }
+
+        return () => {
+            window.removeEventListener('scroll', updateCoords, true);
+            window.removeEventListener('resize', updateCoords);
+        };
+    }, [isOpen]);
+
+    // Normalize options
+    const normalizedOptions = options.map(opt => {
+        if (typeof opt === 'object' && opt !== null) {
+            return { value: opt.value, label: opt.label || opt.value };
+        }
+        return { value: opt, label: opt };
+    });
+
+    const selectedOption = normalizedOptions.find(opt => opt.value === value);
+
+    return (
+        <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+            <div
+                onClick={() => !disabled && setIsOpen(!isOpen)}
+                className="glass-input"
+                style={{
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    background: disabled ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.05)',
+                    color: value ? 'white' : '#94a3b8',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    transition: 'all 0.2s ease',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    opacity: disabled ? 0.6 : 1
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                    {Icon && <Icon size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />}
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {selectedOption ? selectedOption.label : placeholder}
+                    </span>
+                </div>
+                <ChevronDown size={16} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0 }} />
+            </div>
+
+            {isOpen && !disabled && createPortal(
+                <div
+                    id={`select-portal-${placeholder}`}
+                    className="animate-fade-in"
+                    style={{
+                        position: 'fixed',
+                        top: coords.top,
+                        left: coords.left,
+                        width: coords.width,
+                        maxHeight: '250px',
+                        overflowY: 'auto',
+                        background: '#1e293b',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '12px',
+                        zIndex: 9999,
+                        padding: '6px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                    }}
+                >
+                    {normalizedOptions.length > 0 ? normalizedOptions.map(opt => (
+                        <div
+                            key={opt.value}
+                            onClick={() => {
+                                onChange(opt.value);
+                                setIsOpen(false);
+                            }}
+                            style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                background: value === opt.value ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                borderRadius: '8px',
+                                marginBottom: '2px',
+                                fontSize: '0.9rem',
+                                color: value === opt.value ? 'white' : '#cbd5e1',
+                                transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={(e) => value !== opt.value && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+                            onMouseLeave={(e) => value !== opt.value && (e.currentTarget.style.background = 'transparent')}
+                        >
+                            {value === opt.value && <Check size={14} color="#60a5fa" />}
+                            {opt.label}
+                        </div>
+                    )) : (
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                            No options
+                        </div>
+                    )}
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+};
 
 const Scheduler = () => {
     const auth = useAuth();
-    console.log("Scheduler Render. Auth Context:", auth);
     const { userProfile, activeAcademicYear } = auth || {};
 
     const [viewMode, setViewMode] = useState('horizontal');
-    const [selectedDept, setSelectedDept] = useState('CSE');
-    const [selectedSem, setSelectedSem] = useState('3rd');
+    const [viewType, setViewType] = useState('class'); // 'class' or 'faculty'
+    const [selectedDepts, setSelectedDepts] = useState([]);
+    const [selectedSems, setSelectedSems] = useState([]);
+    const [selectedFaculties, setSelectedFaculties] = useState(userProfile?.name ? [userProfile.name] : []);
+    const [selectedSubjects, setSelectedSubjects] = useState([]);
+    const [selectedLabs, setSelectedLabs] = useState([]);
+    const [labRooms, setLabRooms] = useState([]);
 
     // Data States
     const [schedule, setSchedule] = useState([]);
     const [rooms, setRooms] = useState([]);
     const [faculty, setFaculty] = useState([]);
     const [subjects, setSubjects] = useState([]);
+    const [subjectDetails, setSubjectDetails] = useState([]);
+    const [departments, setDepartments] = useState([]);
+    const [semesters, setSemesters] = useState([]);
+    const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Modal States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({
-        day: 'Monday',
-        time: '09:00 - 10:00',
+        day: '',
+        time: '',
         subject: '',
         room: '',
         faculty: '',
-        group: 'All'
+        faculty2: '',
+        group: '',
+        section: '',
+        dept: '',
+        sem: ''
     });
     const [error, setError] = useState('');
+    const [editingId, setEditingId] = useState(null);
 
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const timeSlots = [
-        '09:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00',
-        '12:00 - 01:00', '01:00 - 02:00', '02:00 - 03:00',
-        '03:00 - 04:00', '04:00 - 05:00'
-    ];
+    // Quick Assign State
+    const [quickAssignMode, setQuickAssignMode] = useState(false);
+    const [quickAssignData, setQuickAssignData] = useState({
+        subject: '',
+        room: '',
+        faculty: '',
+        faculty2: '',
+        group: '',
+        section: '',
+        dept: '',
+        sem: '',
+        day: '',
+        time: ''
+    });
+
+    const [days, setDays] = useState([]);
+    const [timeSlots, setTimeSlots] = useState([]);
 
     // Fetch Initial Data
     useEffect(() => {
         const fetchMasterData = async () => {
             try {
-                const [roomsSnap, facultySnap, subjectsSnap] = await Promise.all([
+                const [roomsSnap, facultySnap, subjectsSnap, deptSnap, semestersSnap, groupsSnap] = await Promise.all([
                     getDocs(collection(db, 'rooms')),
                     getDocs(collection(db, 'faculty')),
-                    getDocs(collection(db, 'subjects'))
+                    getDocs(collection(db, 'subjects')),
+                    getDocs(collection(db, 'departments')),
+                    getDocs(collection(db, 'semesters')),
+                    getDocs(collection(db, 'groups'))
                 ]);
 
-                setRooms(roomsSnap.docs.map(d => d.data().name));
-                setFaculty(facultySnap.docs.map(d => d.data().name));
-                setSubjects(subjectsSnap.docs.map(d => d.data().name));
+                const roomsData = roomsSnap.docs.map(d => d.data());
+                setRooms(roomsData.map(d => d.name).sort());
+                setLabRooms(roomsData.filter(d => d.type === 'lab').map(d => d.name).sort());
+                setFaculty(facultySnap.docs.map(d => ({ name: d.data().name, shortCode: d.data().shortCode, empId: d.data().empId })).sort((a, b) => a.name.localeCompare(b.name)));
+                const subData = subjectsSnap.docs.map(d => ({ name: d.data().name, shortCode: d.data().shortCode })).sort((a, b) => a.name.localeCompare(b.name));
+                setSubjects(subData.map(d => d.name));
+                setSubjectDetails(subData);
+
+                const depts = deptSnap.docs.map(d => d.data().code || d.data().name).sort();
+                setDepartments(depts);
+
+                const sems = semestersSnap.docs.map(d => d.data()).sort((a, b) => a.number - b.number);
+                setSemesters(sems);
+
+                const grps = groupsSnap.docs.map(d => d.data()).sort((a, b) => a.name.localeCompare(b.name));
+                setGroups(grps);
+
+                // Default to ALL departments and semesters for the view
+                if (depts.length > 0) {
+                    if (selectedDepts.length === 0) setSelectedDepts(depts);
+                    setQuickAssignData(prev => ({ ...prev, dept: depts[0] }));
+                }
+
+                if (sems.length > 0) {
+                    if (selectedSems.length === 0) setSelectedSems(sems.map(s => s.name));
+                    setQuickAssignData(prev => ({ ...prev, sem: sems[0].name }));
+                }
+
+                // Fetch Days
+                const daysSnap = await getDocs(collection(db, 'days'));
+                const daysData = daysSnap.docs.map(d => d.data());
+                const visibleDays = daysData.filter(d => d.isVisible !== false).sort((a, b) => a.order - b.order).map(d => d.name);
+
+                setDays(visibleDays);
+                if (visibleDays.length > 0) {
+                    setFormData(prev => ({ ...prev, day: visibleDays[0] }));
+                }
+
+                // Fetch Time Slots
+                const timeSlotsSnap = await getDocs(collection(db, 'timeslots'));
+                const slots = timeSlotsSnap.docs.map(d => d.data());
+                slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+                const formatTime = (t) => new Date(`2000-01-01T${t}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                const formattedSlots = slots.map(s => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`);
+                setTimeSlots(formattedSlots);
+
+                if (formattedSlots.length > 0) {
+                    setFormData(prev => ({ ...prev, time: formattedSlots[0] }));
+                }
+
             } catch (err) {
                 console.error("Error loading master data:", err);
             }
@@ -61,110 +440,194 @@ const Scheduler = () => {
         fetchMasterData();
     }, []);
 
-    // Fetch Schedule
-    const fetchSchedule = async () => {
-        console.log("Fetching schedule for year:", activeAcademicYear);
-        setLoading(true);
-        try {
-            if (!activeAcademicYear) {
-                console.warn("No active academic year, skipping fetch.");
-                setSchedule([]);
-                return;
-            }
-            // Filter by Academic Year
-            const q = query(
-                collection(db, 'schedule'),
-                where('academicYear', '==', activeAcademicYear)
-            );
-            const querySnapshot = await getDocs(q);
-            const items = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                // Client-side filter for Dept/Sem (Firestore composite index workaround)
-                if (data.dept === selectedDept && data.sem === selectedSem) {
-                    items.push({ id: doc.id, ...data });
-                }
-            });
-            console.log("Fetched schedule items:", items.length);
-            setSchedule(items);
-        } catch (err) {
-            console.error("Error loading schedule:", err);
-        } finally {
-            setLoading(false);
+    // Fetch Schedule (Real-time)
+    useEffect(() => {
+        if (!activeAcademicYear) {
+            setSchedule([]);
+            return;
         }
+
+        console.log("Setting up real-time schedule listener for:", activeAcademicYear);
+        setLoading(true);
+
+        const q = query(
+            collection(db, 'schedule'),
+            where('academicYear', '==', activeAcademicYear)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const items = [];
+            snapshot.forEach((doc) => {
+                items.push({ id: doc.id, ...doc.data() });
+            });
+            console.log("Real-time update: fetched", items.length, "items");
+            setSchedule(items);
+            setLoading(false);
+        }, (err) => {
+            console.error("Error loading schedule:", err);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [activeAcademicYear]);
+
+    // Filter Logic
+    const getFilteredSchedule = () => {
+        let filtered = schedule;
+
+        if (viewType === 'class') {
+            if (selectedDepts.length > 0) {
+                filtered = filtered.filter(item => selectedDepts.includes(item.dept));
+            }
+            if (selectedSems.length > 0) {
+                filtered = filtered.filter(item => selectedSems.includes(item.sem));
+            }
+        } else if (viewType === 'faculty') {
+            if (selectedFaculties.length > 0) {
+                filtered = filtered.filter(item => selectedFaculties.includes(item.faculty));
+            }
+        } else if (viewType === 'subject') {
+            if (selectedSubjects.length > 0) {
+                filtered = filtered.filter(item => selectedSubjects.includes(item.subject));
+            }
+        } else if (viewType === 'lab') {
+            if (selectedLabs.length > 0) {
+                filtered = filtered.filter(item => selectedLabs.includes(item.room));
+            }
+        }
+        return filtered;
     };
 
-    useEffect(() => {
-        console.log("Scheduler: activeAcademicYear changed to:", activeAcademicYear);
-        if (activeAcademicYear) {
-            fetchSchedule();
-        }
-    }, [selectedDept, selectedSem, activeAcademicYear]);
+    const filteredSchedule = getFilteredSchedule();
 
-    const checkConflict = async (newBooking) => {
+    // Enhanced Conflict Detection Logic
+    const checkConflict = (newBooking, ignoreId = null) => {
         if (!schedule || !Array.isArray(schedule)) return null;
 
-        // 1. Check Room Conflict
-        const roomConflict = schedule.find(item =>
-            item.day === newBooking.day &&
-            item.time === newBooking.time &&
-            item.room === newBooking.room
+        // Filter out the current booking if we are editing
+        const otherBookings = ignoreId
+            ? schedule.filter(item => item.id !== ignoreId)
+            : schedule;
+
+        // Filter for same day and time first to optimize
+        const sameSlotBookings = otherBookings.filter(item =>
+            item.day === newBooking.day && item.time === newBooking.time
         );
 
-        if (roomConflict) {
-            return `Conflict! Room "${newBooking.room}" is already booked for "${roomConflict.subject}" at this time.`;
-        }
+        if (sameSlotBookings.length === 0) return null;
 
-        // 2. Check Faculty Conflict
-        const facultyConflict = schedule.find(item =>
-            item.day === newBooking.day &&
-            item.time === newBooking.time &&
-            item.faculty === newBooking.faculty
-        );
-
-        if (facultyConflict) {
-            return `Conflict! ${newBooking.faculty} is already teaching "${facultyConflict.subject}" in ${facultyConflict.room} at this time.`;
-        }
-
-        return null; // No conflict
-    };
-
-    const handleSave = async (e) => {
-        e.preventDefault();
-        console.log("handleSave called", formData);
-        setError('');
-
-        try {
-            // Run Conflict Detection
-            const conflictError = await checkConflict(formData);
-            if (conflictError) {
-                console.warn("Conflict detected:", conflictError);
-                setError(conflictError);
-                return;
+        for (const item of sameSlotBookings) {
+            // 1. Room Conflict
+            if (item.room === newBooking.room) {
+                return `Conflict! Room "${newBooking.room}" is already booked for "${item.subject}" (${item.dept}-${item.section}).`;
             }
 
-            console.log("Saving schedule item...");
-            await addDoc(collection(db, 'schedule'), {
-                ...formData,
-                dept: selectedDept,
-                sem: selectedSem,
-                academicYear: activeAcademicYear // Save with current year
-            });
-            console.log("Schedule item saved successfully.");
-            setIsModalOpen(false);
-            setFormData({ ...formData, subject: '', room: '', faculty: '' }); // Reset fields
-            fetchSchedule();
+            // 2. Faculty Conflict
+            // Check if New Faculty 1 is busy
+            if (newBooking.faculty && (item.faculty === newBooking.faculty || item.faculty2 === newBooking.faculty)) {
+                return `Conflict! Faculty "${newBooking.faculty}" is already teaching "${item.subject}" in ${item.room}.`;
+            }
+            // Check if New Faculty 2 is busy
+            if (newBooking.faculty2 && (item.faculty === newBooking.faculty2 || item.faculty2 === newBooking.faculty2)) {
+                return `Conflict! Faculty "${newBooking.faculty2}" is already teaching "${item.subject}" in ${item.room}.`;
+            }
+
+            // 3. Student Group Conflict
+            // Must be same Department and Semester to conflict (usually)
+            if (item.dept === newBooking.dept && item.sem === newBooking.sem) {
+                // Check Section/Group overlap
+                if (item.section === newBooking.section) {
+                    // If either is for the whole section (no group or "All"), they conflict
+                    const itemIsWholeSection = !item.group || item.group === 'All';
+                    const newIsWholeSection = !newBooking.group || newBooking.group === 'All';
+
+                    if (itemIsWholeSection || newIsWholeSection) {
+                        return `Conflict! Student Group "${newBooking.dept} ${newBooking.sem} ${newBooking.section}" is already booked for "${item.subject}".`;
+                    }
+
+                    // If both have specific groups, check if they match
+                    if (item.group === newBooking.group) {
+                        return `Conflict! Student Group "${newBooking.dept} ${newBooking.sem} ${newBooking.section}-${newBooking.group}" is already booked for "${item.subject}".`;
+                    }
+                }
+            }
+        }
+
+        return null;
+    };
+
+    const handleSave = async (e, overrideData = null) => {
+        if (e) e.preventDefault();
+        setError('');
+
+        const dataToSave = overrideData || formData;
+
+        // Basic Validation
+        if (!dataToSave.subject || !dataToSave.room || !dataToSave.faculty || !dataToSave.day || !dataToSave.time) {
+            const msg = "Please fill in all required fields (Subject, Room, Faculty, Day, Time).";
+            setError(msg);
+            if (overrideData) alert(msg);
+            return;
+        }
+
+        try {
+            // Check for conflicts
+            const conflictError = checkConflict(dataToSave, editingId);
+            if (conflictError) {
+                setError(conflictError);
+                if (overrideData) alert(conflictError);
+                return; // Block saving
+            }
+
+            // Lookup Faculty EmpIDs for robust linking
+            const faculty1Obj = faculty.find(f => f.name === dataToSave.faculty);
+            const faculty2Obj = dataToSave.faculty2 ? faculty.find(f => f.name === dataToSave.faculty2) : null;
+
+            const finalData = {
+                ...dataToSave,
+                facultyEmpId: faculty1Obj ? faculty1Obj.empId : null,
+                faculty2EmpId: faculty2Obj ? faculty2Obj.empId : null,
+                academicYear: activeAcademicYear
+            };
+
+            if (editingId) {
+                await updateDoc(doc(db, 'schedule', editingId), finalData);
+            } else {
+                await addDoc(collection(db, 'schedule'), finalData);
+            }
+
+            if (!overrideData) {
+                setIsModalOpen(false);
+                setFormData({ ...formData, subject: '', room: '', faculty: '', faculty2: '', group: '' });
+                setEditingId(null);
+            }
         } catch (err) {
             console.error("Error saving schedule:", err);
-            setError("Failed to save schedule. Check console.");
+            setError("Failed to save schedule.");
         }
+    };
+
+    const handleEdit = (assignment) => {
+        setFormData({
+            day: assignment.day,
+            time: assignment.time,
+            subject: assignment.subject,
+            room: assignment.room,
+            faculty: assignment.faculty,
+            faculty2: assignment.faculty2 || '',
+            group: assignment.group || '',
+            section: assignment.section || '',
+            dept: assignment.dept,
+            sem: assignment.sem
+        });
+        setEditingId(assignment.id);
+        setIsModalOpen(true);
     };
 
     const handleDelete = async (id) => {
         if (window.confirm("Are you sure you want to remove this class?")) {
             try {
                 await deleteDoc(doc(db, 'schedule', id));
-                fetchSchedule();
             } catch (err) {
                 console.error("Error deleting:", err);
             }
@@ -172,170 +635,1065 @@ const Scheduler = () => {
     };
 
     const openModal = (day, time) => {
-        setFormData({
-            ...formData,
-            day,
-            time,
-            subject: '',
-            room: '',
-            faculty: ''
-        });
-        setError('');
-        setIsModalOpen(true);
+        if (quickAssignMode) {
+            // Quick Assign Logic
+            if (!quickAssignData.subject || !quickAssignData.room || !quickAssignData.faculty) {
+                alert("Please configure Quick Assign settings first (Subject, Room, Faculty).");
+                return;
+            }
+            handleSave(null, {
+                ...quickAssignData,
+                day,
+                time
+            });
+        } else {
+            // Standard Modal Logic
+            setFormData({
+                ...formData,
+                day,
+                time,
+                subject: '',
+                room: '',
+                faculty: '',
+                dept: selectedDepts.length > 0 ? selectedDepts[0] : (departments[0] || ''),
+                sem: selectedSems.length > 0 ? selectedSems[0] : (semesters[0]?.name || '')
+            });
+            setError('');
+            setIsModalOpen(true);
+        }
     };
 
-    const getAssignment = (day, time) => {
-        if (!schedule || !Array.isArray(schedule)) return null;
-        return schedule.find(item => item.day === day && item.time === time);
+    const getAssignments = (day, time) => {
+        return filteredSchedule.filter(item => item.day === day && item.time === time);
     };
 
     const isAdmin = userProfile && userProfile.role === 'admin';
 
+    const getFacultyShortCode = (name) => {
+        const f = faculty.find(f => f.name === name);
+        return f && f.shortCode ? f.shortCode : name;
+    };
+
+    const getSubjectShortCode = (name) => {
+        const s = subjectDetails.find(s => s.name === name);
+        return s && s.shortCode ? s.shortCode : name;
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', height: '100%' }}>
-            {/* Toolbar */}
-            <div className="glass-panel" style={{ padding: 'var(--space-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
-                <div style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Weekly Schedule <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>({activeAcademicYear})</span></h2>
-                    <div style={{ height: '24px', width: '1px', background: 'var(--glass-border)' }}></div>
-                    <select className="glass-input" value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} style={{ padding: 'var(--space-xs) var(--space-sm)', borderRadius: 'var(--radius-sm)', background: 'rgba(0,0,0,0.2)', color: 'white', border: '1px solid var(--glass-border)' }}>
-                        <option value="CSE">CSE</option>
-                        <option value="ECE">ECE</option>
-                        <option value="ME">ME</option>
-                    </select>
-                    <select className="glass-input" value={selectedSem} onChange={(e) => setSelectedSem(e.target.value)} style={{ padding: 'var(--space-xs) var(--space-sm)', borderRadius: 'var(--radius-sm)', background: 'rgba(0,0,0,0.2)', color: 'white', border: '1px solid var(--glass-border)' }}>
-                        <option value="3rd">3rd Sem</option>
-                        <option value="5th">5th Sem</option>
-                        <option value="7th">7th Sem</option>
-                    </select>
-                </div>
+            <style>{`
+                @media print {
+                    @page { 
+                        size: A4 landscape; 
+                        margin: 5mm; 
+                    }
+                    
+                    body { 
+                        background: white !important; 
+                        color: black !important; 
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                    }
+                    
+                    /* Hide all screen-only elements */
+                    .glass-panel, .sidebar, .navbar, .btn, .glass-input, button, select, h2, div[style*="display: grid"] { 
+                        display: none !important; 
+                    }
 
-                <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-                    <button className="btn" onClick={() => setViewMode('horizontal')} style={{ background: viewMode === 'horizontal' ? 'var(--color-accent)' : 'transparent', border: '1px solid var(--glass-border)', padding: 'var(--space-xs) var(--space-sm)', fontSize: '0.875rem' }}>Horizontal</button>
-                    <button className="btn" onClick={() => setViewMode('vertical')} style={{ background: viewMode === 'vertical' ? 'var(--color-accent)' : 'transparent', border: '1px solid var(--glass-border)', padding: 'var(--space-xs) var(--space-sm)', fontSize: '0.875rem' }}>Vertical</button>
-                </div>
-            </div>
+                    /* Show Print Area */
+                    #print-area {
+                        display: flex !important;
+                        flex-direction: column;
+                        width: 100% !important;
+                        height: 100% !important; /* Fill the printable area defined by @page margins */
+                        background: white;
+                        box-sizing: border-box;
+                    }
 
-            {/* Grid */}
-            <div className="glass-panel" style={{ padding: 0, overflow: 'auto', flex: 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: `100px repeat(${timeSlots.length}, minmax(160px, 1fr))`, minWidth: '100%' }}>
-                    {/* Header Row */}
-                    <div style={{ padding: 'var(--space-md)', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', position: 'sticky', left: 0, zIndex: 10, backdropFilter: 'blur(10px)' }}>
-                        Day / Time
+                    /* Compact Header */
+                    .print-header-section {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-end;
+                        padding-bottom: 5px;
+                        border-bottom: 3px solid black;
+                        margin-bottom: 5px;
+                        flex-shrink: 0;
+                    }
+
+                    .header-title {
+                        font-size: 16pt;
+                        font-weight: 900;
+                        text-transform: uppercase;
+                        margin: 0;
+                        line-height: 1.1;
+                    }
+
+                    .header-sub {
+                        font-size: 12pt;
+                        font-weight: 600;
+                        margin: 0;
+                        text-align: right;
+                    }
+
+                    /* Maximized Table */
+                    .print-table {
+                        width: 100%;
+                        flex-grow: 1; /* Fill remaining vertical space */
+                        border-collapse: collapse;
+                        table-layout: fixed; /* Equal column widths */
+                        border: 3px solid black; /* Outer border */
+                    }
+                    
+                    .print-table th {
+                        border: 2px solid black;
+                        padding: 4px;
+                        text-align: center;
+                        vertical-align: middle;
+                        overflow: hidden;
+                    }
+
+                    .print-table td {
+                        border: 2px solid black;
+                        padding: 4px;
+                        text-align: center;
+                        vertical-align: top;
+                        overflow: hidden;
+                    }
+
+                    /* Specific width for the Day column to fit "WEDNESDAY" */
+                    .print-table th:first-child,
+                    .print-table td:first-child {
+                        width: 140px !important;
+                        vertical-align: middle; /* Keep day names centered vertically */
+                    }
+
+                    .print-table th {
+                        background-color: #e0e0e0 !important;
+                        font-weight: 900;
+                        text-transform: uppercase;
+                        font-size: 14pt;
+                        height: 40px; /* Fixed header height */
+                        color: black;
+                    }
+
+                    .print-table td {
+                        height: auto; /* Let rows distribute evenly */
+                    }
+
+                    /* Cell Content Styling */
+                    .cell-content {
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: flex-start;
+                        align-items: center;
+                        width: 100%;
+                        height: 100%;
+                        padding-top: 4px;
+                    }
+
+                    .subject-text {
+                        font-size: 14pt; /* Slightly reduced to prevent overflow */
+                        font-weight: 800;
+                        line-height: 1.2;
+                        text-align: center;
+                    }
+
+                    .details-text {
+                        font-size: 10pt;
+                        font-weight: 600;
+                        margin-top: 2px;
+                        text-align: center;
+                    }
+
+                    .faculty-text {
+                        font-size: 9pt;
+                        font-style: italic;
+                        margin-top: 2px;
+                        text-align: center;
+                    }
+                }
+            `}</style>
+
+            {/* Toolbar (Screen Only) */}
+            <div className="glass-panel" style={{
+                padding: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '16px',
+                position: 'relative',
+                zIndex: 100,
+                background: 'rgba(30, 41, 59, 0.7)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            }}>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* View Type Switcher */}
+                    <div style={{
+                        display: 'flex',
+                        background: 'rgba(15, 23, 42, 0.6)',
+                        padding: '4px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.05)'
+                    }}>
+                        {[
+                            { id: 'class', label: 'Class', icon: Layers },
+                            { id: 'faculty', label: 'Faculty', icon: Users },
+                            { id: 'subject', label: 'Subject', icon: BookOpen },
+                            { id: 'lab', label: 'Lab', icon: FlaskConical }
+                        ].map(type => (
+                            <button
+                                key={type.id}
+                                onClick={() => setViewType(type.id)}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: viewType === type.id ? 'var(--color-accent)' : 'transparent',
+                                    color: viewType === type.id ? 'white' : '#94a3b8',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s',
+                                    boxShadow: viewType === type.id ? '0 2px 4px rgba(0,0,0,0.2)' : 'none'
+                                }}
+                            >
+                                <type.icon size={14} />
+                                {type.label}
+                            </button>
+                        ))}
                     </div>
-                    {timeSlots.map(slot => (
-                        <div key={slot} style={{ padding: 'var(--space-md)', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', textAlign: 'center', fontWeight: 600, fontSize: '0.875rem' }}>
-                            {slot}
-                        </div>
-                    ))}
 
-                    {/* Rows */}
-                    {days.map(day => (
-                        <React.Fragment key={day}>
-                            <div style={{ padding: 'var(--space-md)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', fontWeight: 600, background: 'rgba(255,255,255,0.02)', position: 'sticky', left: 0, zIndex: 5, backdropFilter: 'blur(10px)' }}>
-                                {day}
-                            </div>
-                            {timeSlots.map(time => {
-                                const assignment = getAssignment(day, time);
-                                return (
-                                    <div key={`${day}-${time}`} style={{ padding: 'var(--space-xs)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', minHeight: '100px', position: 'relative' }}>
-                                        {assignment ? (
-                                            <div className="animate-fade-in" style={{
-                                                background: 'rgba(59, 130, 246, 0.2)',
-                                                border: '1px solid rgba(59, 130, 246, 0.4)',
-                                                borderRadius: 'var(--radius-sm)',
-                                                padding: 'var(--space-xs)',
-                                                height: '100%',
-                                                fontSize: '0.75rem',
-                                                cursor: 'pointer',
-                                                transition: 'transform 0.2s',
-                                                ':hover': { transform: 'scale(1.02)' }
-                                            }}>
-                                                <div style={{ fontWeight: 'bold', color: '#93c5fd', marginBottom: '2px' }}>{assignment.subject}</div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-text-muted)' }}>
-                                                    <span>{assignment.room}</span>
-                                                    <span>{assignment.group}</span>
-                                                </div>
-                                                <div style={{ marginTop: '4px', fontStyle: 'italic', color: 'white' }}>{assignment.faculty}</div>
-                                                {isAdmin && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleDelete(assignment.id); }}
-                                                        style={{ position: 'absolute', top: '2px', right: '2px', background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '0.7rem' }}
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            isAdmin && (
-                                                <div style={{ height: '100%', width: '100%', opacity: 0, transition: 'opacity 0.2s', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
-                                                    onClick={() => openModal(day, time)}
-                                                >
-                                                    <span style={{ fontSize: '1.5rem', color: 'var(--color-text-muted)' }}>+</span>
-                                                </div>
-                                            )
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </React.Fragment>
-                    ))}
+                    <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.1)' }}></div>
+
+                    {/* Filters */}
+                    {viewType === 'class' && (
+                        <>
+                            <MultiSelectDropdown
+                                options={departments}
+                                selected={selectedDepts}
+                                onChange={setSelectedDepts}
+                                label="Departments"
+                                icon={Filter}
+                            />
+                            <MultiSelectDropdown
+                                options={semesters.map(s => s.name)}
+                                selected={selectedSems}
+                                onChange={setSelectedSems}
+                                label="Semesters"
+                                icon={Filter}
+                            />
+                        </>
+                    )}
+
+                    {viewType === 'faculty' && (
+                        <MultiSelectDropdown
+                            options={faculty.map(f => f.name)}
+                            selected={selectedFaculties}
+                            onChange={setSelectedFaculties}
+                            label="Select Faculty"
+                            icon={Users}
+                        />
+                    )}
+
+                    {viewType === 'subject' && (
+                        <MultiSelectDropdown
+                            options={subjects}
+                            selected={selectedSubjects}
+                            onChange={setSelectedSubjects}
+                            label="Select Subjects"
+                            icon={BookOpen}
+                        />
+                    )}
+
+                    {viewType === 'lab' && (
+                        <MultiSelectDropdown
+                            options={labRooms.length > 0 ? labRooms : rooms}
+                            selected={selectedLabs}
+                            onChange={setSelectedLabs}
+                            label="Select Lab Rooms"
+                            icon={FlaskConical}
+                        />
+                    )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    {/* View Mode Toggle */}
+                    <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '10px', padding: '2px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <button
+                            onClick={() => setViewMode('horizontal')}
+                            style={{
+                                padding: '8px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: viewMode === 'horizontal' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                color: viewMode === 'horizontal' ? 'white' : '#64748b',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                            title="Horizontal View"
+                        >
+                            <LayoutGrid size={18} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('vertical')}
+                            style={{
+                                padding: '8px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: viewMode === 'vertical' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                color: viewMode === 'vertical' ? 'white' : '#64748b',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                            title="Vertical View"
+                        >
+                            <List size={18} />
+                        </button>
+                    </div>
+
+                    {isAdmin && (
+                        <button
+                            className="btn"
+                            onClick={() => setQuickAssignMode(!quickAssignMode)}
+                            style={{
+                                background: quickAssignMode ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'rgba(255,255,255,0.05)',
+                                border: quickAssignMode ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                                padding: '10px 16px',
+                                fontSize: '0.875rem',
+                                color: quickAssignMode ? 'white' : '#cbd5e1',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                borderRadius: '10px',
+                                fontWeight: 600,
+                                boxShadow: quickAssignMode ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <Zap size={16} fill={quickAssignMode ? "currentColor" : "none"} />
+                            Quick Assign
+                        </button>
+                    )}
+
+                    <button
+                        className="btn"
+                        onClick={handlePrint}
+                        style={{
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            border: 'none',
+                            padding: '10px 16px',
+                            fontSize: '0.875rem',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            borderRadius: '10px',
+                            fontWeight: 600,
+                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        <Printer size={16} />
+                        Print
+                    </button>
                 </div>
             </div>
 
-            {/* Booking Modal */}
-            {isModalOpen && createPortal(
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
-                    display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999
+            {/* Quick Assign Configuration Panel */}
+            {quickAssignMode && (
+                <div className="animate-fade-in" style={{
+                    padding: '20px',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    background: 'linear-gradient(to right, rgba(245, 158, 11, 0.05), rgba(30, 41, 59, 0.9))',
+                    backdropFilter: 'blur(12px)',
+                    marginTop: '8px',
+                    boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.3)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
                 }}>
-                    <div className="glass-panel" style={{ width: '400px', padding: '2rem' }}>
-                        <h3 style={{ marginBottom: '1.5rem' }}>Add Class</h3>
-                        <p style={{ color: 'var(--color-text-muted)', marginBottom: '1rem' }}>{formData.day} @ {formData.time}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ padding: '8px', background: 'rgba(245, 158, 11, 0.2)', borderRadius: '10px' }}>
+                                <Zap size={20} color="#f59e0b" fill="#f59e0b" />
+                            </div>
+                            <div>
+                                <span style={{ fontWeight: 800, color: '#f59e0b', fontSize: '1rem', letterSpacing: '0.05em', display: 'block' }}>QUICK ASSIGN</span>
+                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Configure class details to quickly add to schedule</span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setQuickAssignMode(false)}
+                            style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                border: 'none',
+                                color: '#94a3b8',
+                                cursor: 'pointer',
+                                padding: '8px',
+                                borderRadius: '8px',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={e => { e.target.style.background = 'rgba(255,255,255,0.1)'; e.target.style.color = 'white'; }}
+                            onMouseLeave={e => { e.target.style.background = 'rgba(255,255,255,0.05)'; e.target.style.color = '#94a3b8'; }}
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
 
-                        {error && (
-                            <div style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                                ⚠️ {error}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                        <Select
+                            options={departments}
+                            value={quickAssignData.dept}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, dept: val })}
+                            placeholder="Select Dept"
+                        />
+                        <Select
+                            options={semesters.map(s => ({ value: s.name, label: s.name }))}
+                            value={quickAssignData.sem}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, sem: val })}
+                            placeholder="Select Sem"
+                        />
+                        <Select
+                            options={subjectDetails.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))}
+                            value={quickAssignData.subject}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, subject: val })}
+                            placeholder="Select Subject"
+                        />
+                        <Select
+                            options={rooms}
+                            value={quickAssignData.room}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, room: val })}
+                            placeholder="Select Room"
+                        />
+                        <Select
+                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
+                            value={quickAssignData.faculty}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, faculty: val })}
+                            placeholder="Faculty 1"
+                        />
+                        <Select
+                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
+                            value={quickAssignData.faculty2}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, faculty2: val })}
+                            placeholder="Faculty 2"
+                        />
+                        <Select
+                            options={groups.map(g => ({ value: g.name, label: g.name }))}
+                            value={quickAssignData.section}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, section: val, group: '' })}
+                            placeholder="Group"
+                        />
+
+                        {quickAssignData.section && groups.find(g => g.name === quickAssignData.section)?.subGroups?.length > 0 ? (
+                            <Select
+                                options={groups.find(g => g.name === quickAssignData.section)?.subGroups || []}
+                                value={quickAssignData.group}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, group: val })}
+                                placeholder="Sub-Group"
+                            />
+                        ) : (
+                            <div style={{ padding: '10px 12px', fontSize: '0.85rem', width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', color: '#64748b', display: 'flex', alignItems: 'center', height: '42px' }}>
+                                No Sub-Groups
                             </div>
                         )}
 
-                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <select className="glass-input" value={formData.subject} onChange={e => setFormData({ ...formData, subject: e.target.value })} required>
-                                <option value="">Select Subject</option>
-                                <option value="Lab">Lab</option>
-                                {subjects.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-
-                            <select className="glass-input" value={formData.room} onChange={e => setFormData({ ...formData, room: e.target.value })} required>
-                                <option value="">Select Room</option>
-                                {rooms.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-
-                            <select className="glass-input" value={formData.faculty} onChange={e => setFormData({ ...formData, faculty: e.target.value })} required>
-                                <option value="">Select Faculty</option>
-                                {faculty.map(f => <option key={f} value={f}>{f}</option>)}
-                            </select>
-
-                            <input
-                                className="glass-input"
-                                placeholder="Group (e.g. G1, All)"
-                                value={formData.group}
-                                onChange={e => setFormData({ ...formData, group: e.target.value })}
-                            />
-
-                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }}>Cancel</button>
-                                <button type="submit" className="btn" style={{ flex: 1, background: 'var(--color-accent)' }}>Save</button>
-                            </div>
-                        </form>
+                        <Select
+                            options={days}
+                            value={quickAssignData.day}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, day: val })}
+                            placeholder="Select Day"
+                        />
+                        <Select
+                            options={timeSlots}
+                            value={quickAssignData.time}
+                            onChange={val => setQuickAssignData({ ...quickAssignData, time: val })}
+                            placeholder="Select Time"
+                        />
                     </div>
-                </div>,
-                document.body
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
+                        <button
+                            className="btn"
+                            onClick={() => setQuickAssignMode(false)}
+                            style={{
+                                padding: '10px 20px',
+                                fontSize: '0.85rem',
+                                background: 'rgba(255,255,255,0.05)',
+                                color: '#94a3b8',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '8px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            className="btn"
+                            onClick={(e) => {
+                                if (quickAssignData.day && quickAssignData.time) {
+                                    // Direct Add
+                                    if (!quickAssignData.subject || !quickAssignData.room || !quickAssignData.faculty) {
+                                        alert("Please select Subject, Room, and Faculty.");
+                                        return;
+                                    }
+                                    handleSave(null, quickAssignData);
+                                    const btn = e.target;
+                                    const originalText = btn.innerText;
+                                    btn.innerText = "✓ Added";
+                                    btn.style.background = "#10b981";
+                                    btn.style.color = "white";
+                                    setTimeout(() => {
+                                        btn.innerText = originalText;
+                                        btn.style.background = "#f59e0b";
+                                        btn.style.color = "black";
+                                    }, 2000);
+                                } else {
+                                    // Toggle Active Mode
+                                    const btn = e.target;
+                                    const originalText = btn.innerText;
+                                    btn.innerText = "Active!";
+                                    btn.style.background = "#10b981";
+                                    btn.style.color = "white";
+                                    setTimeout(() => {
+                                        btn.innerText = originalText;
+                                        btn.style.background = "#f59e0b";
+                                        btn.style.color = "black";
+                                    }, 2000);
+                                }
+                            }}
+                            style={{
+                                padding: '10px 24px',
+                                fontSize: '0.85rem',
+                                background: '#f59e0b',
+                                color: 'black',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
+                            }}
+                        >
+                            {quickAssignData.day && quickAssignData.time ? "Add Class" : "Save Settings"}
+                        </button>
+                    </div>
+                </div>
             )}
-        </div>
+
+            {/* Screen Grid (Original) */}
+            <div className="glass-panel" style={{ padding: 0, overflow: 'auto', flex: 1 }}>
+                {viewMode === 'horizontal' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${timeSlots.length}, minmax(180px, 1fr))`, minWidth: '100%' }}>
+                        {/* Header Row */}
+                        <div style={{ padding: 'var(--space-md)', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', position: 'sticky', left: 0, zIndex: 10, backdropFilter: 'blur(10px)' }}>
+                            Day / Time
+                        </div>
+                        {timeSlots.map(slot => (
+                            <div key={slot} style={{ padding: 'var(--space-md)', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', textAlign: 'center', fontWeight: 600, fontSize: '0.875rem' }}>
+                                {slot}
+                            </div>
+                        ))}
+                        {/* Rows */}
+                        {days.map(day => (
+                            <React.Fragment key={day}>
+                                <div style={{ padding: 'var(--space-md)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', fontWeight: 600, background: 'rgba(255,255,255,0.02)', position: 'sticky', left: 0, zIndex: 5, backdropFilter: 'blur(10px)' }}>
+                                    {day}
+                                </div>
+                                {timeSlots.map(time => {
+                                    const assignments = getAssignments(day, time);
+                                    return (
+                                        <div key={`${day}-${time}`} style={{ padding: 'var(--space-xs)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', minHeight: '100px', height: 'auto', position: 'relative' }}>
+                                            {assignments.length > 0 ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    {assignments.map(assignment => (
+                                                        <div
+                                                            key={assignment.id}
+                                                            className="animate-fade-in"
+                                                            onClick={(e) => {
+                                                                if (isAdmin) {
+                                                                    e.stopPropagation();
+                                                                    handleEdit(assignment);
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)',
+                                                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                                borderRadius: '10px',
+                                                                padding: '10px',
+                                                                fontSize: '0.8rem',
+                                                                cursor: isAdmin ? 'pointer' : 'default',
+                                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                                position: 'relative',
+                                                                wordBreak: 'break-word',
+                                                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
+                                                                borderLeft: '4px solid #3b82f6',
+                                                                backdropFilter: 'blur(4px)'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                if (isAdmin) {
+                                                                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                                                                    e.currentTarget.style.boxShadow = '0 10px 20px -5px rgba(59, 130, 246, 0.4)';
+                                                                    e.currentTarget.style.borderLeft = '4px solid #60a5fa';
+                                                                    e.currentTarget.style.background = 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 1) 100%)';
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (isAdmin) {
+                                                                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)';
+                                                                    e.currentTarget.style.borderLeft = '4px solid #3b82f6';
+                                                                    e.currentTarget.style.background = 'linear-gradient(145deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)';
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div style={{
+                                                                fontWeight: '800',
+                                                                color: '#fff',
+                                                                marginBottom: '6px',
+                                                                fontSize: '0.9rem',
+                                                                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                                                letterSpacing: '0.02em',
+                                                                display: 'flex',
+                                                                justifyContent: 'space-between',
+                                                                alignItems: 'start'
+                                                            }}>
+                                                                {getSubjectShortCode(assignment.subject)}
+                                                            </div>
+
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                                                                    <Layers size={12} color="#64748b" />
+                                                                    <span style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: '4px', color: '#e2e8f0', fontWeight: 500 }}>
+                                                                        {assignment.dept}-{assignment.section}{assignment.group && assignment.group !== 'All' ? `-${assignment.group}` : ''}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}>
+                                                                    <FlaskConical size={12} color="#3b82f6" />
+                                                                    <span style={{ color: '#60a5fa', fontWeight: 600 }}>{assignment.room}</span>
+                                                                </div>
+
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}>
+                                                                    <Users size={12} color="#a855f7" />
+                                                                    <span style={{ color: '#d8b4fe', fontStyle: 'italic' }}>
+                                                                        {getFacultyShortCode(assignment.faculty)}{assignment.faculty2 ? `, ${getFacultyShortCode(assignment.faculty2)}` : ''}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                bottom: '4px',
+                                                                right: '6px',
+                                                                fontSize: '0.65rem',
+                                                                color: 'rgba(255,255,255,0.4)',
+                                                                fontWeight: 500,
+                                                                letterSpacing: '0.02em'
+                                                            }}>
+                                                                {assignment.sem}
+                                                            </div>
+
+                                                            {isAdmin && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDelete(assignment.id); }}
+                                                                    style={{
+                                                                        position: 'absolute',
+                                                                        top: '6px',
+                                                                        right: '6px',
+                                                                        background: 'rgba(239, 68, 68, 0.15)',
+                                                                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                                                                        color: '#fca5a5',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: '0.7rem',
+                                                                        width: '20px',
+                                                                        height: '20px',
+                                                                        borderRadius: '6px',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        transition: 'all 0.2s',
+                                                                        opacity: 0.6
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
+                                                                        e.currentTarget.style.color = 'white';
+                                                                        e.currentTarget.style.opacity = '1';
+                                                                        e.currentTarget.style.transform = 'scale(1.1)';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                                                                        e.currentTarget.style.color = '#fca5a5';
+                                                                        e.currentTarget.style.opacity = '0.6';
+                                                                        e.currentTarget.style.transform = 'scale(1)';
+                                                                    }}
+                                                                    title="Delete Class"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                isAdmin && (
+                                                    <div style={{ height: '100%', width: '100%', opacity: 0, transition: 'opacity 0.2s', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+                                                        onClick={() => openModal(day, time)}
+                                                    >
+                                                        <span style={{ fontSize: '1.5rem', color: 'var(--color-text-muted)' }}>+</span>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </React.Fragment>
+                        ))}
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${days.length}, minmax(180px, 1fr))`, minWidth: '100%' }}>
+                        {/* Vertical View Implementation (Screen) */}
+                        <div style={{ padding: 'var(--space-md)', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', position: 'sticky', left: 0, zIndex: 10, backdropFilter: 'blur(10px)' }}>
+                            Time / Day
+                        </div>
+                        {days.map(day => (
+                            <div key={day} style={{ padding: 'var(--space-md)', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', textAlign: 'center', fontWeight: 600, fontSize: '0.875rem' }}>
+                                {day}
+                            </div>
+                        ))}
+                        {timeSlots.map(time => (
+                            <React.Fragment key={time}>
+                                <div style={{ padding: 'var(--space-md)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', fontWeight: 600, background: 'rgba(255,255,255,0.02)', position: 'sticky', left: 0, zIndex: 5, backdropFilter: 'blur(10px)' }}>
+                                    {time}
+                                </div>
+                                {days.map(day => {
+                                    const assignments = getAssignments(day, time);
+                                    return (
+                                        <div key={`${day}-${time}`} style={{ padding: 'var(--space-xs)', borderBottom: '1px solid var(--glass-border)', borderRight: '1px solid var(--glass-border)', minHeight: '100px', height: 'auto', position: 'relative' }}>
+                                            {assignments.length > 0 ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    {assignments.map(assignment => (
+                                                        <div
+                                                            key={assignment.id}
+                                                            className="animate-fade-in"
+                                                            onClick={(e) => {
+                                                                if (isAdmin) {
+                                                                    e.stopPropagation();
+                                                                    handleEdit(assignment);
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
+                                                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                                borderRadius: '8px',
+                                                                padding: '8px',
+                                                                fontSize: '0.75rem',
+                                                                cursor: isAdmin ? 'pointer' : 'default',
+                                                                transition: 'all 0.2s ease',
+                                                                position: 'relative',
+                                                                wordBreak: 'break-word',
+                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                                                borderLeft: '3px solid #3b82f6'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                if (isAdmin) {
+                                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                                                                    e.currentTarget.style.borderLeft = '3px solid #60a5fa';
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (isAdmin) {
+                                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                                                                    e.currentTarget.style.borderLeft = '3px solid #3b82f6';
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div style={{ fontWeight: 'bold', color: '#fff', marginBottom: '4px', fontSize: '0.85rem', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                                                                {getSubjectShortCode(assignment.subject)}
+                                                            </div>
+                                                            <div style={{ color: '#cbd5e1', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                                                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                                                                    [{assignment.dept}-{assignment.section}{assignment.group ? `-${assignment.group}` : ''}]
+                                                                </span>
+                                                                <span style={{ color: '#93c5fd' }}>-{assignment.room}</span>
+                                                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>[{assignment.sem}]</span>
+                                                                <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                                                                    [{getFacultyShortCode(assignment.faculty)}{assignment.faculty2 ? `, ${getFacultyShortCode(assignment.faculty2)}` : ''}]
+                                                                </span>
+                                                            </div>
+
+                                                            {isAdmin && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDelete(assignment.id); }}
+                                                                    style={{
+                                                                        position: 'absolute',
+                                                                        top: '4px',
+                                                                        right: '4px',
+                                                                        background: 'rgba(239, 68, 68, 0.2)',
+                                                                        border: 'none',
+                                                                        color: '#fca5a5',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: '0.7rem',
+                                                                        width: '18px',
+                                                                        height: '18px',
+                                                                        borderRadius: '50%',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        transition: 'background 0.2s'
+                                                                    }}
+                                                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.5)'}
+                                                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                                                                    title="Delete Class"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                isAdmin && (
+                                                    <div style={{ height: '100%', width: '100%', opacity: 0, transition: 'opacity 0.2s', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+                                                        onClick={() => openModal(day, time)}
+                                                    >
+                                                        <span style={{ fontSize: '1.5rem', color: 'var(--color-text-muted)' }}>+</span>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </React.Fragment>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* DEDICATED PRINT AREA (Hidden on Screen) */}
+            <div id="print-area" style={{ display: 'none' }}>
+                <div className="print-header-section">
+                    <div>
+                        <h1 className="header-title">LAMS SCHEDULE {activeAcademicYear}</h1>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                        <p className="header-sub">
+                            {viewType === 'class'
+                                ? `${selectedDepts.join(', ')} | ${selectedSems.join(', ')} SEM`
+                                : viewType === 'faculty'
+                                    ? `FACULTY: ${selectedFaculties.map(f => f.toUpperCase()).join(', ')}`
+                                    : viewType === 'subject'
+                                        ? `SUBJECTS: ${selectedSubjects.join(', ')}`
+                                        : `LABS: ${selectedLabs.join(', ')}`}
+                        </p>
+                    </div>
+                </div>
+
+                <table className="print-table">
+                    {viewMode === 'horizontal' ? (
+                        <>
+                            <thead>
+                                <tr>
+                                    <th style={{ width: '140px' }}>DAY / TIME</th>
+                                    {timeSlots.map(slot => (
+                                        <th key={slot}>{slot}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {days.map(day => (
+                                    <tr key={day}>
+                                        <th style={{ backgroundColor: '#f9f9f9', width: '140px' }}>{day.toUpperCase()}</th>
+                                        {timeSlots.map(time => {
+                                            const assignments = getAssignments(day, time);
+                                            return (
+                                                <td key={`${day}-${time}`}>
+                                                    {assignments.length > 0 ? assignments.map(a => (
+                                                        <div key={a.id} className="cell-content">
+                                                            <div className="subject-text">{getSubjectShortCode(a.subject)}</div>
+                                                            <div className="details-text">
+                                                                [{a.dept}-{a.section}{a.group ? `-${a.group}` : ''}] -{a.room} [{a.sem}] <span style={{ fontStyle: 'italic' }}>[{getFacultyShortCode(a.faculty)}{a.faculty2 ? `, ${getFacultyShortCode(a.faculty2)}` : ''}]</span>
+                                                            </div>
+                                                        </div>
+                                                    )) : (
+                                                        <div className="cell-content" style={{ opacity: 0.1, fontSize: '24pt' }}>
+                                                            -
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </>
+                    ) : (
+                        <>
+                            <thead>
+                                <tr>
+                                    <th style={{ width: '140px' }}>TIME / DAY</th>
+                                    {days.map(day => (
+                                        <th key={day}>{day.toUpperCase()}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {timeSlots.map(time => (
+                                    <tr key={time}>
+                                        <th style={{ backgroundColor: '#f9f9f9', width: '140px' }}>{time}</th>
+                                        {days.map(day => {
+                                            const assignments = getAssignments(day, time);
+                                            return (
+                                                <td key={`${day}-${time}`}>
+                                                    {assignments.length > 0 ? assignments.map(a => (
+                                                        <div key={a.id} className="cell-content">
+                                                            <div className="subject-text">{getSubjectShortCode(a.subject)}</div>
+                                                            <div className="details-text">
+                                                                [{a.dept}-{a.section}{a.group ? `-${a.group}` : ''}] -{a.room} [{a.sem}] <span style={{ fontStyle: 'italic' }}>[{getFacultyShortCode(a.faculty)}]</span>
+                                                            </div>
+                                                        </div>
+                                                    )) : (
+                                                        <div className="cell-content" style={{ opacity: 0.1, fontSize: '24pt' }}>
+                                                            -
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </>
+                    )}
+                </table>
+            </div >
+
+            {/* Booking Modal */}
+            {
+                isModalOpen && createPortal(
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+                        display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999
+                    }}>
+                        <div className="glass-panel" style={{ width: '400px', padding: '2rem', overflow: 'visible' }}>
+                            <h3 style={{ marginBottom: '1.5rem' }}>{editingId ? 'Edit Class' : 'Add Class'}</h3>
+                            <p style={{ color: 'var(--color-text-muted)', marginBottom: '1rem' }}>{formData.day} @ {formData.time}</p>
+
+                            {error && (
+                                <div style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                                    ⚠️ {error}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <Select
+                                            options={departments}
+                                            value={formData.dept}
+                                            onChange={val => setFormData({ ...formData, dept: val })}
+                                            placeholder="Select Dept"
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <Select
+                                            options={semesters.map(s => ({ value: s.name, label: s.name }))}
+                                            value={formData.sem}
+                                            onChange={val => setFormData({ ...formData, sem: val })}
+                                            placeholder="Select Sem"
+                                        />
+                                    </div>
+                                </div>
+                                <Select
+                                    options={subjectDetails.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))}
+                                    value={formData.subject}
+                                    onChange={val => setFormData({ ...formData, subject: val })}
+                                    placeholder="Select Subject"
+                                />
+
+                                <Select
+                                    options={rooms}
+                                    value={formData.room}
+                                    onChange={val => setFormData({ ...formData, room: val })}
+                                    placeholder="Select Room"
+                                />
+
+                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <Select
+                                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
+                                            value={formData.faculty}
+                                            onChange={val => setFormData({ ...formData, faculty: val })}
+                                            placeholder="Faculty 1"
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <Select
+                                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
+                                            value={formData.faculty2}
+                                            onChange={val => setFormData({ ...formData, faculty2: val })}
+                                            placeholder="Faculty 2"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <Select
+                                            options={groups.map(g => ({ value: g.name, label: g.name }))}
+                                            value={formData.section}
+                                            onChange={val => setFormData({ ...formData, section: val, group: '' })}
+                                            placeholder="Select Group"
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <Select
+                                            options={formData.section && groups.find(g => g.name === formData.section)?.subGroups || []}
+                                            value={formData.group}
+                                            onChange={val => setFormData({ ...formData, group: val })}
+                                            placeholder="Select Sub-Group"
+                                            disabled={!formData.section || !groups.find(g => g.name === formData.section)?.subGroups?.length}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                    <button type="button" onClick={() => setIsModalOpen(false)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }}>Cancel</button>
+                                    <button type="submit" className="btn" style={{ flex: 1, background: 'var(--color-accent)' }}>Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>,
+                    document.body
+                )
+            }
+        </div >
     );
 };
 

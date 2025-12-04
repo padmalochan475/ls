@@ -7,6 +7,9 @@ import Scheduler from './pages/Scheduler';
 import AdminPanel from './pages/AdminPanel';
 import MasterData from './pages/MasterData';
 import Profile from './pages/Profile';
+import Assignments from './pages/Assignments';
+import ErrorBoundary from './components/ErrorBoundary';
+import Analytics from './pages/Analytics';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { currentUser, userProfile, loading, logout } = useAuth();
@@ -46,71 +49,74 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          } />
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
 
-          <Route path="/schedule" element={
-            <ProtectedRoute>
-              <Layout>
-                <Scheduler />
-              </Layout>
-            </ProtectedRoute>
-          } />
+            <Route path="/schedule" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Scheduler />
+                </Layout>
+              </ProtectedRoute>
+            } />
 
-          <Route path="/assignments" element={
-            <ProtectedRoute>
-              <Layout>
-                <div className="glass-panel" style={{ padding: '2rem' }}><h2>Assignments Component Placeholder</h2></div>
-              </Layout>
-            </ProtectedRoute>
-          } />
+            <Route path="/assignments" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Assignments />
+                </Layout>
+              </ProtectedRoute>
+            } />
 
-          <Route path="/master-data" element={
-            <ProtectedRoute>
-              <Layout>
-                <MasterData />
-              </Layout>
-            </ProtectedRoute>
-          } />
+            <Route path="/master-data" element={
+              <ProtectedRoute>
+                <Layout>
+                  <MasterData />
+                </Layout>
+              </ProtectedRoute>
+            } />
 
-          <Route path="/analytics" element={
-            <ProtectedRoute>
-              <Layout>
-                <div className="glass-panel" style={{ padding: '2rem' }}><h2>Analytics Component Placeholder</h2></div>
-              </Layout>
-            </ProtectedRoute>
-          } />
 
-          <Route path="/admin" element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <AdminPanel />
-              </Layout>
-            </ProtectedRoute>
-          } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Analytics />
+                </Layout>
+              </ProtectedRoute>
+            } />
 
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Layout>
-                <Profile />
-              </Layout>
-            </ProtectedRoute>
-          } />
+            <Route path="/admin" element={
+              <ProtectedRoute requiredRole="admin">
+                <Layout>
+                  <AdminPanel />
+                </Layout>
+              </ProtectedRoute>
+            } />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Profile />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

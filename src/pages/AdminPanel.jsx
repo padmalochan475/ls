@@ -210,16 +210,23 @@ const AdminPanel = () => {
                         <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
                             Select the year you want to manage (Assignments, Schedule, etc).
                         </p>
-                        <select
-                            value={activeAcademicYear}
-                            onChange={(e) => setSelectedAcademicYear(e.target.value)}
-                            className="glass-input"
-                            style={{ width: '100%', fontSize: '1.2rem', padding: '0.75rem', fontWeight: 'bold', color: 'var(--color-accent)' }}
-                        >
-                            {academicYears.map(year => (
-                                <option key={year} value={year} style={{ color: 'black' }}>{year}</option>
-                            ))}
-                        </select>
+                        <div style={{ position: 'relative', width: '100%' }}>
+                            <select
+                                value={activeAcademicYear}
+                                onChange={(e) => setSelectedAcademicYear(e.target.value)}
+                                className="glass-input"
+                                style={{
+                                    fontSize: '1.2rem',
+                                    fontWeight: 'bold',
+                                    color: 'var(--color-accent)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {academicYears.map(year => (
+                                    <option key={year} value={year} style={{ background: '#1e293b', color: 'white' }}>{year}</option>
+                                ))}
+                            </select>
+                        </div>
 
                         <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                             <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Current System Default:</div>
@@ -382,10 +389,11 @@ const AdminPanel = () => {
                                             value={user.role}
                                             onChange={(e) => handleRoleChange(user.id, e.target.value)}
                                             className="glass-input"
-                                            style={{ padding: '0.25rem', fontSize: '0.9rem', width: 'auto' }}
+                                            style={{ padding: '0.25rem', fontSize: '0.9rem', width: 'auto', opacity: user.email === 'padmalochan.maharana@tat.ac.in' ? 0.5 : 1 }}
+                                            disabled={user.email === 'padmalochan.maharana@tat.ac.in'}
                                         >
-                                            <option value="user" style={{ color: 'black' }}>User</option>
-                                            <option value="admin" style={{ color: 'black' }}>Admin</option>
+                                            <option value="user" style={{ background: '#1e293b', color: 'white' }}>User</option>
+                                            <option value="admin" style={{ background: '#1e293b', color: 'white' }}>Admin</option>
                                         </select>
                                     </td>
                                     <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
@@ -401,7 +409,8 @@ const AdminPanel = () => {
                                         <button
                                             onClick={() => handleDeleteUser(user.id)}
                                             className="btn"
-                                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: '#ef4444' }}
+                                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: '#ef4444', opacity: user.email === 'padmalochan.maharana@tat.ac.in' ? 0.5 : 1 }}
+                                            disabled={user.email === 'padmalochan.maharana@tat.ac.in'}
                                         >
                                             Delete
                                         </button>

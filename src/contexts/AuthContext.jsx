@@ -8,6 +8,7 @@ import {
     sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
+import { FlaskConical } from 'lucide-react';
 
 const AuthContext = createContext();
 
@@ -120,43 +121,50 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
             console.log("Auth State Changed:", user ? user.uid : "No User");
             setCurrentUser(user);
 
-            if (user) {
-                // Fetch user profile
-                const docRef = doc(db, 'users', user.uid);
-                try {
-                    const docSnap = await getDoc(docRef);
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-
-                        // Emergency Admin Override
-                        if (user.email === 'padmalochan.maharana@tat.ac.in') {
-                            data.role = 'admin';
-                            data.status = 'approved';
-                        }
-
-                        console.log("User Profile Loaded:", data);
-                        setUserProfile(data);
-                    } else {
-                        console.error("No user profile found in Firestore! (Auto-logout disabled for debugging)");
-                        // setUserProfile(null);
-                        // setTimeout(() => { signOut(auth).catch(e => console.error(e)); }, 100);
-                    }
-                } catch (err) {
-                    console.error("Error fetching user profile:", err);
-                }
-            } else {
-                setUserProfile(null);
+            if (!user) {
+                setLoading(false);
             }
-
-            setLoading(false);
         });
 
         return unsubscribe;
     }, []);
+
+    useEffect(() => {
+        let unsubscribeProfile = () => { };
+
+        if (currentUser) {
+            const docRef = doc(db, 'users', currentUser.uid);
+            unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+
+                    // Emergency Admin Override
+                    if (currentUser.email === 'padmalochan.maharana@tat.ac.in') {
+                        data.role = 'admin';
+                        data.status = 'approved';
+                    }
+
+                    console.log("User Profile Updated:", data);
+                    setUserProfile(data);
+                } else {
+                    console.error("No user profile found in Firestore!");
+                    setUserProfile(null);
+                }
+                setLoading(false);
+            }, (err) => {
+                console.error("Error fetching user profile:", err);
+                setLoading(false);
+            });
+        } else {
+            setUserProfile(null);
+        }
+
+        return () => unsubscribeProfile();
+    }, [currentUser]);
 
     const value = {
         currentUser,
@@ -172,17 +180,74 @@ export const AuthProvider = ({ children }) => {
         loading
     };
 
-    console.log("AuthContext State:", {
-        selected: selectedAcademicYear,
-        system: systemAcademicYear,
-        active: value.activeAcademicYear,
-        localStorage: localStorage.getItem('selectedAcademicYear'),
-        years: academicYears
-    });
-
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {loading ? (
+                <div style={{
+                    height: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    color: 'white',
+                    background: 'radial-gradient(circle at center, #1e293b 0%, #0f172a 100%)',
+                    zIndex: 9999,
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0
+                }}>
+                    <div style={{
+                        position: 'relative',
+                        marginBottom: '2rem'
+                    }}>
+                        {/* Glow Effect */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '50%', left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '120px', height: '120px',
+                            background: 'radial-gradient(circle, rgba(59,130,246,0.4) 0%, transparent 70%)',
+                            borderRadius: '50%',
+                            animation: 'pulse-glow 2s infinite'
+                        }}></div>
+
+                        {/* Logo */}
+                        <div style={{
+                            width: '80px', height: '80px',
+                            background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                            borderRadius: '20px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 10px 25px rgba(59, 130, 246, 0.5)',
+                            position: 'relative',
+                            zIndex: 2
+                        }}>
+                            <FlaskConical size={40} color="white" />
+                        </div>
+                    </div>
+
+                    <div style={{ textAlign: 'center', zIndex: 2 }}>
+                        <h2 style={{
+                            fontSize: '1.5rem', fontWeight: 'bold', margin: '0 0 0.5rem 0',
+                            background: 'linear-gradient(to right, #fff, #94a3b8)',
+                            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+                        }}>
+                            LAMS 2.0
+                        </h2>
+                        <div style={{
+                            fontSize: '0.9rem', color: '#64748b',
+                            display: 'flex', alignItems: 'center', gap: '0.5rem'
+                        }}>
+                            <span style={{
+                                display: 'inline-block', width: '8px', height: '8px',
+                                borderRadius: '50%', background: '#3b82f6',
+                                animation: 'pulse-glow 1s infinite'
+                            }}></span>
+                            Initializing System...
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                children
+            )}
         </AuthContext.Provider>
     );
 };

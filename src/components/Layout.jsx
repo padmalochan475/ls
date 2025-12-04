@@ -35,11 +35,13 @@ const Layout = ({ children }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    const isAdmin = userProfile && userProfile.role === 'admin';
+
     const navItems = [
         { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
         { path: '/assignments', label: 'Assignments', icon: <FilePlus size={20} /> },
         { path: '/schedule', label: 'Schedule', icon: <Calendar size={20} /> },
-        { path: '/master-data', label: 'Master Data', icon: <Settings size={20} /> },
+        ...(isAdmin ? [{ path: '/master-data', label: 'Master Data', icon: <Settings size={20} /> }] : []),
         { path: '/analytics', label: 'Analytics', icon: <BarChart3 size={20} /> },
     ];
 
@@ -67,21 +69,40 @@ const Layout = ({ children }) => {
             <aside
                 className="glass-panel"
                 style={{
-                    width: isSidebarOpen && !isMobile ? '260px' : (isMobile ? '260px' : '80px'),
-                    margin: isMobile ? 0 : 'var(--space-md)',
-                    padding: 'var(--space-md)',
+                    // Base Styles
                     display: 'flex',
                     flexDirection: 'column',
+                    padding: 'var(--space-md)',
+                    background: 'var(--glass-bg)',
+                    backdropFilter: 'blur(var(--glass-blur))',
+                    WebkitBackdropFilter: 'blur(var(--glass-blur))',
+                    borderRight: '1px solid var(--glass-border)',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    position: isMobile ? 'fixed' : 'sticky',
-                    top: isMobile ? 0 : 'var(--space-md)',
-                    left: isMobile ? (isMobileMenuOpen ? 0 : '-100%') : 0,
-                    height: isMobile ? '100vh' : 'calc(100vh - 2 * var(--space-md))',
-                    zIndex: 100,
-                    borderRadius: isMobile ? 0 : 'var(--radius-lg)',
-                    borderLeft: isMobile ? 'none' : '1px solid var(--glass-border)',
-                    borderTop: isMobile ? 'none' : '1px solid var(--glass-border)',
-                    borderBottom: isMobile ? 'none' : '1px solid var(--glass-border)',
+                    zIndex: 1100, // Must be higher than overlay (900) and toggle button (1000)
+
+                    // Desktop vs Mobile Logic
+                    ...(isMobile ? {
+                        position: 'fixed',
+                        top: 0,
+                        bottom: 0,
+                        left: 0,
+                        width: '280px', // Wider for touch
+                        margin: 0,
+                        borderRadius: 0,
+                        transform: isMobileMenuOpen ? 'translateX(0)' : 'translateX(-100%)',
+                        boxShadow: isMobileMenuOpen ? '0 0 50px 10px rgba(0,0,0,0.5)' : 'none',
+                        paddingBottom: 'calc(env(safe-area-inset-bottom) + 2rem)', // Safe area for mobile
+                    } : {
+                        position: 'sticky',
+                        top: 'var(--space-md)',
+                        height: 'calc(100vh - 2 * var(--space-md))',
+                        width: isSidebarOpen ? '260px' : '80px',
+                        margin: 'var(--space-md)',
+                        borderRadius: 'var(--radius-lg)',
+                        border: '1px solid var(--glass-border)',
+                        transform: 'none',
+                        boxShadow: 'var(--glass-shadow)',
+                    })
                 }}
             >
                 {/* Logo Area */}
@@ -109,7 +130,7 @@ const Layout = ({ children }) => {
                 </div>
 
                 {/* Navigation */}
-                <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+                <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)', overflowY: 'auto', minHeight: 0 }}>
                     {navItems.map((item) => (
                         <Link
                             key={item.path}
@@ -127,7 +148,8 @@ const Layout = ({ children }) => {
                                 transition: 'all 0.2s ease',
                                 justifyContent: (isSidebarOpen || isMobile) ? 'flex-start' : 'center',
                                 position: 'relative',
-                                overflow: 'hidden'
+                                overflow: 'hidden',
+                                flexShrink: 0
                             }}
                         >
                             <span style={{ marginRight: (isSidebarOpen || isMobile) ? 'var(--space-md)' : 0, display: 'flex' }}>{item.icon}</span>
@@ -168,7 +190,8 @@ const Layout = ({ children }) => {
                                 justifyContent: (isSidebarOpen || isMobile) ? 'flex-start' : 'center',
                                 marginTop: 'var(--space-sm)',
                                 borderTop: '1px solid rgba(255,255,255,0.1)',
-                                paddingTop: 'var(--space-md)'
+                                paddingTop: 'var(--space-md)',
+                                flexShrink: 0
                             }}
                         >
                             <span style={{ marginRight: (isSidebarOpen || isMobile) ? 'var(--space-md)' : 0, display: 'flex' }}><Shield size={20} /></span>
@@ -178,7 +201,7 @@ const Layout = ({ children }) => {
                 </nav>
 
                 {/* User Profile */}
-                <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: 'var(--space-md)', marginTop: 'auto' }}>
+                <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: 'var(--space-md)', marginTop: 'auto', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
                         <div style={{
                             width: '36px',
@@ -242,17 +265,26 @@ const Layout = ({ children }) => {
                                 (location.pathname === '/admin' ? 'Admin Panel' :
                                     location.pathname === '/profile' ? 'My Profile' : 'Dashboard')}
                         </h2>
-                        {location.pathname === '/' && (
-                            <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>Welcome back to your lab management workspace</p>
-                        )}
                     </div>
-                    <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-                        {!isMobile && (
-                            <>
-                                <button className="btn glass-panel" style={{ padding: 'var(--space-sm)' }}>🔔</button>
-                                <button className="btn glass-panel" style={{ padding: 'var(--space-sm)' }}>⚙️</button>
-                            </>
-                        )}
+
+                    {/* Global Academic Year Selector */}
+                    <div style={{ position: 'relative', minWidth: '180px' }}>
+                        <select
+                            value={activeAcademicYear}
+                            onChange={(e) => setSelectedAcademicYear(e.target.value)}
+                            className="glass-input"
+                            style={{
+                                fontWeight: '600',
+                                color: 'var(--color-accent)',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {academicYears.map(year => (
+                                <option key={year} value={year} style={{ background: '#1e293b', color: 'white' }}>
+                                    {year}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </header>
 
