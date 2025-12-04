@@ -437,7 +437,7 @@ const Assignments = () => {
             <div className="assignments-header">
                 <div>
                     <h2 className="page-title">
-                        Create Assignment <span className="academic-year-badge">({activeAcademicYear})</span>
+                        {isAdmin ? 'Create Assignment' : 'Assignments'} <span className="academic-year-badge">({activeAcademicYear})</span>
                     </h2>
                 </div>
                 {isAdmin && (
