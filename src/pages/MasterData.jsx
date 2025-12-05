@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
-import { collection, getDocs, getDoc, addDoc, deleteDoc, doc, updateDoc, query, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, getDoc, addDoc, deleteDoc, doc, updateDoc, query, where, writeBatch, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import ConfirmModal from '../components/ConfirmModal';
 import '../styles/design-system.css';
 import { Settings, Users, BookOpen, Clock, MapPin, Layers, Box, Download, Plus, Search, Edit2, Trash2, Grid, List, User, Briefcase, Hash, Calendar, Eye, Check, ChevronDown } from 'lucide-react';
 
@@ -40,7 +42,8 @@ const MasterData = ({ initialTab }) => {
             });
 
             setNewYearInput('');
-            fetchData();
+            setNewYearInput('');
+            // fetchData(); // Removed: Handled by listener
         } catch (e) {
             console.error("Error adding year:", e);
             alert("Failed to add academic year.");
@@ -68,40 +71,53 @@ const MasterData = ({ initialTab }) => {
 
     const activeCollection = tabs.find(t => t.id === activeTab)?.collection;
 
-    const fetchData = async () => {
+    // Real-Time Data Listener
+    useEffect(() => {
         if (!activeCollection) return;
         setLoading(true);
+        setSearchTerm(''); // Reset search on tab change
+
+        let unsubscribe = () => { };
+
         try {
             if (activeTab === 'settings') {
                 const docRef = doc(db, 'settings', 'config');
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    setData([{ id: 'config', ...docSnap.data() }]);
-                }
-            } else {
-                const querySnapshot = await getDocs(collection(db, activeCollection));
-                const items = [];
-                querySnapshot.forEach((doc) => {
-                    items.push({ id: doc.id, ...doc.data() });
+                unsubscribe = onSnapshot(docRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        setData([{ id: 'config', ...docSnap.data() }]);
+                    }
+                    setLoading(false);
                 });
+            } else {
+                unsubscribe = onSnapshot(collection(db, activeCollection), (snapshot) => {
+                    const items = [];
+                    snapshot.forEach((doc) => {
+                        items.push({ id: doc.id, ...doc.data() });
+                    });
 
-                // Sort items based on collection
-                if (activeCollection === 'days') {
-                    items.sort((a, b) => a.order - b.order);
-                } else if (activeCollection === 'timeslots') {
-                    items.sort((a, b) => a.startTime.localeCompare(b.startTime));
-                } else {
-                    items.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
-                }
+                    // Sort items logic (Client-side sort for now, cheap for Master Data)
+                    if (activeCollection === 'days') {
+                        items.sort((a, b) => a.order - b.order);
+                    } else if (activeCollection === 'timeslots') {
+                        items.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+                    } else {
+                        items.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
+                    }
 
-                setData(items);
+                    setData(items);
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Error fetching data:", error);
+                    setLoading(false);
+                });
             }
-        } catch (error) {
-            console.error("Error fetching data: ", error);
-        } finally {
+        } catch (err) {
+            console.error("Listener setup error:", err);
             setLoading(false);
         }
-    };
+
+        return () => unsubscribe();
+    }, [activeTab, activeCollection]);
 
     const fetchDependencies = async () => {
         try {
@@ -115,11 +131,6 @@ const MasterData = ({ initialTab }) => {
             console.error("Error fetching dependencies:", e);
         }
     };
-
-    useEffect(() => {
-        fetchData();
-        setSearchTerm('');
-    }, [activeTab]);
 
     useEffect(() => {
         if (isModalOpen) fetchDependencies();
@@ -142,7 +153,7 @@ const MasterData = ({ initialTab }) => {
                 }
             });
 
-            fetchData(); // Refresh
+            // fetchData(); // Removed: Handled by listener
         } catch (e) {
             console.error("Error updating config:", e);
             alert("Failed to update settings.");
@@ -152,36 +163,94 @@ const MasterData = ({ initialTab }) => {
 
 
 
-    const handleDeleteYear = async (yearToDelete) => {
-        if (!window.confirm(`Are you sure you want to delete the academic year ${yearToDelete}? This cannot be undone.`)) {
-            return;
+    // Delete Confirmation State
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, type: 'item' });
+
+    const confirmDelete = (id, e) => {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
         }
+        setDeleteConfirm({ isOpen: true, id, type: 'item' });
+    };
+
+    const handleDeleteYear = (yearToDelete) => {
+        setDeleteConfirm({ isOpen: true, id: yearToDelete, type: 'year' });
+    };
+
+    const executeDelete = async () => {
+        const { id, type } = deleteConfirm;
+        if (!id) return;
+        setDeleteConfirm({ isOpen: false, id: null, type: 'item' });
 
         try {
-            const configRef = doc(db, 'settings', 'config');
-            const currentData = data[0];
-            const currentYears = currentData.academicYears || [];
-            const currentConfigs = currentData.yearConfigs || {};
+            if (type === 'year') {
+                const configRef = doc(db, 'settings', 'config');
+                const currentData = data[0]; // Assuming data is loaded
+                const currentYears = currentData.academicYears || [];
+                const currentConfigs = currentData.yearConfigs || {};
 
-            // Prevent deleting the active year
-            if (yearToDelete === currentData.activeAcademicYear) {
-                alert("Cannot delete the currently active academic year. Please switch to another year first.");
-                return;
+                if (id === currentData.activeAcademicYear) {
+                    alert("Cannot delete the currently active academic year. Please switch to another year first.");
+                    return;
+                }
+
+                const updatedYears = currentYears.filter(y => y !== id);
+                const updatedConfigs = { ...currentConfigs };
+                delete updatedConfigs[id];
+
+                await updateDoc(configRef, {
+                    academicYears: updatedYears,
+                    yearConfigs: updatedConfigs
+                });
+                // fetchData();
+
+            } else {
+                // Item Deletion
+                if (!activeCollection) return;
+
+                // Dependency Check for Faculty within Item Delete
+                if (activeTab === 'faculty') {
+                    const facultyItem = data.find(d => d.id === id);
+                    if (facultyItem) {
+                        const q1 = query(collection(db, 'schedule'), where('faculty', '==', facultyItem.name));
+                        const q2 = query(collection(db, 'schedule'), where('faculty2', '==', facultyItem.name));
+                        const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+                        if (!snap1.empty || !snap2.empty) {
+                            alert(`Cannot delete ${facultyItem.name}. They have active assignments. Please remove their assignments first.`);
+                            return;
+                        }
+                    }
+                }
+                await deleteDoc(doc(db, activeCollection, id));
+                // fetchData();
             }
+        } catch (error) {
+            console.error("Error deleting:", error);
+            alert(`Error deleting: ${error.message}`);
+        }
+    };
 
-            const updatedYears = currentYears.filter(y => y !== yearToDelete);
-            const updatedConfigs = { ...currentConfigs };
-            delete updatedConfigs[yearToDelete];
+    const openModal = (item = null) => {
+        setFormData(item || {});
+        setEditingId(item ? item.id : null);
+        setIsModalOpen(true);
+    };
 
-            await updateDoc(configRef, {
-                academicYears: updatedYears,
-                yearConfigs: updatedConfigs
+    const handleUserSelect = (userId) => {
+        const selectedUser = usersList.find(u => u.id === userId);
+        if (selectedUser) {
+            setFormData({
+                ...formData,
+                name: selectedUser.name || '',
+                empId: selectedUser.empId || '',
+                email: selectedUser.email || '',
+                // Keep existing fields if any
+                department: formData.department || '',
+                designation: formData.designation || '',
+                photoURL: selectedUser.photoURL || ''
             });
-
-            fetchData();
-        } catch (e) {
-            console.error("Error deleting year:", e);
-            alert("Failed to delete academic year.");
         }
     };
 
@@ -276,73 +345,10 @@ const MasterData = ({ initialTab }) => {
             setIsModalOpen(false);
             setFormData({});
             setEditingId(null);
-            fetchData();
+            // fetchData(); // Removed: Handled by listener
         } catch (error) {
             console.error("Error saving document: ", error);
             alert(`Failed to save: ${error.message}`);
-        }
-    };
-
-    // Delete Confirmation State
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null });
-
-    const confirmDelete = (id, e) => {
-        if (e) {
-            e.stopPropagation();
-            e.preventDefault();
-        }
-        setDeleteConfirm({ isOpen: true, id });
-    };
-
-    const executeDelete = async () => {
-        const id = deleteConfirm.id;
-        if (!id || !activeCollection) return;
-
-        try {
-            // Dependency Check for Faculty
-            if (activeTab === 'faculty') {
-                const facultyItem = data.find(d => d.id === id);
-                if (facultyItem) {
-                    const q1 = query(collection(db, 'schedule'), where('faculty', '==', facultyItem.name));
-                    const q2 = query(collection(db, 'schedule'), where('faculty2', '==', facultyItem.name));
-                    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-
-                    if (!snap1.empty || !snap2.empty) {
-                        alert(`Cannot delete ${facultyItem.name}. They have active assignments. Please remove their assignments first.`);
-                        setDeleteConfirm({ isOpen: false, id: null });
-                        return;
-                    }
-                }
-            }
-
-            await deleteDoc(doc(db, activeCollection, id));
-            setDeleteConfirm({ isOpen: false, id: null });
-            fetchData();
-        } catch (error) {
-            console.error("Error deleting document: ", error);
-            alert(`Error deleting item: ${error.message}`);
-        }
-    };
-
-    const openModal = (item = null) => {
-        setFormData(item || {});
-        setEditingId(item ? item.id : null);
-        setIsModalOpen(true);
-    };
-
-    const handleUserSelect = (userId) => {
-        const selectedUser = usersList.find(u => u.id === userId);
-        if (selectedUser) {
-            setFormData({
-                ...formData,
-                name: selectedUser.name || '',
-                empId: selectedUser.empId || '',
-                email: selectedUser.email || '',
-                // Keep existing fields if any
-                department: formData.department || '',
-                designation: formData.designation || '',
-                photoURL: selectedUser.photoURL || ''
-            });
         }
     };
 
@@ -1133,38 +1139,19 @@ const MasterData = ({ initialTab }) => {
                 </div>
             )}
             {/* Delete Confirmation Modal */}
-            {deleteConfirm.isOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)',
-                    display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100
-                }}>
-                    <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                        <div style={{ color: '#f87171', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
-                            <Trash2 size={48} />
-                        </div>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Confirm Deletion</h3>
-                        <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
-                            Are you sure you want to delete this item? This action cannot be undone.
-                        </p>
-                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                            <button
-                                onClick={() => setDeleteConfirm({ isOpen: false, id: null })}
-                                className="btn"
-                                style={{ background: 'rgba(255,255,255,0.1)' }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={executeDelete}
-                                className="btn"
-                                style={{ background: '#ef4444', color: 'white' }}
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {deleteConfirm.isOpen && createPortal(
+                <ConfirmModal
+                    isOpen={deleteConfirm.isOpen}
+                    onClose={() => setDeleteConfirm({ isOpen: false, id: null, type: 'item' })}
+                    onConfirm={executeDelete}
+                    title={deleteConfirm.type === 'year' ? "Delete Academic Year" : "Delete Item"}
+                    message={deleteConfirm.type === 'year'
+                        ? `Are you sure you want to delete the academic year ${deleteConfirm.id}? This cannot be undone.`
+                        : "Are you sure you want to delete this item? This action cannot be undone."
+                    }
+                    isDangerous={true}
+                />,
+                document.body
             )}
         </div>
     );

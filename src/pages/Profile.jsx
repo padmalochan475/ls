@@ -129,7 +129,8 @@ const Profile = () => {
             });
             setMessage({ type: 'success', text: 'Profile updated successfully!' });
             setIsEditing(false);
-            setTimeout(() => window.location.reload(), 1000); // Reload to refresh context
+            // Context automatically updates via onSnapshot
+            // window.location.reload() removed for cleaner UX
         } catch (error) {
             console.error(error);
             setMessage({ type: 'error', text: 'Failed to update profile.' });

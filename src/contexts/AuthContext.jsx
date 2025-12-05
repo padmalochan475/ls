@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { auth, db } from '../lib/firebase';
 import {
     signInWithEmailAndPassword,
@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
     const [systemAcademicYear, setSystemAcademicYear] = useState('2024-2025'); // Global System Default
-    const [selectedAcademicYear, setSelectedAcademicYear] = useState(localStorage.getItem('selectedAcademicYear') || null); // User's View Choice
+    const [selectedAcademicYear, setSelectedAcademicYear] = useState(null); // User's View Choice (Defaults to System)
     const [academicYears, setAcademicYears] = useState(['2024-2025']); // List of all years
     const [maxFacultyLoad, setMaxFacultyLoad] = useState(18); // Default Max Load
     const [yearConfigs, setYearConfigs] = useState({});
@@ -81,8 +81,9 @@ export const AuthProvider = ({ children }) => {
     const handleSetSelectedYear = (year) => {
         console.log("Setting Selected Year:", year);
         setSelectedAcademicYear(year);
-        localStorage.setItem('selectedAcademicYear', year);
     };
+
+    const previousSystemYear = useRef(null);
 
     // Listen for Academic Year Changes (Global Config)
     useEffect(() => {
@@ -93,24 +94,17 @@ export const AuthProvider = ({ children }) => {
                 const fetchedYears = data.academicYears || ['2024-2025'];
                 const fetchedConfigs = data.yearConfigs || {};
 
+                // Update Global Context State
                 setSystemAcademicYear(fetchedSystemYear);
                 setAcademicYears(fetchedYears);
                 setYearConfigs(fetchedConfigs);
 
-                // Validate User's Selection
-                const storedYear = localStorage.getItem('selectedAcademicYear');
-                if (storedYear && fetchedYears.includes(storedYear)) {
-                    setSelectedAcademicYear(storedYear);
-                } else {
-                    // If stored year is invalid or null, fallback to system default
-                    if (storedYear) {
-                        console.warn("Stored academic year is invalid, resetting to system default.");
-                        localStorage.removeItem('selectedAcademicYear');
-                    }
-                    setSelectedAcademicYear(fetchedSystemYear);
+                // Validation: If currently viewed year is deleted, reset to system default
+                if (selectedAcademicYear && !fetchedYears.includes(selectedAcademicYear)) {
+                    setSelectedAcademicYear(null);
                 }
             } else {
-                // Initialize if missing
+                // Initialize Default Config if Missing
                 setDoc(doc(db, 'settings', 'config'), {
                     activeAcademicYear: '2024-2025',
                     academicYears: ['2024-2025'],
@@ -121,7 +115,7 @@ export const AuthProvider = ({ children }) => {
             }
         });
         return () => unsubscribe();
-    }, []);
+    }, [selectedAcademicYear]);
 
     // Update Max Load when Year or Configs Change
     useEffect(() => {
@@ -153,11 +147,8 @@ export const AuthProvider = ({ children }) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
 
-                    // Emergency Admin Override
-                    if (currentUser.email === 'padmalochan.maharana@tat.ac.in') {
-                        data.role = 'admin';
-                        data.status = 'approved';
-                    }
+                    // Standard Profile Processing
+                    // (Hardcoded overrides removed for authenticity)
 
                     console.log("User Profile Updated:", data);
                     setUserProfile(data);

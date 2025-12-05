@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db, auth } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
+import ConfirmModal from '../components/ConfirmModal';
 import '../styles/design-system.css';
 
 const AdminPanel = () => {
@@ -13,30 +14,28 @@ const AdminPanel = () => {
     const [filter, setFilter] = useState('all'); // 'all', 'pending', 'approved'
     const [selectedUser, setSelectedUser] = useState(null);
 
-    const fetchUsers = async () => {
+    // Real-Time Users Listener
+    useEffect(() => {
         setLoading(true);
-        try {
-            const querySnapshot = await getDocs(collection(db, 'users'));
+        const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
             const usersList = [];
-            querySnapshot.forEach((doc) => {
+            snapshot.forEach((doc) => {
                 usersList.push({ id: doc.id, ...doc.data() });
             });
             setUsers(usersList);
-        } catch (error) {
-            console.error("Error fetching users: ", error);
-        } finally {
             setLoading(false);
-        }
-    };
+        }, (error) => {
+            console.error("Error fetching users:", error);
+            setLoading(false);
+        });
 
-    useEffect(() => {
-        fetchUsers();
+        return () => unsubscribe();
     }, []);
 
     const handleStatusChange = async (userId, newStatus) => {
         try {
             await updateDoc(doc(db, 'users', userId), { status: newStatus });
-            fetchUsers(); // Refresh list
+            // fetchUsers(); // Refresh list
         } catch (error) {
             console.error("Error updating status: ", error);
             alert("Failed to update status.");
@@ -46,22 +45,30 @@ const AdminPanel = () => {
     const handleRoleChange = async (userId, newRole) => {
         try {
             await updateDoc(doc(db, 'users', userId), { role: newRole });
-            fetchUsers();
+            // fetchUsers();
         } catch (error) {
             console.error("Error updating role: ", error);
             alert("Failed to update role.");
         }
     };
 
-    const handleDeleteUser = async (userId) => {
-        if (window.confirm("Are you sure you want to DELETE this user? This cannot be undone.")) {
-            try {
-                await deleteDoc(doc(db, 'users', userId));
-                fetchUsers();
-            } catch (error) {
-                console.error("Error deleting user: ", error);
-                alert("Failed to delete user.");
-            }
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+    const handleDeleteUser = (userId) => {
+        setConfirmModal({ isOpen: true, id: userId });
+    };
+
+    const executeDeleteUser = async () => {
+        const userId = confirmModal.id;
+        if (!userId) return;
+        setConfirmModal({ isOpen: false, id: null });
+
+        try {
+            await deleteDoc(doc(db, 'users', userId));
+            // fetchUsers();
+        } catch (error) {
+            console.error("Error deleting user: ", error);
+            alert("Failed to delete user.");
         }
     };
 
@@ -289,6 +296,17 @@ const AdminPanel = () => {
                         </div>
                     </div>
                 </div>,
+                document.body
+            )}
+            {createPortal(
+                <ConfirmModal
+                    isOpen={confirmModal.isOpen}
+                    onClose={() => setConfirmModal({ isOpen: false, id: null })}
+                    onConfirm={executeDeleteUser}
+                    title="Delete User"
+                    message="Are you sure you want to PERMANENTLY delete this user? This cannot be undone."
+                    isDangerous={true}
+                />,
                 document.body
             )}
         </div>

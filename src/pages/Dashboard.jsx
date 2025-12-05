@@ -206,74 +206,93 @@ const Dashboard = () => {
             } catch (err) {
                 console.error("Error fetching master data:", err);
             }
+
         };
         fetchMasterData();
     }, []);
 
+    // Real-time Schedule Listener
     useEffect(() => {
-        const fetchData = async () => {
-            if (!activeAcademicYear || weekDates.length === 0) return;
-            setLoading(true);
-            try {
-                const q = query(
-                    collection(db, 'schedule'),
-                    where('academicYear', '==', activeAcademicYear)
-                );
-                const snap = await getDocs(q);
-                const allData = snap.docs.map(d => d.data());
-                setTotalClasses(allData.length);
+        if (!activeAcademicYear || weekDates.length === 0) {
+            setLoading(false);
+            return;
+        }
 
-                // 1. Filter for Selected Date's Schedule
-                let dailyFiltered = [];
-                const isPersonalView = dashboardView === 'personal';
+        setLoading(true);
+        console.log("Setting up Dashboard real-time listener...");
 
-                const isMyAssignment = (item, targetName) => {
-                    // 1. Robust Check: Match by EmpID (if available in both profile and schedule)
-                    if (isPersonalView && userProfile?.empId) {
-                        if (item.facultyEmpId === userProfile.empId) return true;
-                        if (item.faculty2EmpId === userProfile.empId) return true;
-                    }
+        const q = query(
+            collection(db, 'schedule'),
+            where('academicYear', '==', activeAcademicYear)
+        );
 
-                    // 2. Fallback Check: Match by Name (Legacy data or Admin view)
-                    if (!item.faculty) return false;
-                    return item.faculty === targetName || item.faculty.includes(targetName) || (item.faculty2 && item.faculty2.includes(targetName));
-                };
+        const unsubscribe = onSnapshot(q, (snap) => {
+            const allData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setTotalClasses(allData.length);
 
-                if (selectedFaculty === 'All Assignments') {
-                    dailyFiltered = allData.filter(item => item.day === currentDayName);
-                } else {
-                    if (!selectedFaculty) {
-                        dailyFiltered = [];
-                    } else {
-                        dailyFiltered = allData.filter(item =>
-                            item.day === currentDayName && isMyAssignment(item, selectedFaculty)
-                        );
-                    }
+            // Filter Logic
+            let dailyFiltered = [];
+            const isPersonalView = dashboardView === 'personal';
+
+            const isMyAssignment = (item, targetName) => {
+                // 1. Robust Check: Match by EmpID
+                if (isPersonalView && userProfile?.empId) {
+                    if (item.facultyEmpId === userProfile.empId) return true;
+                    if (item.faculty2EmpId === userProfile.empId) return true;
                 }
-                setTodaySchedule(dailyFiltered);
+                // 2. Fallback Check: Match by Name
+                if (!item.faculty) return false;
+                return item.faculty === targetName || item.faculty.includes(targetName) || (item.faculty2 && item.faculty2.includes(targetName));
+            };
 
-                // 2. Filter for Weekly Schedule
-                if (selectedFaculty !== 'All Assignments' && selectedFaculty) {
-                    const facultyData = allData.filter(item => isMyAssignment(item, selectedFaculty));
-
-                    const grouped = {};
-                    weekDates.forEach(({ dayName }) => {
-                        grouped[dayName] = facultyData.filter(item => item.day === dayName).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-                    });
-                    setWeeklySchedule(grouped);
+            if (selectedFaculty === 'All Assignments') {
+                dailyFiltered = allData.filter(item => item.day === currentDayName);
+            } else {
+                if (!selectedFaculty) {
+                    dailyFiltered = [];
                 } else {
-                    setWeeklySchedule({});
+                    dailyFiltered = allData.filter(item =>
+                        item.day === currentDayName && isMyAssignment(item, selectedFaculty)
+                    );
                 }
-
-            } catch (err) {
-                console.error("Error fetching schedule:", err);
-            } finally {
-                setLoading(false);
             }
-        };
+            setTodaySchedule(dailyFiltered);
 
-        fetchData();
-    }, [activeAcademicYear, selectedFaculty, currentDayName, weekDates]);
+            // Weekly Data Processing
+            let facultyData = allData;
+            if (selectedFaculty !== 'All Assignments' && selectedFaculty) {
+                facultyData = allData.filter(item => isMyAssignment(item, selectedFaculty));
+            } else if (!selectedFaculty) {
+                facultyData = [];
+            }
+
+            const grouped = {};
+            weekDates.forEach(({ dayName }) => {
+                // If 'All Assignments', showing all. If specific, showing filtered.
+                // Wait, the original logic for 'All Assignments' didn't populate 'grouped' for Weekly Schedule?
+                // Let's check original logic:
+                // "if (selectedFaculty !== 'All Assignments' && selectedFaculty)" -> Populate Grouped.
+                // Else -> setWeeklySchedule({}).
+
+                if (selectedFaculty !== 'All Assignments' && selectedFaculty) {
+                    grouped[dayName] = facultyData.filter(item => item.day === dayName).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+                }
+            });
+
+            if (selectedFaculty === 'All Assignments') {
+                setWeeklySchedule({});
+            } else {
+                setWeeklySchedule(grouped);
+            }
+
+            setLoading(false);
+        }, (err) => {
+            console.error("Error fetching dashboard data:", err);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [activeAcademicYear, weekDates, currentDayName, selectedFaculty, dashboardView, userProfile]);
 
     // Helper to get relative date label
     const getDateLabel = (date) => {

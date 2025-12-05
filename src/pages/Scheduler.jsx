@@ -5,7 +5,8 @@ import { collection, getDocs, addDoc, query, where, deleteDoc, doc, updateDoc, o
 import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
 import '../styles/design-system.css';
-import { ChevronDown, Check, LayoutGrid, List, Zap, Printer, Filter, Users, BookOpen, FlaskConical, Layers, X } from 'lucide-react';
+import ConfirmModal from '../components/ConfirmModal';
+import { ChevronDown, Check, LayoutGrid, List, Zap, Printer, Filter, Users, BookOpen, FlaskConical, Layers, X, RefreshCw } from 'lucide-react';
 
 const MultiSelectDropdown = ({ options, selected, onChange, label, icon: Icon }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -439,6 +440,7 @@ const Scheduler = () => {
     useEffect(() => {
         if (!activeAcademicYear) {
             setSchedule([]);
+            setLoading(false);
             return;
         }
 
@@ -555,6 +557,11 @@ const Scheduler = () => {
         if (e) e.preventDefault();
         setError('');
 
+        if (!navigator.onLine) {
+            alert("You are offline. Cannot save changes.");
+            return;
+        }
+
         const dataToSave = overrideData || formData;
 
         // Basic Validation
@@ -619,13 +626,38 @@ const Scheduler = () => {
         setIsModalOpen(true);
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm("Are you sure you want to remove this class?")) {
-            try {
-                await deleteDoc(doc(db, 'schedule', id));
-            } catch (err) {
-                console.error("Error deleting:", err);
-            }
+    // Deleting State
+    const [deletingIds, setDeletingIds] = useState(new Set());
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+    const handleDelete = (id) => {
+        if (!id) return;
+        setConfirmModal({ isOpen: true, id });
+    };
+
+    const executeDelete = async () => {
+        const id = confirmModal.id;
+        if (!id) return;
+        setConfirmModal({ isOpen: false, id: null });
+
+        if (!navigator.onLine) {
+            alert("You are offline. Cannot delete.");
+            return;
+        }
+
+        setDeletingIds(prev => new Set(prev).add(id));
+
+        try {
+            await deleteDoc(doc(db, 'schedule', id));
+            // onSnapshot will handle the removal
+        } catch (err) {
+            console.error("Error deleting:", err);
+            setDeletingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(id);
+                return newSet;
+            });
+            alert("Failed to delete class.");
         }
     };
 
@@ -680,6 +712,15 @@ const Scheduler = () => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', height: '100%' }}>
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                title="Remove Class"
+                message="Are you sure you want to remove this class from the schedule?"
+                onConfirm={executeDelete}
+                onCancel={() => setConfirmModal({ isOpen: false, id: null })}
+                isDangerous={true}
+                confirmText="Remove"
+            />
             <style>{`
                 @media print {
                     @page { 
@@ -1348,10 +1389,10 @@ const Scheduler = () => {
                                                                         position: 'absolute',
                                                                         top: '6px',
                                                                         right: '6px',
-                                                                        background: 'rgba(239, 68, 68, 0.15)',
+                                                                        background: deletingIds.has(assignment.id) ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.15)',
                                                                         border: '1px solid rgba(239, 68, 68, 0.2)',
                                                                         color: '#fca5a5',
-                                                                        cursor: 'pointer',
+                                                                        cursor: deletingIds.has(assignment.id) ? 'wait' : 'pointer',
                                                                         fontSize: '0.7rem',
                                                                         width: '20px',
                                                                         height: '20px',
@@ -1360,23 +1401,28 @@ const Scheduler = () => {
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
                                                                         transition: 'all 0.2s',
-                                                                        opacity: 0.6
+                                                                        opacity: deletingIds.has(assignment.id) ? 0.5 : 0.6
                                                                     }}
                                                                     onMouseEnter={(e) => {
-                                                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
-                                                                        e.currentTarget.style.color = 'white';
-                                                                        e.currentTarget.style.opacity = '1';
-                                                                        e.currentTarget.style.transform = 'scale(1.1)';
+                                                                        if (!deletingIds.has(assignment.id)) {
+                                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
+                                                                            e.currentTarget.style.color = 'white';
+                                                                            e.currentTarget.style.opacity = '1';
+                                                                            e.currentTarget.style.transform = 'scale(1.1)';
+                                                                        }
                                                                     }}
                                                                     onMouseLeave={(e) => {
-                                                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-                                                                        e.currentTarget.style.color = '#fca5a5';
-                                                                        e.currentTarget.style.opacity = '0.6';
-                                                                        e.currentTarget.style.transform = 'scale(1)';
+                                                                        if (!deletingIds.has(assignment.id)) {
+                                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                                                                            e.currentTarget.style.color = '#fca5a5';
+                                                                            e.currentTarget.style.opacity = '0.6';
+                                                                            e.currentTarget.style.transform = 'scale(1)';
+                                                                        }
                                                                     }}
-                                                                    title="Delete Class"
+                                                                    title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete Class"}
+                                                                    disabled={deletingIds.has(assignment.id)}
                                                                 >
-                                                                    ✕
+                                                                    {deletingIds.has(assignment.id) ? <RefreshCw size={10} className="spin" /> : '✕'}
                                                                 </button>
                                                             )}
                                                         </div>
@@ -1480,10 +1526,10 @@ const Scheduler = () => {
                                                                         position: 'absolute',
                                                                         top: '4px',
                                                                         right: '4px',
-                                                                        background: 'rgba(239, 68, 68, 0.2)',
+                                                                        background: deletingIds.has(assignment.id) ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.2)',
                                                                         border: 'none',
                                                                         color: '#fca5a5',
-                                                                        cursor: 'pointer',
+                                                                        cursor: deletingIds.has(assignment.id) ? 'wait' : 'pointer',
                                                                         fontSize: '0.7rem',
                                                                         width: '18px',
                                                                         height: '18px',
@@ -1491,13 +1537,23 @@ const Scheduler = () => {
                                                                         display: 'flex',
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
-                                                                        transition: 'background 0.2s'
+                                                                        transition: 'background 0.2s',
+                                                                        opacity: deletingIds.has(assignment.id) ? 0.5 : 1
                                                                     }}
-                                                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.5)'}
-                                                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
-                                                                    title="Delete Class"
+                                                                    onMouseEnter={(e) => {
+                                                                        if (!deletingIds.has(assignment.id)) {
+                                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.5)';
+                                                                        }
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        if (!deletingIds.has(assignment.id)) {
+                                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                                                        }
+                                                                    }}
+                                                                    title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete Class"}
+                                                                    disabled={deletingIds.has(assignment.id)}
                                                                 >
-                                                                    ✕
+                                                                    {deletingIds.has(assignment.id) ? <RefreshCw size={10} className="spin" /> : '✕'}
                                                                 </button>
                                                             )}
                                                         </div>

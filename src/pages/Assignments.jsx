@@ -10,6 +10,7 @@ import {
     User, Monitor, GraduationCap, ChevronDown, Brain, Activity
 } from 'lucide-react';
 import MasterData from './MasterData';
+import ConfirmModal from '../components/ConfirmModal';
 
 const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = false, style }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -635,6 +636,7 @@ const Assignments = () => {
     useEffect(() => {
         if (!activeAcademicYear) {
             setFullSchedule([]);
+            setLoading(false);
             return;
         }
 
@@ -754,6 +756,11 @@ const Assignments = () => {
     };
 
     const handleAssign = async () => {
+        if (!navigator.onLine) {
+            alert("You are offline. Cannot save assignments.");
+            return;
+        }
+
         if (!selectedDay || !selectedTime || !selectedSubject || !selectedFaculty || !selectedRoom || !selectedDept || !selectedSem || !selectedMainGroup) {
             alert("Please fill in all required fields.");
             return;
@@ -777,7 +784,6 @@ const Assignments = () => {
                 faculty: selectedFaculty,
                 facultyEmpId: facultyObj ? facultyObj.empId : null,
                 faculty2: selectedFaculty2 || null,
-                room: selectedRoom,
                 room: selectedRoom,
                 group: selectedSubGroup,
                 section: selectedMainGroup,
@@ -804,13 +810,39 @@ const Assignments = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm("Delete this assignment?")) return;
+    // Deleting State
+    const [deletingIds, setDeletingIds] = useState(new Set());
+
+    // Modal State
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+    const handleDelete = (e, id) => {
+        e.stopPropagation();
+        if (!id) return;
+        setConfirmModal({ isOpen: true, id });
+    };
+
+    const executeDelete = async () => {
+        const id = confirmModal.id;
+        if (!id) return;
+
+        setConfirmModal({ isOpen: false, id: null });
+
+        // Authentic Update: Show "Deleting..." state, wait for DB
+        setDeletingIds(prev => new Set(prev).add(id));
+
         try {
             await deleteDoc(doc(db, 'schedule', id));
-            setLastSavedCount(prev => prev + 1);
-        } catch (e) {
-            console.error("Error deleting:", e);
+            setSuccessMsg('Assignment deleted permanently.');
+            // onSnapshot will handle the removal from UI
+        } catch (err) {
+            console.error("Delete failed:", err);
+            setDeletingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(id);
+                return newSet;
+            });
+            alert("Failed to delete assignment: " + err.message);
         }
     };
 
@@ -853,13 +885,20 @@ const Assignments = () => {
     }, [rawGroups, selectedMainGroup]);
 
 
-
-
-
     return (
         <div className="assignments-container animate-fade-in">
+            {/* Confirm Modal */}
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                title="Delete Assignment"
+                message="Are you sure you want to delete this assignment? This action cannot be undone."
+                onConfirm={executeDelete}
+                onCancel={() => setConfirmModal({ isOpen: false, id: null })}
+                isDangerous={true}
+                confirmText="Delete Permanently"
+            />
             {/* Header */}
-            <div className="assignments-header">
+            < div className="assignments-header" >
                 <div>
                     <h2 className="page-title">
                         {isAdmin ? 'Create Assignment' : 'Assignments'} <span className="academic-year-badge">({activeAcademicYear})</span>
@@ -873,234 +912,236 @@ const Assignments = () => {
                         <Settings size={16} /> <span className="hide-on-mobile">Manage Master Data</span>
                     </button>
                 )}
-            </div>
+            </div >
 
             {/* Main Content Grid */}
-            <div className="assignments-content" style={!isAdmin ? { gridTemplateColumns: '1fr' } : {}}>
+            < div className="assignments-content" style={!isAdmin ? { gridTemplateColumns: '1fr' } : {}}>
 
                 {/* Left Column: Form */}
-                {isAdmin && (
-                    <div className="glass-panel form-panel">
+                {
+                    isAdmin && (
+                        <div className="glass-panel form-panel">
 
-                        {/* Section 1: Schedule */}
-                        <div className="form-section">
-                            <h3 className="section-title" style={{ color: '#60a5fa' }}>
-                                <Clock size={16} /> Schedule
-                            </h3>
-                            <div className="form-grid-2">
-                                <div className="form-group">
-                                    <label>Day</label>
-                                    <Select
-                                        options={days}
-                                        value={selectedDay}
-                                        onChange={setSelectedDay}
-                                        placeholder="Select Day..."
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Time</label>
-                                    <Select
-                                        options={timeSlots}
-                                        value={selectedTime}
-                                        onChange={setSelectedTime}
-                                        placeholder="Select Time..."
-                                    />
-                                </div>
-                            </div>
-
-                            {/* AI Insight Banner */}
-                            {(selectedDay && selectedTime) && (
-                                <div className="glass-panel" style={{
-                                    marginTop: '1rem',
-                                    padding: '0.75rem',
-                                    background: isAnalyzing ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.2)',
-                                    border: isAnalyzing ? '1px solid rgba(255,255,255,0.1)' : `1px solid ${aiInsight?.color || 'transparent'}`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    borderRadius: '12px',
-                                    transition: 'all 0.3s ease'
-                                }}>
-                                    {isAnalyzing ? (
-                                        <RefreshCw size={18} className="spin-slow" style={{ color: '#94a3b8' }} />
-                                    ) : (
-                                        <Brain size={18} style={{ color: aiInsight?.color }} className={aiInsight?.status === 'optimal' ? 'pulse-slow' : ''} />
-                                    )}
-
-                                    <div style={{ flex: 1 }}>
-                                        {isAnalyzing ? (
-                                            <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                                AI Analysis running...
-                                            </span>
-                                        ) : (
-                                            <div className="animate-fade-in">
-                                                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: aiInsight?.color }}>
-                                                    {aiInsight?.message}
-                                                </div>
-                                                {aiInsight?.utilization > 0 && (
-                                                    <div style={{
-                                                        height: '4px',
-                                                        background: 'rgba(255,255,255,0.1)',
-                                                        borderRadius: '2px',
-                                                        marginTop: '6px',
-                                                        overflow: 'hidden'
-                                                    }}>
-                                                        <div style={{
-                                                            height: '100%',
-                                                            width: `${aiInsight.utilization}%`,
-                                                            background: aiInsight.color,
-                                                            transition: 'width 1s ease-out'
-                                                        }} />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                            {/* Section 1: Schedule */}
+                            <div className="form-section">
+                                <h3 className="section-title" style={{ color: '#60a5fa' }}>
+                                    <Clock size={16} /> Schedule
+                                </h3>
+                                <div className="form-grid-2">
+                                    <div className="form-group">
+                                        <label>Day</label>
+                                        <Select
+                                            options={days}
+                                            value={selectedDay}
+                                            onChange={setSelectedDay}
+                                            placeholder="Select Day..."
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Time</label>
+                                        <Select
+                                            options={timeSlots}
+                                            value={selectedTime}
+                                            onChange={setSelectedTime}
+                                            placeholder="Select Time..."
+                                        />
                                     </div>
                                 </div>
-                            )}
-                        </div>
 
-                        {/* Section 2: Class Info */}
-                        <div className="form-section">
-                            <h3 className="section-title" style={{ color: '#34d399' }}>
-                                <Layers size={16} /> Class Info
-                            </h3>
-                            <div className="form-grid-2">
-                                <div className="form-group">
-                                    <label>Dept</label>
-                                    <Select
-                                        options={departments}
-                                        value={selectedDept}
-                                        onChange={setSelectedDept}
-                                        placeholder="Select..."
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Sem</label>
-                                    <Select
-                                        options={semesters}
-                                        value={selectedSem}
-                                        onChange={setSelectedSem}
-                                        placeholder="Select..."
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Group</label>
-                                    <Select
-                                        options={rawGroups.map(g => ({ value: g.name, label: g.name }))}
-                                        value={selectedMainGroup}
-                                        onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }}
-                                        placeholder="Select Group..."
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Sub Group</label>
-                                    <Select
-                                        options={availableSubGroups}
-                                        value={selectedSubGroup}
-                                        onChange={setSelectedSubGroup}
-                                        placeholder="Select Sub Group..."
-                                        disabled={!selectedMainGroup || selectedMainGroup === 'All' || availableSubGroups.length === 0}
-                                    />
+                                {/* AI Insight Banner */}
+                                {(selectedDay && selectedTime) && (
+                                    <div className="glass-panel" style={{
+                                        marginTop: '1rem',
+                                        padding: '0.75rem',
+                                        background: isAnalyzing ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.2)',
+                                        border: isAnalyzing ? '1px solid rgba(255,255,255,0.1)' : `1px solid ${aiInsight?.color || 'transparent'}`,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        borderRadius: '12px',
+                                        transition: 'all 0.3s ease'
+                                    }}>
+                                        {isAnalyzing ? (
+                                            <RefreshCw size={18} className="spin-slow" style={{ color: '#94a3b8' }} />
+                                        ) : (
+                                            <Brain size={18} style={{ color: aiInsight?.color }} className={aiInsight?.status === 'optimal' ? 'pulse-slow' : ''} />
+                                        )}
+
+                                        <div style={{ flex: 1 }}>
+                                            {isAnalyzing ? (
+                                                <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                                    AI Analysis running...
+                                                </span>
+                                            ) : (
+                                                <div className="animate-fade-in">
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: aiInsight?.color }}>
+                                                        {aiInsight?.message}
+                                                    </div>
+                                                    {aiInsight?.utilization > 0 && (
+                                                        <div style={{
+                                                            height: '4px',
+                                                            background: 'rgba(255,255,255,0.1)',
+                                                            borderRadius: '2px',
+                                                            marginTop: '6px',
+                                                            overflow: 'hidden'
+                                                        }}>
+                                                            <div style={{
+                                                                height: '100%',
+                                                                width: `${aiInsight.utilization}%`,
+                                                                background: aiInsight.color,
+                                                                transition: 'width 1s ease-out'
+                                                            }} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Section 2: Class Info */}
+                            <div className="form-section">
+                                <h3 className="section-title" style={{ color: '#34d399' }}>
+                                    <Layers size={16} /> Class Info
+                                </h3>
+                                <div className="form-grid-2">
+                                    <div className="form-group">
+                                        <label>Dept</label>
+                                        <Select
+                                            options={departments}
+                                            value={selectedDept}
+                                            onChange={setSelectedDept}
+                                            placeholder="Select..."
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Sem</label>
+                                        <Select
+                                            options={semesters}
+                                            value={selectedSem}
+                                            onChange={setSelectedSem}
+                                            placeholder="Select..."
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Group</label>
+                                        <Select
+                                            options={rawGroups.map(g => ({ value: g.name, label: g.name }))}
+                                            value={selectedMainGroup}
+                                            onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }}
+                                            placeholder="Select Group..."
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Sub Group</label>
+                                        <Select
+                                            options={availableSubGroups}
+                                            value={selectedSubGroup}
+                                            onChange={setSelectedSubGroup}
+                                            placeholder="Select Sub Group..."
+                                            disabled={!selectedMainGroup || selectedMainGroup === 'All' || availableSubGroups.length === 0}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Section 3: Details */}
-                        <div className="form-section">
-                            <h3 className="section-title" style={{ color: '#f472b6' }}>
-                                <BookOpen size={16} /> Details
-                            </h3>
-                            <div className="form-grid-2">
-                                <div className="form-group full-width">
-                                    <label>Subject</label>
-                                    <Select
-                                        options={subjects.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))}
-                                        value={selectedSubject}
-                                        onChange={setSelectedSubject}
-                                        placeholder="Select Subject..."
-                                    />
-                                </div>
-                                <div className="form-group full-width">
-                                    <label>Room</label>
-                                    <Select
-                                        options={rooms}
-                                        value={selectedRoom}
-                                        onChange={setSelectedRoom}
-                                        placeholder="Select Room..."
-                                    />
+                            {/* Section 3: Details */}
+                            <div className="form-section">
+                                <h3 className="section-title" style={{ color: '#f472b6' }}>
+                                    <BookOpen size={16} /> Details
+                                </h3>
+                                <div className="form-grid-2">
+                                    <div className="form-group full-width">
+                                        <label>Subject</label>
+                                        <Select
+                                            options={subjects.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))}
+                                            value={selectedSubject}
+                                            onChange={setSelectedSubject}
+                                            placeholder="Select Subject..."
+                                        />
+                                    </div>
+                                    <div className="form-group full-width">
+                                        <label>Room</label>
+                                        <Select
+                                            options={rooms}
+                                            value={selectedRoom}
+                                            onChange={setSelectedRoom}
+                                            placeholder="Select Room..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Section 4: Faculty */}
-                        <div className="form-section">
-                            <h3 className="section-title" style={{ color: '#fbbf24' }}>
-                                <Users size={16} /> Faculty
-                            </h3>
-                            <div className="form-grid-1">
-                                <div className="form-group">
-                                    <label>Faculty 1</label>
-                                    <Select
-                                        options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
-                                        value={selectedFaculty}
-                                        onChange={setSelectedFaculty}
-                                        placeholder="Select Faculty..."
-                                    />
-                                    {renderFacultyLoad(selectedFaculty)}
-                                </div>
-                                <div className="form-group">
-                                    <label>Faculty 2</label>
-                                    <Select
-                                        options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
-                                        value={selectedFaculty2}
-                                        onChange={setSelectedFaculty2}
-                                        placeholder="Select Faculty..."
-                                    />
-                                    {renderFacultyLoad(selectedFaculty2)}
+                            {/* Section 4: Faculty */}
+                            <div className="form-section">
+                                <h3 className="section-title" style={{ color: '#fbbf24' }}>
+                                    <Users size={16} /> Faculty
+                                </h3>
+                                <div className="form-grid-1">
+                                    <div className="form-group">
+                                        <label>Faculty 1</label>
+                                        <Select
+                                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
+                                            value={selectedFaculty}
+                                            onChange={setSelectedFaculty}
+                                            placeholder="Select Faculty..."
+                                        />
+                                        {renderFacultyLoad(selectedFaculty)}
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Faculty 2</label>
+                                        <Select
+                                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
+                                            value={selectedFaculty2}
+                                            onChange={setSelectedFaculty2}
+                                            placeholder="Select Faculty..."
+                                        />
+                                        {renderFacultyLoad(selectedFaculty2)}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Actions */}
-                        <div className="form-actions">
-                            {/* Conflict Alert */}
-                            {conflict && !saving && !successMsg && (
-                                <div className="alert-box error animate-fade-in">
-                                    <AlertTriangle size={18} className="alert-icon" />
-                                    <div className="alert-content">{conflict.message}</div>
-                                </div>
-                            )}
+                            {/* Actions */}
+                            <div className="form-actions">
+                                {/* Conflict Alert */}
+                                {conflict && !saving && !successMsg && (
+                                    <div className="alert-box error animate-fade-in">
+                                        <AlertTriangle size={18} className="alert-icon" />
+                                        <div className="alert-content">{conflict.message}</div>
+                                    </div>
+                                )}
 
-                            {/* Success Message */}
-                            {successMsg && (
-                                <div className="alert-box success animate-fade-in">
-                                    <Check size={18} className="alert-icon" />
-                                    <div className="alert-content">{successMsg}</div>
-                                    <button onClick={() => setSuccessMsg('')} className="alert-close">
-                                        <X size={14} />
+                                {/* Success Message */}
+                                {successMsg && (
+                                    <div className="alert-box success animate-fade-in">
+                                        <Check size={18} className="alert-icon" />
+                                        <div className="alert-content">{successMsg}</div>
+                                        <button onClick={() => setSuccessMsg('')} className="alert-close">
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div className="button-group">
+                                    <button className="btn btn-secondary" onClick={() => {
+                                        setSelectedSubject(''); setSelectedFaculty(''); setSelectedRoom(''); setSelectedFaculty2('');
+                                    }}>
+                                        Clear
+                                    </button>
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={handleAssign}
+                                        disabled={saving || !!conflict}
+                                    >
+                                        {saving ? <RefreshCw className="spin" size={18} /> : <Check size={18} />}
+                                        {saving ? 'Creating...' : 'Create Assignment'}
                                     </button>
                                 </div>
-                            )}
-
-                            <div className="button-group">
-                                <button className="btn btn-secondary" onClick={() => {
-                                    setSelectedSubject(''); setSelectedFaculty(''); setSelectedRoom(''); setSelectedFaculty2('');
-                                }}>
-                                    Clear
-                                </button>
-                                <button
-                                    className="btn btn-primary"
-                                    onClick={handleAssign}
-                                    disabled={saving || !!conflict}
-                                >
-                                    {saving ? <RefreshCw className="spin" size={18} /> : <Check size={18} />}
-                                    {saving ? 'Creating...' : 'Create Assignment'}
-                                </button>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Right Column: Existing Assignments Table */}
                 <div className="glass-panel table-panel">
@@ -1168,7 +1209,7 @@ const Assignments = () => {
                             </thead>
                             <tbody>
                                 {filteredAssignments.length > 0 ? filteredAssignments.map((assignment, index) => (
-                                    <tr key={index} className="table-row-hover">
+                                    <tr key={assignment.id} className="table-row-hover">
                                         <td>
                                             <div className="cell-primary">{assignment.day}</div>
                                             <div className="cell-secondary">
@@ -1213,11 +1254,17 @@ const Assignments = () => {
                                         <td className="actions-col">
                                             {assignment.id && isAdmin && (
                                                 <button
-                                                    onClick={() => handleDelete(assignment.id)}
+                                                    onClick={(e) => handleDelete(e, assignment.id)}
                                                     className="icon-btn-danger"
-                                                    title="Delete"
+                                                    title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete"}
+                                                    disabled={deletingIds.has(assignment.id)}
+                                                    style={deletingIds.has(assignment.id) ? { opacity: 0.7, cursor: 'wait' } : {}}
                                                 >
-                                                    <Trash2 size={16} />
+                                                    {deletingIds.has(assignment.id) ? (
+                                                        <RefreshCw size={16} className="spin" />
+                                                    ) : (
+                                                        <Trash2 size={16} />
+                                                    )}
                                                 </button>
                                             )}
                                         </td>
@@ -1241,24 +1288,26 @@ const Assignments = () => {
                         </table>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* Manage Data Modal */}
-            {isManageModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-content glass-panel animate-scale-in">
-                        <button
-                            onClick={() => { setIsManageModalOpen(false); fetchMasterData(); }}
-                            className="modal-close-btn"
-                        >
-                            <X size={20} />
-                        </button>
-                        <div className="modal-body">
-                            <MasterData initialTab={manageModalTab} />
+            {
+                isManageModalOpen && (
+                    <div className="modal-overlay">
+                        <div className="modal-content glass-panel animate-scale-in">
+                            <button
+                                onClick={() => { setIsManageModalOpen(false); fetchMasterData(); }}
+                                className="modal-close-btn"
+                            >
+                                <X size={20} />
+                            </button>
+                            <div className="modal-body">
+                                <MasterData initialTab={manageModalTab} />
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* CSS Styles */}
             <style>{`
@@ -1792,7 +1841,7 @@ const Assignments = () => {
                     }
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 
