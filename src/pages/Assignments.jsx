@@ -3,14 +3,301 @@ import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
 import { collection, addDoc, getDocs, query, where, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import { useMasterData } from '../contexts/MasterDataContext';
 import {
     Check, Users, MapPin, BookOpen, Layers, Hash, X, Zap, RefreshCw,
     AlertTriangle, Info, Keyboard, Settings, Calendar, Clock, Search, Trash2,
-    User, Monitor, GraduationCap, ChevronDown
+    User, Monitor, GraduationCap, ChevronDown, Brain, Activity
 } from 'lucide-react';
 import MasterData from './MasterData';
 
 const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = false, style }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [highlightedIndex, setHighlightedIndex] = useState(-1);
+    const [search, setSearch] = useState('');
+    const searchInputRef = useRef(null);
+    const dropdownRef = useRef(null);
+    const listRef = useRef(null);
+    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+
+    // Generate a safe ID for the portal
+    const portalId = `select-portal-${placeholder.replace(/[^a-zA-Z0-9]/g, '-')}`;
+
+    // Normalize options
+    const normalizedOptions = options.map(opt => {
+        if (typeof opt === 'object' && opt !== null) {
+            return { ...opt, value: opt.value, label: opt.label || opt.value };
+        }
+        return { value: opt, label: opt };
+    });
+
+    // Filter options based on search
+    const filteredOptions = normalizedOptions.filter(opt =>
+        opt.label.toString().toLowerCase().includes(search.toLowerCase())
+    );
+
+    const selectedOption = normalizedOptions.find(opt => opt.value === value);
+
+    // Close on click outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                // Check if click is inside the portal
+                const portal = document.getElementById(portalId);
+                if (portal && portal.contains(event.target)) return;
+                setIsOpen(false);
+                setSearch('');
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [portalId]);
+
+    // Update coords on open and scroll
+    useEffect(() => {
+        const updateCoords = () => {
+            if (dropdownRef.current) {
+                const rect = dropdownRef.current.getBoundingClientRect();
+                setCoords({
+                    top: rect.bottom + 6,
+                    left: rect.left,
+                    width: rect.width
+                });
+            }
+        };
+
+        if (isOpen) {
+            updateCoords();
+            window.addEventListener('scroll', updateCoords, true);
+            window.addEventListener('resize', updateCoords);
+
+            // Focus search input
+            if (searchInputRef.current) {
+                searchInputRef.current.focus();
+            }
+
+            // Set initial highlighted index
+            const index = filteredOptions.findIndex(opt => opt.value === value);
+            setHighlightedIndex(index >= 0 ? index : 0);
+        } else {
+            setSearch('');
+        }
+
+        return () => {
+            window.removeEventListener('scroll', updateCoords, true);
+            window.removeEventListener('resize', updateCoords);
+        };
+    }, [isOpen, value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Scroll highlighted item into view
+    useEffect(() => {
+        if (isOpen && listRef.current && highlightedIndex >= 0) {
+            const list = listRef.current;
+            // Adjust for search input being the first child
+            const element = list.children[highlightedIndex + 1];
+            if (element) {
+                element.scrollIntoView({ block: 'nearest' });
+            }
+        }
+    }, [highlightedIndex, isOpen]);
+
+    const handleKeyDown = (e) => {
+        if (disabled) return;
+
+        // Prevent double entry if typing in search input
+        if (e.target === searchInputRef.current && e.key.length === 1) {
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (isOpen) {
+                if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+                    const option = filteredOptions[highlightedIndex];
+                    if (!option.disabled) {
+                        onChange(option.value);
+                        setIsOpen(false);
+                        setSearch('');
+                        // Return focus to the main div so tab order is preserved
+                        if (dropdownRef.current) dropdownRef.current.querySelector('[tabindex]').focus();
+                    }
+                }
+            } else {
+                setIsOpen(true);
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!isOpen) {
+                setIsOpen(true);
+            } else {
+                setHighlightedIndex(prev => (prev + 1) % filteredOptions.length);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!isOpen) {
+                setIsOpen(true);
+            } else {
+                setHighlightedIndex(prev => (prev - 1 + filteredOptions.length) % filteredOptions.length);
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setIsOpen(false);
+            setSearch('');
+            if (dropdownRef.current) dropdownRef.current.querySelector('[tabindex]').focus();
+        } else if (e.key === 'Tab') {
+            if (isOpen) {
+                // Select current item on Tab and move to next
+                if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+                    const option = filteredOptions[highlightedIndex];
+                    if (!option.disabled) {
+                        onChange(option.value);
+                    }
+                }
+                setIsOpen(false);
+                setSearch('');
+                // Restore focus to trigger so default Tab behavior moves to the NEXT element from here
+                if (dropdownRef.current) dropdownRef.current.querySelector('[tabindex]').focus();
+            }
+        } else if (!isOpen && e.key.length === 1) {
+            e.preventDefault();
+            // Open and start searching if typing while closed
+            setIsOpen(true);
+            setSearch(e.key);
+        }
+    };
+
+    return (
+        <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+            <div
+                onClick={() => !disabled && setIsOpen(!isOpen)}
+                onKeyDown={handleKeyDown}
+                tabIndex={disabled ? -1 : 0}
+                className={`glass-input premium-input ${isOpen ? 'focused' : ''}`}
+                style={{
+                    padding: '0.75rem 1rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    opacity: disabled ? 0.6 : 1,
+                    background: disabled ? 'rgba(255,255,255,0.02)' : 'rgba(15, 23, 42, 0.6)',
+                    borderColor: isOpen ? 'var(--color-accent)' : undefined,
+                    boxShadow: isOpen ? '0 0 0 3px var(--color-accent-subtle)' : undefined
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                    {Icon && <Icon size={16} style={{ color: isOpen ? 'var(--color-accent)' : '#94a3b8', flexShrink: 0, transition: 'color 0.2s' }} />}
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: value ? 'white' : '#94a3b8' }}>
+                        {selectedOption ? selectedOption.label : placeholder}
+                    </span>
+                </div>
+                <ChevronDown size={16} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0, color: isOpen ? 'var(--color-accent)' : '#94a3b8' }} />
+            </div>
+
+            {isOpen && !disabled && createPortal(
+                <div
+                    id={portalId}
+                    ref={listRef}
+                    className="animate-fade-in"
+                    style={{
+                        position: 'fixed',
+                        top: coords.top,
+                        left: coords.left,
+                        width: coords.width,
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        background: '#1e293b',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '10px',
+                        zIndex: 9999,
+                        padding: '6px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                    }}
+                >
+                    {/* Search Input */}
+                    <div style={{ padding: '4px 4px 8px 4px', position: 'sticky', top: 0, background: '#1e293b', zIndex: 10 }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            background: 'rgba(255,255,255,0.05)',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            border: '1px solid rgba(255,255,255,0.1)'
+                        }}>
+                            <Search size={14} color="#94a3b8" style={{ marginRight: '8px' }} />
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={search}
+                                onChange={(e) => {
+                                    setSearch(e.target.value);
+                                    setHighlightedIndex(0);
+                                }}
+                                onKeyDown={(e) => {
+                                    // Let global handler handle navigation, but stop propagation for typing
+                                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape' || e.key === 'Tab') {
+                                        handleKeyDown(e);
+                                    } else {
+                                        e.stopPropagation();
+                                    }
+                                }}
+                                placeholder="Search..."
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'white',
+                                    fontSize: '0.9rem',
+                                    width: '100%',
+                                    outline: 'none'
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
+                    </div>
+
+                    {filteredOptions.length > 0 ? filteredOptions.map((opt, index) => (
+                        <div
+                            key={opt.value}
+                            onClick={() => {
+                                if (opt.disabled) return;
+                                onChange(opt.value);
+                                setIsOpen(false);
+                                setSearch('');
+                                if (dropdownRef.current) dropdownRef.current.querySelector('[tabindex]').focus();
+                            }}
+                            onMouseEnter={() => setHighlightedIndex(index)}
+                            style={{
+                                padding: '8px 12px',
+                                cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                background: (value === opt.value || index === highlightedIndex) ? 'var(--color-accent)' : 'transparent',
+                                borderRadius: '8px',
+                                marginBottom: '2px',
+                                fontSize: '0.9rem',
+                                color: (value === opt.value || index === highlightedIndex) ? 'white' : (opt.disabled ? '#64748b' : '#cbd5e1'),
+                                transition: 'all 0.15s',
+                                fontWeight: (value === opt.value || index === highlightedIndex) ? 600 : 400,
+                                opacity: opt.disabled ? 0.6 : 1
+                            }}
+                        >
+                            {(value === opt.value || index === highlightedIndex) && <Check size={14} color="white" />}
+                            <span style={{ flex: 1 }}>{opt.label}</span>
+                        </div>
+                    )) : (
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                            No options found
+                        </div>
+                    )}
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+};
+
+const MultiSelectDropdown = ({ options, selected, onChange, label, icon: Icon }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
     const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
@@ -20,14 +307,14 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 // Check if click is inside the portal
-                const portal = document.getElementById(`select-portal-${placeholder}`);
+                const portal = document.getElementById(`multiselect-portal-${label.replace(/\s+/g, '-')}`);
                 if (portal && portal.contains(event.target)) return;
                 setIsOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [placeholder]);
+    }, [label]);
 
     // Update coords on open and scroll
     useEffect(() => {
@@ -54,90 +341,116 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
         };
     }, [isOpen]);
 
-    // Normalize options
-    const normalizedOptions = options.map(opt => {
-        if (typeof opt === 'object' && opt !== null) {
-            return { value: opt.value, label: opt.label || opt.value };
+    const toggleOption = (option) => {
+        if (selected.includes(option)) {
+            onChange(selected.filter(item => item !== option));
+        } else {
+            onChange([...selected, option]);
         }
-        return { value: opt, label: opt };
-    });
-
-    const selectedOption = normalizedOptions.find(opt => opt.value === value);
+    };
 
     return (
-        <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+        <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
             <div
-                onClick={() => !disabled && setIsOpen(!isOpen)}
-                className="glass-input premium-input"
+                onClick={() => setIsOpen(!isOpen)}
+                className="glass-input"
                 style={{
                     padding: '0.75rem 1rem',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    cursor: 'pointer',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    opacity: disabled ? 0.6 : 1,
-                    background: disabled ? 'rgba(255,255,255,0.02)' : 'rgba(15, 23, 42, 0.6)'
+                    transition: 'all 0.2s ease',
+                    boxShadow: isOpen ? '0 0 0 2px rgba(59, 130, 246, 0.5)' : 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 500
                 }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                     {Icon && <Icon size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />}
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: value ? 'white' : '#94a3b8' }}>
-                        {selectedOption ? selectedOption.label : placeholder}
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: selected.length > 0 ? 'white' : '#94a3b8' }}>
+                        {selected.length > 0 ? `${selected.length} Selected` : label}
                     </span>
                 </div>
-                <ChevronDown size={16} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0, color: '#94a3b8' }} />
+                <ChevronDown size={16} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0 }} />
             </div>
-
-            {isOpen && !disabled && createPortal(
+            {isOpen && createPortal(
                 <div
-                    id={`select-portal-${placeholder}`}
+                    id={`multiselect-portal-${label.replace(/\s+/g, '-')}`}
                     className="animate-fade-in"
                     style={{
                         position: 'fixed',
                         top: coords.top,
                         left: coords.left,
                         width: coords.width,
-                        maxHeight: '250px',
+                        maxHeight: '300px',
                         overflowY: 'auto',
                         background: '#1e293b',
                         border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '10px',
+                        borderRadius: '12px',
                         zIndex: 9999,
                         padding: '6px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)'
                     }}
                 >
-                    {normalizedOptions.length > 0 ? normalizedOptions.map(opt => (
+                    <div
+                        onClick={() => onChange(selected.length === options.length ? [] : options)}
+                        style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid rgba(255,255,255,0.1)',
+                            marginBottom: '4px',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            color: '#60a5fa',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}
+                    >
+                        {selected.length === options.length ? 'Unselect All' : 'Select All'}
+                    </div>
+                    {options.map(opt => (
                         <div
-                            key={opt.value}
-                            onClick={() => {
-                                onChange(opt.value);
-                                setIsOpen(false);
-                            }}
+                            key={opt}
+                            onClick={() => toggleOption(opt)}
                             style={{
                                 padding: '8px 12px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
-                                background: value === opt.value ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                background: selected.includes(opt) ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
                                 borderRadius: '8px',
                                 marginBottom: '2px',
                                 fontSize: '0.9rem',
-                                color: value === opt.value ? 'white' : '#cbd5e1',
-                                transition: 'background 0.15s'
+                                transition: 'background 0.15s',
+                                color: selected.includes(opt) ? 'white' : '#cbd5e1'
                             }}
-                            onMouseEnter={(e) => value !== opt.value && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
-                            onMouseLeave={(e) => value !== opt.value && (e.currentTarget.style.background = 'transparent')}
+                            onMouseEnter={(e) => !selected.includes(opt) && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+                            onMouseLeave={(e) => !selected.includes(opt) && (e.currentTarget.style.background = 'transparent')}
                         >
-                            {value === opt.value && <Check size={14} color="#60a5fa" />}
-                            {opt.label}
+                            <div style={{
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '4px',
+                                border: selected.includes(opt) ? 'none' : '2px solid #475569',
+                                background: selected.includes(opt) ? '#3b82f6' : 'transparent',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                flexShrink: 0
+                            }}>
+                                {selected.includes(opt) && <Check size={12} color="white" strokeWidth={3} />}
+                            </div>
+                            <span style={{ flex: 1 }}>{opt}</span>
                         </div>
-                    )) : (
-                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
-                            No options
-                        </div>
-                    )}
+                    ))}
                 </div>,
                 document.body
             )}
@@ -146,7 +459,7 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
 };
 
 const Assignments = () => {
-    const { activeAcademicYear, userProfile } = useAuth();
+    const { activeAcademicYear, userProfile, maxFacultyLoad } = useAuth();
     const isAdmin = userProfile && userProfile.role === 'admin';
 
     // Master Data State
@@ -176,6 +489,72 @@ const Assignments = () => {
     const [selectedRoom, setSelectedRoom] = useState('');
     const [selectedFaculty, setSelectedFaculty] = useState('');
     const [selectedFaculty2, setSelectedFaculty2] = useState('');
+
+    // Table Filters State
+    const [filterDepts, setFilterDepts] = useState([]);
+    const [filterSems, setFilterSems] = useState([]);
+    const [filterGroups, setFilterGroups] = useState([]);
+    const [filterSubjects, setFilterSubjects] = useState([]);
+
+    // AI / Smart Features State
+    const [aiInsight, setAiInsight] = useState(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // AI Analysis Engine (Simulated)
+    useEffect(() => {
+        if (!selectedDay || !selectedTime) {
+            setAiInsight(null);
+            return;
+        }
+
+        setIsAnalyzing(true);
+        const timer = setTimeout(() => {
+            // 1. Calculate Resource Load
+            const activeSlots = fullSchedule.filter(s => s.day === selectedDay && s.time === selectedTime);
+            const totalRooms = rooms.length || 1; // Avoid divide by zero
+            const utilization = Math.round((activeSlots.length / totalRooms) * 100);
+
+            // 2. Analyze Constraints
+            let status = 'optimal';
+            let message = 'Optimal slot available.';
+            let color = '#30d158'; // Success green
+
+            if (utilization > 80) {
+                status = 'critical';
+                message = `High traffic detected! ${utilization}% of rooms are booked.`;
+                color = '#ff453a'; // Danger red
+            } else if (utilization > 50) {
+                status = 'moderate';
+                message = `Moderate activity. ${utilization}% utilization.`;
+                color = '#ff9f0a'; // Warning orange
+            }
+
+            // 3. Subject Frequency Check
+            if (selectedSubject && selectedMainGroup) {
+                const subjectCount = fullSchedule.filter(s =>
+                    s.section === selectedMainGroup &&
+                    s.subject === selectedSubject &&
+                    s.day === selectedDay
+                ).length;
+
+                if (subjectCount > 0) {
+                    message = `Note: ${selectedSubject} is already scheduled for this group on ${selectedDay}.`;
+                    status = 'warning';
+                    color = '#ff9f0a';
+                }
+            }
+
+            setAiInsight({
+                status,
+                message,
+                utilization,
+                color
+            });
+            setIsAnalyzing(false);
+        }, 600); // Simulate processing delay
+
+        return () => clearTimeout(timer);
+    }, [selectedDay, selectedTime, selectedSubject, selectedMainGroup, fullSchedule, rooms]);
 
     // UI State
     const [loading, setLoading] = useState(true);
@@ -212,48 +591,45 @@ const Assignments = () => {
         }
     }, [successMsg]);
 
-    // Fetch Master Data
-    const fetchMasterData = async () => {
-        try {
-            const [deptSnap, semSnap, subSnap, facSnap, roomSnap, daySnap, timeSnap, groupSnap] = await Promise.all([
-                getDocs(collection(db, 'departments')),
-                getDocs(collection(db, 'semesters')),
-                getDocs(collection(db, 'subjects')),
-                getDocs(collection(db, 'faculty')),
-                getDocs(collection(db, 'rooms')),
-                getDocs(collection(db, 'days')),
-                getDocs(collection(db, 'timeslots')),
-                getDocs(collection(db, 'groups'))
-            ]);
-
-            setDepartments(deptSnap.docs.map(d => d.data().code || d.data().name).sort());
-            setSemesters(semSnap.docs.map(d => d.data().name).sort((a, b) => parseInt(a) - parseInt(b)));
-            setSubjects(subSnap.docs.map(d => ({ name: d.data().name, shortCode: d.data().shortCode || '' })).sort((a, b) => a.name.localeCompare(b.name)));
-            setFaculty(facSnap.docs.map(d => ({ name: d.data().name, empId: d.data().empId, shortCode: d.data().shortCode || '' })).sort((a, b) => a.name.localeCompare(b.name)));
-            setRooms(roomSnap.docs.map(d => d.data().name).sort());
-
-            const dayData = daySnap.docs.map(d => d.data()).filter(d => d.isVisible !== false).sort((a, b) => a.order - b.order);
-            setDays(dayData.map(d => d.name));
-
-            const timeData = timeSnap.docs.map(d => d.data()).sort((a, b) => a.startTime.localeCompare(b.startTime));
-            const formatTime = (t) => new Date(`2000-01-01T${t}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-            setTimeSlots(timeData.map(s => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`));
-
-            const groupsData = groupSnap.docs.map(d => d.data());
-            setRawGroups(groupsData);
-
-
-
-        } catch (err) {
-            console.error("Error loading master data:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const {
+        departments: rawDepartments,
+        semesters: rawSemesters,
+        subjects: rawSubjects,
+        faculty: rawFaculty,
+        rooms: rawRooms,
+        days: rawDays,
+        timeSlots: rawTimeSlots,
+        groups: contextGroups
+    } = useMasterData();
 
     useEffect(() => {
-        fetchMasterData();
-    }, []);
+        if (!rawDepartments || !rawSemesters) return;
+
+        setDepartments(rawDepartments.map(d => d.code || d.name).sort());
+        setSemesters(rawSemesters.map(d => d.name)); // Context sorts by number already? Check context: yes. But local sort used parseInt? It's fine.
+        setSubjects(rawSubjects.map(d => ({ name: d.name, shortCode: d.shortCode || '' })).sort((a, b) => a.name.localeCompare(b.name)));
+        setFaculty(rawFaculty.map(d => ({ name: d.name, empId: d.empId, shortCode: d.shortCode || '' })).sort((a, b) => a.name.localeCompare(b.name)));
+        setRooms(rawRooms.map(d => d.name).sort());
+
+        const visibleDays = rawDays.filter(d => d.isVisible !== false).map(d => d.name);
+        setDays(visibleDays);
+
+        const formatTime = (t) => new Date(`2000-01-01T${t}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        setTimeSlots(rawTimeSlots.map(s => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`));
+
+        if (contextGroups) {
+            setRawGroups(contextGroups);
+        }
+
+        // Manage loading state - we want it to be false once master data is here.
+        // But we also have schedule fetching which sets loading.
+        // Assuming fetchSchedule handles its own loading or we combine them.
+        // Actually fetchSchedule sets loading(true) then false.
+        // If master data arrives later, it just updates state.
+        // We can set loading(false) here too just in case.
+        setLoading(false);
+
+    }, [rawDepartments, rawSemesters, rawSubjects, rawFaculty, rawRooms, rawDays, rawTimeSlots, contextGroups]);
 
     // Fetch Schedule (Real-time)
     useEffect(() => {
@@ -290,16 +666,16 @@ const Assignments = () => {
             if (s.section !== selectedMainGroup) return false;
 
             // Check Sub-Group
-            // If either is whole section (no sub-group or 'All'), they conflict
             if (!s.group || s.group === 'All') return true;
             if (!selectedSubGroup || selectedSubGroup === 'All') return true;
-
-            // If both have specific sub-groups, check if they match
             if (s.group === selectedSubGroup) return true;
 
             return false;
         });
-        if (studentBusy) return { type: 'student', message: `Class is busy: ${studentBusy.subject} (${studentBusy.room})` };
+        if (studentBusy) return {
+            type: 'student',
+            message: `⚠️ Conflict: ${studentBusy.dept} ${selectedMainGroup}${selectedSubGroup ? `-${selectedSubGroup}` : ''} already has ${studentBusy.subject} in Room ${studentBusy.room}.`
+        };
 
         // 2. Faculty Conflict
         const checkFacultyBusy = (facName) => {
@@ -316,27 +692,66 @@ const Assignments = () => {
         };
 
         const f1Busy = checkFacultyBusy(selectedFaculty);
-        if (f1Busy) return { type: 'faculty', message: `Faculty ${selectedFaculty} is busy in ${f1Busy.dept}-${f1Busy.sem}` };
+        if (f1Busy) return {
+            type: 'faculty',
+            message: `⚠️ Conflict: ${selectedFaculty} is teaching ${f1Busy.subject} (${f1Busy.dept}-${f1Busy.sem}) at this time.`
+        };
 
         const f2Busy = checkFacultyBusy(selectedFaculty2);
-        if (f2Busy) return { type: 'faculty', message: `Faculty ${selectedFaculty2} is busy in ${f2Busy.dept}-${f2Busy.sem}` };
+        if (f2Busy) return {
+            type: 'faculty',
+            message: `⚠️ Conflict: ${selectedFaculty2} is teaching ${f2Busy.subject} (${f2Busy.dept}-${f2Busy.sem}) at this time.`
+        };
 
         // 3. Room Conflict
         if (selectedRoom) {
             const roomBusy = fullSchedule.find(s => s.day === selectedDay && s.time === selectedTime && s.room === selectedRoom);
-            if (roomBusy) return { type: 'room', message: `Room ${selectedRoom} is occupied by ${roomBusy.dept}-${roomBusy.sem}` };
+            if (roomBusy) return {
+                type: 'room',
+                message: `⚠️ Conflict: Room ${selectedRoom} is booked for ${roomBusy.subject} (${roomBusy.dept}-${roomBusy.sem}).`
+            };
         }
 
-        return null;
         // 4. Self-Conflict (Same Faculty)
         if (selectedFaculty && selectedFaculty2 && selectedFaculty === selectedFaculty2) {
-            return { type: 'faculty', message: `Cannot select the same faculty (${selectedFaculty}) twice.` };
+            return { type: 'faculty', message: `⚠️ Invalid: Cannot select the same faculty (${selectedFaculty}) twice.` };
         }
 
         return null;
     }, [fullSchedule, selectedDay, selectedTime, selectedDept, selectedSem, selectedMainGroup, selectedSubGroup, selectedFaculty, selectedFaculty2, selectedRoom, faculty, getEffectiveGroup]);
 
     const conflict = checkConflict();
+
+    // Faculty Load Monitor
+    const renderFacultyLoad = (facultyName) => {
+        if (!facultyName) return null;
+        const load = fullSchedule.filter(s => s.faculty === facultyName || s.faculty2 === facultyName).length;
+        const max = maxFacultyLoad || 18;
+        const percentage = Math.min((load / max) * 100, 100);
+
+        let statusColor = '#4ade80'; // Green
+        let statusText = 'Optimal';
+
+        if (load >= max) {
+            statusColor = '#ef4444'; // Red
+            statusText = 'Overloaded';
+        } else if (load >= max * 0.8) {
+            statusColor = '#facc15'; // Yellow
+            statusText = 'Heavy';
+        }
+
+        return (
+            <div className="animate-fade-in" style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#94a3b8' }}>Weekly Load</span>
+                    <span style={{ color: statusColor, fontWeight: 600 }}>{load} / {max} Hours ({statusText})</span>
+                </div>
+                <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ width: `${percentage}%`, height: '100%', background: statusColor, transition: 'width 0.5s ease' }} />
+                </div>
+            </div>
+        );
+    };
 
     const handleAssign = async () => {
         if (!selectedDay || !selectedTime || !selectedSubject || !selectedFaculty || !selectedRoom || !selectedDept || !selectedSem || !selectedMainGroup) {
@@ -402,11 +817,17 @@ const Assignments = () => {
     const filteredAssignments = fullSchedule.filter(s => {
         const search = searchTerm.toLowerCase().trim();
 
-        // 1. Filter by Department (if selected)
-        if (selectedDept && s.dept !== selectedDept) return false;
+        // 1. Filter by Department
+        if (filterDepts.length > 0 && !filterDepts.includes(s.dept)) return false;
 
-        // 2. Filter by Semester (if selected)
-        if (selectedSem && s.sem !== selectedSem) return false;
+        // 2. Filter by Semester
+        if (filterSems.length > 0 && !filterSems.includes(s.sem)) return false;
+
+        // 3. Filter by Group
+        if (filterGroups.length > 0 && !filterGroups.includes(s.section)) return false;
+
+        // 4. Filter by Subject
+        if (filterSubjects.length > 0 && !filterSubjects.includes(s.subject)) return false;
 
         // 3. Search Filter
         if (!search) return true;
@@ -430,6 +851,10 @@ const Assignments = () => {
         const groupObj = rawGroups.find(g => g.name === selectedMainGroup);
         return groupObj && groupObj.subGroups ? groupObj.subGroups : [];
     }, [rawGroups, selectedMainGroup]);
+
+
+
+
 
     return (
         <div className="assignments-container animate-fade-in">
@@ -482,6 +907,57 @@ const Assignments = () => {
                                     />
                                 </div>
                             </div>
+
+                            {/* AI Insight Banner */}
+                            {(selectedDay && selectedTime) && (
+                                <div className="glass-panel" style={{
+                                    marginTop: '1rem',
+                                    padding: '0.75rem',
+                                    background: isAnalyzing ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.2)',
+                                    border: isAnalyzing ? '1px solid rgba(255,255,255,0.1)' : `1px solid ${aiInsight?.color || 'transparent'}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    borderRadius: '12px',
+                                    transition: 'all 0.3s ease'
+                                }}>
+                                    {isAnalyzing ? (
+                                        <RefreshCw size={18} className="spin-slow" style={{ color: '#94a3b8' }} />
+                                    ) : (
+                                        <Brain size={18} style={{ color: aiInsight?.color }} className={aiInsight?.status === 'optimal' ? 'pulse-slow' : ''} />
+                                    )}
+
+                                    <div style={{ flex: 1 }}>
+                                        {isAnalyzing ? (
+                                            <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                                AI Analysis running...
+                                            </span>
+                                        ) : (
+                                            <div className="animate-fade-in">
+                                                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: aiInsight?.color }}>
+                                                    {aiInsight?.message}
+                                                </div>
+                                                {aiInsight?.utilization > 0 && (
+                                                    <div style={{
+                                                        height: '4px',
+                                                        background: 'rgba(255,255,255,0.1)',
+                                                        borderRadius: '2px',
+                                                        marginTop: '6px',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        <div style={{
+                                                            height: '100%',
+                                                            width: `${aiInsight.utilization}%`,
+                                                            background: aiInsight.color,
+                                                            transition: 'width 1s ease-out'
+                                                        }} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Section 2: Class Info */}
@@ -571,6 +1047,7 @@ const Assignments = () => {
                                         onChange={setSelectedFaculty}
                                         placeholder="Select Faculty..."
                                     />
+                                    {renderFacultyLoad(selectedFaculty)}
                                 </div>
                                 <div className="form-group">
                                     <label>Faculty 2</label>
@@ -580,6 +1057,7 @@ const Assignments = () => {
                                         onChange={setSelectedFaculty2}
                                         placeholder="Select Faculty..."
                                     />
+                                    {renderFacultyLoad(selectedFaculty2)}
                                 </div>
                             </div>
                         </div>
@@ -587,7 +1065,7 @@ const Assignments = () => {
                         {/* Actions */}
                         <div className="form-actions">
                             {/* Conflict Alert */}
-                            {conflict && (
+                            {conflict && !saving && !successMsg && (
                                 <div className="alert-box error animate-fade-in">
                                     <AlertTriangle size={18} className="alert-icon" />
                                     <div className="alert-content">{conflict.message}</div>
@@ -626,18 +1104,52 @@ const Assignments = () => {
 
                 {/* Right Column: Existing Assignments Table */}
                 <div className="glass-panel table-panel">
-                    <div className="table-header">
-                        <h3 className="table-title">
-                            Assignments <span className="count-badge">{filteredAssignments.length}</span>
-                        </h3>
-                        <div className="search-wrapper">
-                            <Search size={16} className="search-icon" />
-                            <input
-                                type="text"
-                                placeholder="Search..."
-                                className="glass-input search-input"
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
+                    <div className="table-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 className="table-title">
+                                Assignments <span className="count-badge">{filteredAssignments.length}</span>
+                            </h3>
+                            <div className="search-wrapper">
+                                <Search size={16} className="search-icon" />
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    className="glass-input search-input"
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Table Filters */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                            <MultiSelectDropdown
+                                options={departments}
+                                selected={filterDepts}
+                                onChange={setFilterDepts}
+                                label="Filter Dept"
+                                icon={BookOpen}
+                            />
+                            <MultiSelectDropdown
+                                options={semesters}
+                                selected={filterSems}
+                                onChange={setFilterSems}
+                                label="Filter Sem"
+                                icon={Layers}
+                            />
+                            <MultiSelectDropdown
+                                options={rawGroups.map(g => g.name)}
+                                selected={filterGroups}
+                                onChange={setFilterGroups}
+                                label="Filter Group"
+                                icon={Users}
+                            />
+                            <MultiSelectDropdown
+                                options={subjects.map(s => s.name)}
+                                selected={filterSubjects}
+                                onChange={setFilterSubjects}
+                                label="Filter Subject"
+                                icon={BookOpen}
                             />
                         </div>
                     </div>

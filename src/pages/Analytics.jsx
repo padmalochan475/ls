@@ -13,6 +13,7 @@ const Analytics = () => {
     const { activeAcademicYear, setSelectedAcademicYear, academicYears } = useAuth();
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedFaculty, setSelectedFaculty] = useState('');
+    const [explorerFaculty, setExplorerFaculty] = useState(null);
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState({
         assignments: [],
@@ -74,7 +75,9 @@ const Analytics = () => {
         const deptCounts = {};
         assignments.forEach(a => {
             const d = a.dept || 'Unknown';
-            deptCounts[d] = (deptCounts[d] || 0) + 1;
+            if (d !== 'Unknown') {
+                deptCounts[d] = (deptCounts[d] || 0) + 1;
+            }
         });
         const assignmentsByDept = Object.keys(deptCounts).map(k => ({ name: k, count: deptCounts[k] }));
 
@@ -116,13 +119,14 @@ const Analytics = () => {
         assignments.forEach(a => {
             if (a.day) dayCounts[a.day] = (dayCounts[a.day] || 0) + 1;
         });
-        const assignmentsByDay = dayOrder.map(d => ({ name: d, count: dayCounts[d] }));
-
+        const dailyWorkload = dayOrder.map(d => ({ name: d, count: dayCounts[d] }));
         // 7. Faculty by Dept
         const facByDept = {};
         faculty.forEach(f => {
             const d = f.dept || 'Unknown';
-            facByDept[d] = (facByDept[d] || 0) + 1;
+            if (d !== 'Unknown') {
+                facByDept[d] = (facByDept[d] || 0) + 1;
+            }
         });
         const facultyByDept = Object.keys(facByDept).map(k => ({ name: k, count: facByDept[k] }));
 
@@ -130,7 +134,9 @@ const Analytics = () => {
         const subByDept = {};
         subjects.forEach(s => {
             const d = s.dept || 'Unknown';
-            subByDept[d] = (subByDept[d] || 0) + 1;
+            if (d !== 'Unknown') {
+                subByDept[d] = (subByDept[d] || 0) + 1;
+            }
         });
         const subjectsByDept = Object.keys(subByDept).map(k => ({ name: k, count: subByDept[k] }));
 
@@ -195,10 +201,7 @@ const Analytics = () => {
         Object.values(scatterMap).forEach(v => scatterData.push(v));
 
 
-        return {
-            counts, assignmentsByDept, facultyWorkload, subjectFrequency, roomUsage, assignmentsByDay, facultyByDept, subjectsByDept,
-            assignmentsByTime, assignmentsBySem, assignmentsByGroup, creationTrend, scatterData
-        };
+
         // 14. Faculty Workload Distribution (Histogram)
         const workloadDist = { '0-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '20+': 0 };
         Object.values(facCounts).forEach(count => {
@@ -231,10 +234,12 @@ const Analytics = () => {
         const deptResources = {};
         assignments.forEach(a => {
             const d = a.dept || 'Unknown';
-            if (!deptResources[d]) deptResources[d] = { subjects: new Set(), faculty: new Set(), rooms: new Set() };
-            if (a.subject) deptResources[d].subjects.add(a.subject);
-            if (a.faculty) deptResources[d].faculty.add(a.faculty);
-            if (a.room) deptResources[d].rooms.add(a.room);
+            if (d !== 'Unknown') {
+                if (!deptResources[d]) deptResources[d] = { subjects: new Set(), faculty: new Set(), rooms: new Set() };
+                if (a.subject) deptResources[d].subjects.add(a.subject);
+                if (a.faculty) deptResources[d].faculty.add(a.faculty);
+                if (a.room) deptResources[d].rooms.add(a.room);
+            }
         });
         const deptResourceUsage = Object.keys(deptResources).map(d => ({
             name: d,
@@ -247,9 +252,15 @@ const Analytics = () => {
         // 17. Faculty Subject Variety (Unique subjects per faculty)
         const facSubVariety = {};
         assignments.forEach(a => {
-            if (a.faculty && a.subject) {
-                if (!facSubVariety[a.faculty]) facSubVariety[a.faculty] = new Set();
-                facSubVariety[a.faculty].add(a.subject);
+            if (a.subject) {
+                if (a.faculty) {
+                    if (!facSubVariety[a.faculty]) facSubVariety[a.faculty] = new Set();
+                    facSubVariety[a.faculty].add(a.subject);
+                }
+                if (a.faculty2) {
+                    if (!facSubVariety[a.faculty2]) facSubVariety[a.faculty2] = new Set();
+                    facSubVariety[a.faculty2].add(a.subject);
+                }
             }
         });
         const facultySubjectVariety = Object.keys(facSubVariety)
@@ -273,16 +284,18 @@ const Analytics = () => {
         const deptDayMap = {};
         assignments.forEach(a => {
             const d = a.dept || 'Unknown';
-            if (!deptDayMap[d]) deptDayMap[d] = { name: d, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
-            if (a.day) {
-                const shortDay = a.day.substring(0, 3);
-                if (deptDayMap[d][shortDay] !== undefined) deptDayMap[d][shortDay]++;
+            if (d !== 'Unknown') {
+                if (!deptDayMap[d]) deptDayMap[d] = { name: d, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+                if (a.day) {
+                    const shortDay = a.day.substring(0, 3);
+                    if (deptDayMap[d][shortDay] !== undefined) deptDayMap[d][shortDay]++;
+                }
             }
         });
         const deptWorkloadByDay = Object.values(deptDayMap);
 
         return {
-            counts, assignmentsByDept, facultyWorkload, subjectFrequency, roomUsage, assignmentsByDay, facultyByDept, subjectsByDept,
+            counts, assignmentsByDept, facultyWorkload, subjectFrequency, roomUsage, dailyWorkload, facultyByDept, subjectsByDept,
             assignmentsByTime, assignmentsBySem, assignmentsByGroup, creationTrend, scatterData,
             facultyWorkloadDist, roomHeatmapData, deptResourceUsage,
             facultySubjectVariety, timeOfDayDist, deptWorkloadByDay,
@@ -306,7 +319,8 @@ const Analytics = () => {
         facultyAssignments.forEach(a => {
             if (a.day) dayCounts[a.day] = (dayCounts[a.day] || 0) + 1;
         });
-        const dailySchedule = Object.keys(dayCounts).map(k => ({ name: k, count: dayCounts[k] }));
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const dailySchedule = dayOrder.map(d => ({ name: d, count: dayCounts[d] }));
 
         return {
             totalClasses: facultyAssignments.length,
@@ -352,7 +366,7 @@ const Analytics = () => {
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis dataKey="name" stroke="#94a3b8" />
                             <YAxis stroke="#94a3b8" />
-                            <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                            <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                             <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]}>
                                 {stats.assignmentsByDept && stats.assignmentsByDept.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -366,11 +380,11 @@ const Analytics = () => {
                 <div className="chart-container glass-panel">
                     <h3>Daily Workload Distribution</h3>
                     <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={stats.assignmentsByDay}>
+                        <AreaChart data={stats.dailyWorkload}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis dataKey="name" stroke="#94a3b8" />
                             <YAxis stroke="#94a3b8" />
-                            <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                            <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.2)' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                             <Area type="monotone" dataKey="count" stroke="#8b5cf6" fill="rgba(139, 92, 246, 0.3)" />
                         </AreaChart>
                     </ResponsiveContainer>
@@ -384,7 +398,7 @@ const Analytics = () => {
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis dataKey="name" stroke="#94a3b8" />
                             <YAxis stroke="#94a3b8" />
-                            <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                            <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                             <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
@@ -472,7 +486,7 @@ const Analytics = () => {
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis dataKey="date" stroke="#94a3b8" />
                             <YAxis stroke="#94a3b8" />
-                            <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                            <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.2)' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                             <Line type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
                         </LineChart>
                     </ResponsiveContainer>
@@ -501,7 +515,7 @@ const Analytics = () => {
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis type="number" stroke="#94a3b8" />
                             <YAxis dataKey="name" type="category" stroke="#94a3b8" width={100} tick={{ fontSize: 12 }} />
-                            <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                            <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                             <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
                         </BarChart>
                     </ResponsiveContainer>
@@ -515,7 +529,7 @@ const Analytics = () => {
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis type="number" stroke="#94a3b8" />
                             <YAxis dataKey="name" type="category" stroke="#94a3b8" width={100} tick={{ fontSize: 12 }} />
-                            <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                            <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                             <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
                         </BarChart>
                     </ResponsiveContainer>
@@ -533,170 +547,261 @@ const Analytics = () => {
                     value={selectedFaculty}
                     onChange={(e) => setSelectedFaculty(e.target.value)}
                     className="glass-input"
-                    style={{ flex: 1, maxWidth: '300px', padding: '0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }}
+                    style={{ flex: 1, maxWidth: '300px', padding: '0.5rem', borderRadius: '8px', background: '#1e293b', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }}
                 >
-                    <option value="">Select Faculty...</option>
+                    <option value="" style={{ background: '#1e293b', color: 'white' }}>Select Faculty...</option>
                     {stats.facultyList && stats.facultyList.map(f => (
-                        <option key={f} value={f}>{f}</option>
+                        <option key={f} value={f} style={{ background: '#1e293b', color: 'white' }}>{f}</option>
                     ))}
                 </select>
             </div>
 
             {selectedFaculty && selectedFacultyStats && (
-                <>
-                    <div className="stat-card glass-panel">
-                        <div className="icon-wrapper" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' }}><BookOpen size={24} /></div>
-                        <div><h3>Total Classes</h3><p>{selectedFacultyStats.totalClasses}</p></div>
-                    </div>
-                    <div className="stat-card glass-panel">
-                        <div className="icon-wrapper" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}><Layers size={24} /></div>
-                        <div><h3>Unique Subjects</h3><p>{selectedFacultyStats.uniqueSubjects}</p></div>
-                    </div>
+                <div className="glass-panel" style={{ gridColumn: '1 / -1', padding: '2rem' }}>
+                    <h3 style={{ marginBottom: '2rem', fontSize: '1.2rem', color: 'white' }}>Workload Analysis: <span style={{ color: 'var(--color-accent)' }}>{selectedFaculty}</span></h3>
 
-                    <div className="chart-container glass-panel">
-                        <h3>Subject Distribution for {selectedFaculty}</h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                                <Pie
-                                    data={selectedFacultyStats.subjectDist}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    fill="#8884d8"
-                                    paddingAngle={5}
-                                    dataKey="count"
-                                    label
-                                >
-                                    {selectedFacultyStats.subjectDist.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', alignItems: 'start' }}>
+                        {/* Left: Metrics & List */}
+                        <div>
+                            <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                                <h4 style={{ color: '#93c5fd', fontSize: '0.9rem', margin: '0 0 0.5rem 0', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Weekly Load</h4>
+                                <div style={{ fontSize: '3.5rem', fontWeight: 'bold', color: '#60a5fa', lineHeight: 1, display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                                    {selectedFacultyStats.totalClasses} <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 'normal' }}>classes/week</span>
+                                </div>
+                            </div>
 
-                    <div className="chart-container glass-panel">
-                        <h3>Daily Schedule for {selectedFaculty}</h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={selectedFacultyStats.dailySchedule}>
+                            <h4 style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Subject Breakdown</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {selectedFacultyStats.subjectDist.map((sub, idx) => (
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: COLORS[idx % COLORS.length] }}></div>
+                                            <span style={{ fontWeight: 500, color: '#e2e8f0' }}>{sub.name}</span>
+                                        </div>
+                                        <span style={{ fontWeight: 'bold', color: 'white' }}>{sub.count} <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal' }}>classes</span></span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Right: Chart */}
+                        <div style={{ height: '350px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', padding: '1rem' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={selectedFacultyStats.subjectDist}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={80}
+                                        outerRadius={110}
+                                        paddingAngle={5}
+                                        dataKey="count"
+                                        stroke="none"
+                                    >
+                                        {selectedFacultyStats.subjectDist.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }} itemStyle={{ color: 'white' }} />
+                                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                    <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
+                                        <tspan x="50%" dy="-0.5em" fontSize="32" fill="white" fontWeight="bold">{selectedFacultyStats.totalClasses}</tspan>
+                                        <tspan x="50%" dy="1.5em" fontSize="14" fill="#94a3b8">Total Classes</tspan>
+                                    </text>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="glass-panel" style={{ gridColumn: '1 / -1', padding: '2rem' }}>
+                <h3 style={{ marginBottom: '1.5rem', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Activity size={20} color="var(--color-accent)" />
+                    Advanced Faculty Workload Explorer
+                </h3>
+                <p style={{ color: '#94a3b8', marginBottom: '2rem' }}>
+                    Click on a faculty member's bar to view their detailed schedule breakdown.
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+                    {/* Chart Side */}
+                    <div style={{ height: '400px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={stats.facultyWorkload}
+                                layout="vertical"
+                                margin={{ left: 20, right: 20 }}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                <XAxis dataKey="name" stroke="#94a3b8" />
-                                <YAxis stroke="#94a3b8" />
-                                <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                                <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                <XAxis type="number" stroke="#94a3b8" />
+                                <YAxis dataKey="name" type="category" stroke="#94a3b8" width={150} tick={{ fontSize: 12 }} />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }}
+                                />
+                                <Bar
+                                    dataKey="count"
+                                    fill="#3b82f6"
+                                    radius={[0, 4, 4, 0]}
+                                    barSize={30}
+                                    onClick={(data) => setExplorerFaculty(data.name)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    {stats.facultyWorkload.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={explorerFaculty === entry.name ? '#f59e0b' : '#3b82f6'}
+                                            cursor="pointer"
+                                        />
+                                    ))}
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
-                </>
-            )}
 
-            <div className="chart-container glass-panel" style={{ gridColumn: '1 / -1' }}>
-                <h3>Top 10 Faculty by Workload (Classes Assigned)</h3>
-                <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={stats.facultyWorkload} layout="vertical" margin={{ left: 100 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis type="number" stroke="#94a3b8" />
-                        <YAxis dataKey="name" type="category" stroke="#94a3b8" width={150} />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                        <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-                    </BarChart>
-                </ResponsiveContainer>
+                    {/* Details Side */}
+                    <div style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        borderRadius: '12px',
+                        padding: '1.5rem',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        maxHeight: '400px',
+                        overflowY: 'auto'
+                    }}>
+                        {explorerFaculty ? (
+                            <>
+                                <h4 style={{ color: '#f59e0b', margin: '0 0 1.5rem 0', fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                                    Schedule: {explorerFaculty}
+                                </h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {data.assignments
+                                        .filter(a => a.faculty === explorerFaculty || a.faculty2 === explorerFaculty)
+                                        .sort((a, b) => {
+                                            const days = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
+                                            if (days[a.day] !== days[b.day]) return days[a.day] - days[b.day];
+                                            return a.time.localeCompare(b.time);
+                                        })
+                                        .map((assignment, idx) => (
+                                            <div key={idx} style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '80px 1fr',
+                                                gap: '1rem',
+                                                padding: '1rem',
+                                                background: 'rgba(30, 41, 59, 0.5)',
+                                                borderRadius: '8px',
+                                                borderLeft: `3px solid ${COLORS[idx % COLORS.length]}`
+                                            }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                    <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '0.9rem' }}>{assignment.day?.substring(0, 3)}</span>
+                                                    <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{assignment.time}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                    <span style={{ fontWeight: '600', color: 'white' }}>{assignment.subject}</span>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem', color: '#94a3b8' }}>
+                                                        <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{assignment.dept}</span>
+                                                        <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{assignment.section}</span>
+                                                        <span>{assignment.room}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    {data.assignments.filter(a => a.faculty === explorerFaculty || a.faculty2 === explorerFaculty).length === 0 && (
+                                        <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>No classes assigned found.</div>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem', color: '#64748b' }}>
+                                <Users size={48} style={{ opacity: 0.2 }} />
+                                <p>Select a faculty member from the chart to see their detailed schedule.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
-            <div className="chart-container glass-panel">
-                <h3>Faculty Workload Distribution (Classes per Faculty)</h3>
-                <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={stats.facultyWorkloadDist}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="name" stroke="#94a3b8" />
-                        <YAxis stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                        <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-            <div className="chart-container glass-panel">
-                <h3>Faculty Subject Variety (Unique Subjects Taught)</h3>
-                <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={stats.facultySubjectVariety} layout="vertical" margin={{ left: 100 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis type="number" stroke="#94a3b8" />
-                        <YAxis dataKey="name" type="category" stroke="#94a3b8" width={150} />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                        <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
+        </div >
     );
+    const renderDepartments = () => {
+        const CustomLegend = ({ payload }) => {
+            const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const sortedPayload = [...payload].sort((a, b) => {
+                return order.indexOf(a.value) - order.indexOf(b.value);
+            });
 
-    const renderDepartments = () => (
-        <div className="analytics-grid">
-            <div className="chart-container glass-panel">
-                <h3>Faculty Distribution by Department</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={stats.facultyByDept}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="name" stroke="#94a3b8" />
-                        <YAxis stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                        <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
-                            {stats.facultyByDept && stats.facultyByDept.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+            return (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '10px' }}>
+                    {sortedPayload.map((entry, index) => (
+                        <div key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '14px', color: '#94a3b8' }}>
+                            <div style={{ width: 12, height: 12, backgroundColor: entry.color, borderRadius: '2px' }} />
+                            <span>{entry.value}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        const CustomTooltip = ({ active, payload, label }) => {
+            if (active && payload && payload.length) {
+                const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const sortedPayload = [...payload].sort((a, b) => {
+                    return order.indexOf(a.name) - order.indexOf(b.name);
+                });
+
+                return (
+                    <div style={{ background: '#1e293b', border: 'none', padding: '10px', borderRadius: '4px', color: 'white' }}>
+                        <p style={{ fontWeight: 'bold', marginBottom: '5px' }}>{label}</p>
+                        {sortedPayload.map((entry, index) => (
+                            <div key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', marginBottom: '2px' }}>
+                                <span style={{ color: entry.color }}>{entry.name}:</span>
+                                <span>{entry.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                );
+            }
+            return null;
+        };
+
+        return (
+            <div className="analytics-grid">
+                <div className="chart-container glass-panel" style={{ gridColumn: '1 / -1' }}>
+                    <h3>Department Resource Utilization (Unique Subjects, Faculty, Rooms)</h3>
+                    <ResponsiveContainer width="100%" height={400}>
+                        <BarChart data={stats.deptResourceUsage}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                            <XAxis dataKey="name" stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" />
+                            <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                            <Legend />
+                            <Bar dataKey="subjects" name="Unique Subjects" fill="#3b82f6" />
+                            <Bar dataKey="faculty" name="Unique Faculty" fill="#10b981" />
+                            <Bar dataKey="rooms" name="Unique Rooms" fill="#f59e0b" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="chart-container glass-panel" style={{ gridColumn: '1 / -1' }}>
+                    <h3>Department Workload by Day</h3>
+                    <ResponsiveContainer width="100%" height={400}>
+                        <BarChart data={stats.deptWorkloadByDay}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                            <XAxis dataKey="name" stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" />
+                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+                            <Legend content={<CustomLegend />} />
+                            <Bar dataKey="Mon" stackId="a" fill="#3b82f6" name="Mon" />
+                            <Bar dataKey="Tue" stackId="a" fill="#10b981" name="Tue" />
+                            <Bar dataKey="Wed" stackId="a" fill="#f59e0b" name="Wed" />
+                            <Bar dataKey="Thu" stackId="a" fill="#ef4444" name="Thu" />
+                            <Bar dataKey="Fri" stackId="a" fill="#8b5cf6" name="Fri" />
+                            <Bar dataKey="Sat" stackId="a" fill="#ec4899" name="Sat" />
+                            <Bar dataKey="Sun" stackId="a" fill="#6366f1" name="Sun" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
             </div>
-            <div className="chart-container glass-panel">
-                <h3>Subject Distribution by Department</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={stats.subjectsByDept}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="name" stroke="#94a3b8" />
-                        <YAxis stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                        <Bar dataKey="count" fill="#ec4899" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-            <div className="chart-container glass-panel" style={{ gridColumn: '1 / -1' }}>
-                <h3>Department Resource Utilization (Unique Subjects, Faculty, Rooms)</h3>
-                <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={stats.deptResourceUsage}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="name" stroke="#94a3b8" />
-                        <YAxis stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                        <Legend />
-                        <Bar dataKey="subjects" name="Unique Subjects" fill="#3b82f6" />
-                        <Bar dataKey="faculty" name="Unique Faculty" fill="#10b981" />
-                        <Bar dataKey="rooms" name="Unique Rooms" fill="#f59e0b" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-            <div className="chart-container glass-panel" style={{ gridColumn: '1 / -1' }}>
-                <h3>Department Workload by Day</h3>
-                <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={stats.deptWorkloadByDay}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="name" stroke="#94a3b8" />
-                        <YAxis stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
-                        <Legend />
-                        <Bar dataKey="Mon" stackId="a" fill="#3b82f6" />
-                        <Bar dataKey="Tue" stackId="a" fill="#10b981" />
-                        <Bar dataKey="Wed" stackId="a" fill="#f59e0b" />
-                        <Bar dataKey="Thu" stackId="a" fill="#ef4444" />
-                        <Bar dataKey="Fri" stackId="a" fill="#8b5cf6" />
-                        <Bar dataKey="Sat" stackId="a" fill="#ec4899" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
-    );
+        );
+    };
 
     const renderSubjects = () => (
         <div className="analytics-grid single-col">
@@ -707,7 +812,7 @@ const Analytics = () => {
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                         <XAxis dataKey="name" stroke="#94a3b8" />
                         <YAxis stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                        <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                         <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
@@ -724,7 +829,7 @@ const Analytics = () => {
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                         <XAxis dataKey="name" stroke="#94a3b8" />
                         <YAxis stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                        <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                         <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>

@@ -20,9 +20,9 @@ export const AuthProvider = ({ children }) => {
     const [systemAcademicYear, setSystemAcademicYear] = useState('2024-2025'); // Global System Default
     const [selectedAcademicYear, setSelectedAcademicYear] = useState(localStorage.getItem('selectedAcademicYear') || null); // User's View Choice
     const [academicYears, setAcademicYears] = useState(['2024-2025']); // List of all years
+    const [maxFacultyLoad, setMaxFacultyLoad] = useState(18); // Default Max Load
+    const [yearConfigs, setYearConfigs] = useState({});
     const [loading, setLoading] = useState(true);
-
-
 
     const login = async (identifier, password) => {
         let email = identifier;
@@ -83,42 +83,53 @@ export const AuthProvider = ({ children }) => {
         setSelectedAcademicYear(year);
         localStorage.setItem('selectedAcademicYear', year);
     };
+
     // Listen for Academic Year Changes (Global Config)
     useEffect(() => {
         const unsubscribe = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                const fetchedSystemYear = data.activeAcademicYear;
-                const fetchedYears = data.academicYears || [];
+                const fetchedSystemYear = data.activeAcademicYear || '2024-2025';
+                const fetchedYears = data.academicYears || ['2024-2025'];
+                const fetchedConfigs = data.yearConfigs || {};
 
                 setSystemAcademicYear(fetchedSystemYear);
-                setAcademicYears([...fetchedYears]); // Force new reference
+                setAcademicYears(fetchedYears);
+                setYearConfigs(fetchedConfigs);
 
                 // Validate User's Selection
                 const storedYear = localStorage.getItem('selectedAcademicYear');
-                if (storedYear) {
-                    if (fetchedYears.includes(storedYear)) {
-                        setSelectedAcademicYear(storedYear);
-                    } else {
-                        // Stored year is invalid (removed from system), reset to default
+                if (storedYear && fetchedYears.includes(storedYear)) {
+                    setSelectedAcademicYear(storedYear);
+                } else {
+                    // If stored year is invalid or null, fallback to system default
+                    if (storedYear) {
                         console.warn("Stored academic year is invalid, resetting to system default.");
                         localStorage.removeItem('selectedAcademicYear');
-                        setSelectedAcademicYear(fetchedSystemYear);
                     }
-                } else {
-                    // No selection, use system default
                     setSelectedAcademicYear(fetchedSystemYear);
                 }
             } else {
                 // Initialize if missing
                 setDoc(doc(db, 'settings', 'config'), {
                     activeAcademicYear: '2024-2025',
-                    academicYears: ['2024-2025']
+                    academicYears: ['2024-2025'],
+                    yearConfigs: {
+                        '2024-2025': { maxFacultyLoad: 18 }
+                    }
                 });
             }
         });
         return () => unsubscribe();
     }, []);
+
+    // Update Max Load when Year or Configs Change
+    useEffect(() => {
+        const currentYear = selectedAcademicYear || systemAcademicYear;
+        const currentConfig = yearConfigs[currentYear] || {};
+        const maxLoad = currentConfig.maxFacultyLoad || 18;
+        setMaxFacultyLoad(maxLoad);
+    }, [selectedAcademicYear, systemAcademicYear, yearConfigs]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -172,6 +183,7 @@ export const AuthProvider = ({ children }) => {
         activeAcademicYear: selectedAcademicYear || systemAcademicYear, // Fallback to system if null
         systemAcademicYear, // Expose system default if needed
         academicYears,
+        maxFacultyLoad, // Expose the dynamic limit
         setSelectedAcademicYear: handleSetSelectedYear, // Allow changing view with persistence
         login,
         signup,

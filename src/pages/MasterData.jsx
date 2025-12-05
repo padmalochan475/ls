@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, query, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, getDoc, addDoc, deleteDoc, doc, updateDoc, query, where, writeBatch } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/design-system.css';
-import { Settings, Users, BookOpen, Clock, MapPin, Layers, Box, Download, Plus, Search, Edit2, Trash2, Grid, List, User, Briefcase, Hash, Calendar } from 'lucide-react';
+import { Settings, Users, BookOpen, Clock, MapPin, Layers, Box, Download, Plus, Search, Edit2, Trash2, Grid, List, User, Briefcase, Hash, Calendar, Eye, Check, ChevronDown } from 'lucide-react';
 
 const MasterData = ({ initialTab }) => {
     const { userProfile } = useAuth();
@@ -18,6 +18,34 @@ const MasterData = ({ initialTab }) => {
     const [formData, setFormData] = useState({});
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [newYearInput, setNewYearInput] = useState('');
+
+    const handleAddYear = async () => {
+        if (!newYearInput.trim()) return;
+        try {
+            const configRef = doc(db, 'settings', 'config');
+            const currentData = data[0];
+            const currentYears = currentData.academicYears || [];
+
+            if (currentYears.includes(newYearInput.trim())) {
+                alert('Academic Year already exists!');
+                return;
+            }
+
+            const updatedYears = [...currentYears, newYearInput.trim()].sort().reverse();
+
+            await updateDoc(configRef, {
+                academicYears: updatedYears,
+                [`yearConfigs.${newYearInput.trim()}`]: { maxFacultyLoad: 18 } // Default config
+            });
+
+            setNewYearInput('');
+            fetchData();
+        } catch (e) {
+            console.error("Error adding year:", e);
+            alert("Failed to add academic year.");
+        }
+    };
 
     // Dependencies
     const [deptOptions, setDeptOptions] = useState([]);
@@ -35,6 +63,7 @@ const MasterData = ({ initialTab }) => {
         { id: 'days', label: 'Days', icon: <Calendar size={18} />, collection: 'days' },
         { id: 'timeslots', label: 'Time Slots', icon: <Clock size={18} />, collection: 'timeslots' },
         { id: 'semesters', label: 'Semesters', icon: <Hash size={18} />, collection: 'semesters' },
+        { id: 'settings', label: 'Settings', icon: <Settings size={18} />, collection: 'settings' },
     ];
 
     const activeCollection = tabs.find(t => t.id === activeTab)?.collection;
@@ -43,22 +72,30 @@ const MasterData = ({ initialTab }) => {
         if (!activeCollection) return;
         setLoading(true);
         try {
-            const querySnapshot = await getDocs(collection(db, activeCollection));
-            const items = [];
-            querySnapshot.forEach((doc) => {
-                items.push({ id: doc.id, ...doc.data() });
-            });
-
-            // Sort items based on collection
-            if (activeCollection === 'days') {
-                items.sort((a, b) => a.order - b.order);
-            } else if (activeCollection === 'timeslots') {
-                items.sort((a, b) => a.startTime.localeCompare(b.startTime));
+            if (activeTab === 'settings') {
+                const docRef = doc(db, 'settings', 'config');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setData([{ id: 'config', ...docSnap.data() }]);
+                }
             } else {
-                items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            }
+                const querySnapshot = await getDocs(collection(db, activeCollection));
+                const items = [];
+                querySnapshot.forEach((doc) => {
+                    items.push({ id: doc.id, ...doc.data() });
+                });
 
-            setData(items);
+                // Sort items based on collection
+                if (activeCollection === 'days') {
+                    items.sort((a, b) => a.order - b.order);
+                } else if (activeCollection === 'timeslots') {
+                    items.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                } else {
+                    items.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
+                }
+
+                setData(items);
+            }
         } catch (error) {
             console.error("Error fetching data: ", error);
         } finally {
@@ -87,6 +124,66 @@ const MasterData = ({ initialTab }) => {
     useEffect(() => {
         if (isModalOpen) fetchDependencies();
     }, [isModalOpen]);
+
+    const handleUpdateConfig = async (year, newLoad) => {
+        if (!newLoad || isNaN(newLoad)) {
+            alert("Please enter a valid number for faculty load.");
+            return;
+        }
+        try {
+            const configRef = doc(db, 'settings', 'config');
+            const currentData = data[0];
+            const currentConfigs = currentData.yearConfigs || {};
+
+            await updateDoc(configRef, {
+                [`yearConfigs.${year}`]: {
+                    ...(currentConfigs[year] || {}),
+                    maxFacultyLoad: parseInt(newLoad)
+                }
+            });
+
+            fetchData(); // Refresh
+        } catch (e) {
+            console.error("Error updating config:", e);
+            alert("Failed to update settings.");
+        }
+    };
+
+
+
+
+    const handleDeleteYear = async (yearToDelete) => {
+        if (!window.confirm(`Are you sure you want to delete the academic year ${yearToDelete}? This cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const configRef = doc(db, 'settings', 'config');
+            const currentData = data[0];
+            const currentYears = currentData.academicYears || [];
+            const currentConfigs = currentData.yearConfigs || {};
+
+            // Prevent deleting the active year
+            if (yearToDelete === currentData.activeAcademicYear) {
+                alert("Cannot delete the currently active academic year. Please switch to another year first.");
+                return;
+            }
+
+            const updatedYears = currentYears.filter(y => y !== yearToDelete);
+            const updatedConfigs = { ...currentConfigs };
+            delete updatedConfigs[yearToDelete];
+
+            await updateDoc(configRef, {
+                academicYears: updatedYears,
+                yearConfigs: updatedConfigs
+            });
+
+            fetchData();
+        } catch (e) {
+            console.error("Error deleting year:", e);
+            alert("Failed to delete academic year.");
+        }
+    };
 
     // Helper to format time for comparison/update
     const formatTimeForSchedule = (time) => {
@@ -202,6 +299,22 @@ const MasterData = ({ initialTab }) => {
         if (!id || !activeCollection) return;
 
         try {
+            // Dependency Check for Faculty
+            if (activeTab === 'faculty') {
+                const facultyItem = data.find(d => d.id === id);
+                if (facultyItem) {
+                    const q1 = query(collection(db, 'schedule'), where('faculty', '==', facultyItem.name));
+                    const q2 = query(collection(db, 'schedule'), where('faculty2', '==', facultyItem.name));
+                    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+                    if (!snap1.empty || !snap2.empty) {
+                        alert(`Cannot delete ${facultyItem.name}. They have active assignments. Please remove their assignments first.`);
+                        setDeleteConfirm({ isOpen: false, id: null });
+                        return;
+                    }
+                }
+            }
+
             await deleteDoc(doc(db, activeCollection, id));
             setDeleteConfirm({ isOpen: false, id: null });
             fetchData();
@@ -706,7 +819,7 @@ const MasterData = ({ initialTab }) => {
                     </p>
                 </div>
 
-                {isAdmin && (
+                {isAdmin && activeTab !== 'settings' && (
                     <button
                         onClick={() => openModal()}
                         style={{
@@ -753,91 +866,252 @@ const MasterData = ({ initialTab }) => {
                     ))}
                 </div>
 
-                {/* Search */}
-                <div className="glass-panel" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <Search size={20} color="var(--color-text-muted)" />
-                    <input
-                        type="text"
-                        placeholder={`Search ${tabs.find(t => t.id === activeTab)?.label}...`}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{
-                            background: 'transparent', border: 'none', color: 'white',
-                            fontSize: '1rem', width: '100%', outline: 'none'
-                        }}
-                    />
-                </div>
-            </div>
-
-            {/* Grid Content */}
-            {loading ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-text-muted)' }}>Loading...</div>
-            ) : filteredData.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }}>📂</div>
-                    <div>No items found.</div>
-                </div>
-            ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                    {filteredData.map(item => (
-                        <div key={item.id} className="glass-panel" style={{
-                            padding: '1.5rem',
-                            display: 'flex', flexDirection: 'column', gap: '1rem',
-                            position: 'relative', overflow: 'hidden',
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            transition: 'transform 0.2s, box-shadow 0.2s',
-                            cursor: 'default'
-                        }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.transform = 'translateY(-4px)';
-                                e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.3)';
-                                e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = 'none';
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                            }}
-                        >
-                            {/* Card Content */}
-                            <div style={{ flex: 1 }}>
-                                {renderCardContent(item)}
+                {activeTab === 'settings' ? (
+                    <div className="settings-panel animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                        {/* Left Column: View Data For */}
+                        <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'fit-content' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                                <div style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                                    <Eye size={20} color="#fff" />
+                                </div>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>View Data For</h3>
                             </div>
 
-                            {/* Actions */}
-                            {isAdmin && (
-                                <div style={{
-                                    display: 'flex', justifyContent: 'flex-end', gap: '0.5rem',
-                                    paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)'
-                                }}>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                                Select the year you want to manage (Assignments, Schedule, etc).
+                            </p>
+
+                            <div style={{ position: 'relative' }}>
+                                <select
+                                    className="glass-input"
+                                    style={{
+                                        width: '100%', padding: '1rem', paddingRight: '2.5rem',
+                                        appearance: 'none', cursor: 'pointer',
+                                        fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-accent)'
+                                    }}
+                                    value={data[0]?.activeAcademicYear || ''}
+                                    onChange={async (e) => {
+                                        try {
+                                            await updateDoc(doc(db, 'settings', 'config'), { activeAcademicYear: e.target.value });
+                                            fetchData();
+                                        } catch (err) {
+                                            console.error(err);
+                                            alert('Failed to update active year');
+                                        }
+                                    }}
+                                >
+                                    {data[0]?.academicYears?.map(year => (
+                                        <option key={year} value={year} style={{ color: 'black' }}>{year}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={20} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.7 }} />
+                            </div>
+
+                            <div style={{
+                                background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '1.25rem',
+                                border: '1px solid rgba(255,255,255,0.05)', marginTop: '1rem'
+                            }}>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>Current System Default:</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#4ade80', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {data[0]?.activeAcademicYear} <span style={{ fontSize: '0.8rem', background: 'rgba(74, 222, 128, 0.1)', padding: '2px 8px', borderRadius: '12px' }}>(Active)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Create & Manage */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                            {/* Create New Year */}
+                            <div className="glass-panel" style={{ padding: '2rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                                    <div style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                                        <Plus size={20} color="#fff" />
+                                    </div>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Create New Year</h3>
+                                </div>
+
+                                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
+                                    Add a new academic year to the system.
+                                </p>
+
+                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 2025-2026"
+                                        className="glass-input"
+                                        value={newYearInput}
+                                        onChange={(e) => setNewYearInput(e.target.value)}
+                                        style={{ flex: 1, minWidth: '250px' }}
+                                    />
                                     <button
-                                        onClick={() => openModal(item)}
+                                        className="btn"
+                                        onClick={handleAddYear}
                                         style={{
-                                            background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa',
-                                            border: 'none', borderRadius: '6px', padding: '6px 12px',
-                                            cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500,
-                                            display: 'flex', alignItems: 'center', gap: '4px'
+                                            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                                            padding: '0 2rem', fontSize: '1rem', fontWeight: 600,
+                                            boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)'
                                         }}
                                     >
-                                        <Edit2 size={14} /> Edit
-                                    </button>
-                                    <button
-                                        onClick={(e) => confirmDelete(item.id, e)}
-                                        style={{
-                                            background: 'rgba(239, 68, 68, 0.1)', color: '#f87171',
-                                            border: 'none', borderRadius: '6px', padding: '6px 12px',
-                                            cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500,
-                                            display: 'flex', alignItems: 'center', gap: '4px'
-                                        }}
-                                    >
-                                        <Trash2 size={14} /> Delete
+                                        Add
                                     </button>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* Manage Years */}
+                            <div className="glass-panel" style={{ padding: '2rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                                    <div style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                                        <Settings size={20} color="#fff" />
+                                    </div>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Manage Years</h3>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '300px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                    {data[0]?.academicYears?.map(year => {
+                                        const config = data[0].yearConfigs?.[year] || {};
+                                        const load = config.maxFacultyLoad || 18;
+                                        const isDefault = year === data[0].activeAcademicYear;
+
+                                        return (
+                                            <div key={year} style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px',
+                                                border: isDefault ? '1px solid rgba(74, 222, 128, 0.3)' : '1px solid rgba(255,255,255,0.05)'
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'white' }}>
+                                                        {year} {isDefault && <span style={{ fontSize: '0.75rem', color: '#4ade80', marginLeft: '0.5rem' }}>(Default)</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                                                        Max Load: {load} hrs/week
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <input
+                                                        type="number"
+                                                        defaultValue={load}
+                                                        className="glass-input"
+                                                        style={{ width: '70px', padding: '0.5rem', fontSize: '0.9rem' }}
+                                                        id={`load-${year}`}
+                                                    />
+                                                    <button
+                                                        className="btn"
+                                                        style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.1)' }}
+                                                        onClick={() => {
+                                                            const val = document.getElementById(`load-${year}`).value;
+                                                            handleUpdateConfig(year, val);
+                                                        }}
+                                                        title="Save Config"
+                                                    >
+                                                        <Check size={16} />
+                                                    </button>
+                                                    {!isDefault && (
+                                                        <button
+                                                            className="btn"
+                                                            style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171' }}
+                                                            onClick={() => handleDeleteYear(year)}
+                                                            title="Delete Year"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
-                    ))}
-                </div>
-            )}
+                    </div>
+                ) : (
+                    <>
+                        {/* Search */}
+                        <div className="glass-panel" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <Search size={20} color="var(--color-text-muted)" />
+                            <input
+                                type="text"
+                                placeholder={`Search ${tabs.find(t => t.id === activeTab)?.label}...`}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={{
+                                    background: 'transparent', border: 'none', color: 'white',
+                                    fontSize: '1rem', width: '100%', outline: 'none'
+                                }}
+                            />
+                        </div>
+
+                        {/* Grid Content */}
+                        {loading ? (
+                            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-text-muted)' }}>Loading...</div>
+                        ) : filteredData.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                                <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }}>📂</div>
+                                <div>No items found.</div>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                                {filteredData.map(item => (
+                                    <div key={item.id} className="glass-panel" style={{
+                                        padding: '1.5rem',
+                                        display: 'flex', flexDirection: 'column', gap: '1rem',
+                                        position: 'relative', overflow: 'hidden',
+                                        border: '1px solid rgba(255,255,255,0.05)',
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                        cursor: 'default'
+                                    }}
+                                        onMouseEnter={e => {
+                                            e.currentTarget.style.transform = 'translateY(-4px)';
+                                            e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.3)';
+                                            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                                        }}
+                                        onMouseLeave={e => {
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.boxShadow = 'none';
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                        }}
+                                    >
+                                        {/* Card Content */}
+                                        <div style={{ flex: 1 }}>
+                                            {renderCardContent(item)}
+                                        </div>
+
+                                        {/* Actions */}
+                                        {isAdmin && (
+                                            <div style={{
+                                                display: 'flex', justifyContent: 'flex-end', gap: '0.5rem',
+                                                paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)'
+                                            }}>
+                                                <button
+                                                    onClick={() => openModal(item)}
+                                                    style={{
+                                                        background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa',
+                                                        border: 'none', borderRadius: '6px', padding: '6px 12px',
+                                                        cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500,
+                                                        display: 'flex', alignItems: 'center', gap: '4px'
+                                                    }}
+                                                >
+                                                    <Edit2 size={14} /> Edit
+                                                </button>
+                                                <button
+                                                    onClick={(e) => confirmDelete(item.id, e)}
+                                                    style={{
+                                                        background: 'rgba(239, 68, 68, 0.1)', color: '#f87171',
+                                                        border: 'none', borderRadius: '6px', padding: '6px 12px',
+                                                        cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500,
+                                                        display: 'flex', alignItems: 'center', gap: '4px'
+                                                    }}
+                                                >
+                                                    <Trash2 size={14} /> Delete
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
 
             {/* Modal */}
             {isModalOpen && (

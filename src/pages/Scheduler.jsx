@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
 import { collection, getDocs, addDoc, query, where, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import { useMasterData } from '../contexts/MasterDataContext';
 import '../styles/design-system.css';
 import { ChevronDown, Check, LayoutGrid, List, Zap, Printer, Filter, Users, BookOpen, FlaskConical, Layers, X } from 'lucide-react';
 
@@ -368,77 +369,71 @@ const Scheduler = () => {
     const [days, setDays] = useState([]);
     const [timeSlots, setTimeSlots] = useState([]);
 
-    // Fetch Initial Data
+    const {
+        rooms: rawRooms,
+        faculty: rawFaculty,
+        subjects: rawSubjects,
+        departments: rawDepartments,
+        semesters: rawSemesters,
+        groups: rawGroups,
+        days: rawDays,
+        timeSlots: rawTimeSlots
+    } = useMasterData();
+
     useEffect(() => {
-        const fetchMasterData = async () => {
-            try {
-                const [roomsSnap, facultySnap, subjectsSnap, deptSnap, semestersSnap, groupsSnap] = await Promise.all([
-                    getDocs(collection(db, 'rooms')),
-                    getDocs(collection(db, 'faculty')),
-                    getDocs(collection(db, 'subjects')),
-                    getDocs(collection(db, 'departments')),
-                    getDocs(collection(db, 'semesters')),
-                    getDocs(collection(db, 'groups'))
-                ]);
+        if (!rawRooms || !rawFaculty) return;
 
-                const roomsData = roomsSnap.docs.map(d => d.data());
-                setRooms(roomsData.map(d => d.name).sort());
-                setLabRooms(roomsData.filter(d => d.type === 'lab').map(d => d.name).sort());
-                setFaculty(facultySnap.docs.map(d => ({ name: d.data().name, shortCode: d.data().shortCode, empId: d.data().empId })).sort((a, b) => a.name.localeCompare(b.name)));
-                const subData = subjectsSnap.docs.map(d => ({ name: d.data().name, shortCode: d.data().shortCode })).sort((a, b) => a.name.localeCompare(b.name));
-                setSubjects(subData.map(d => d.name));
-                setSubjectDetails(subData);
+        // Process Rooms
+        setRooms(rawRooms.map(d => d.name).sort());
+        setLabRooms(rawRooms.filter(d => d.type === 'lab').map(d => d.name).sort());
 
-                const depts = deptSnap.docs.map(d => d.data().code || d.data().name).sort();
-                setDepartments(depts);
+        // Process Faculty
+        setFaculty(rawFaculty.map(d => ({ name: d.data?.name || d.name, shortCode: d.data?.shortCode || d.shortCode, empId: d.data?.empId || d.empId })).sort((a, b) => a.name.localeCompare(b.name)));
 
-                const sems = semestersSnap.docs.map(d => d.data()).sort((a, b) => a.number - b.number);
-                setSemesters(sems);
+        // Process Subjects
+        const subData = rawSubjects.map(d => ({ name: d.name, shortCode: d.shortCode })).sort((a, b) => a.name.localeCompare(b.name));
+        setSubjects(subData.map(d => d.name));
+        setSubjectDetails(subData);
 
-                const grps = groupsSnap.docs.map(d => d.data()).sort((a, b) => a.name.localeCompare(b.name));
-                setGroups(grps);
+        // Process Departments
+        const depts = rawDepartments.map(d => d.code || d.name).sort();
+        setDepartments(depts);
 
-                // Default to ALL departments and semesters for the view
-                if (depts.length > 0) {
-                    if (selectedDepts.length === 0) setSelectedDepts(depts);
-                    setQuickAssignData(prev => ({ ...prev, dept: depts[0] }));
-                }
+        // Process Semesters
+        setSemesters(rawSemesters); // Already sorted by context
 
-                if (sems.length > 0) {
-                    if (selectedSems.length === 0) setSelectedSems(sems.map(s => s.name));
-                    setQuickAssignData(prev => ({ ...prev, sem: sems[0].name }));
-                }
+        // Process Groups
+        setGroups(rawGroups); // Context doesn't sort by name by default? Context sorts by name if no sortFn.
 
-                // Fetch Days
-                const daysSnap = await getDocs(collection(db, 'days'));
-                const daysData = daysSnap.docs.map(d => d.data());
-                const visibleDays = daysData.filter(d => d.isVisible !== false).sort((a, b) => a.order - b.order).map(d => d.name);
+        // Default to ALL departments and semesters for the view
+        if (depts.length > 0) {
+            if (selectedDepts.length === 0) setSelectedDepts(depts);
+            setQuickAssignData(prev => ({ ...prev, dept: depts[0] }));
+        }
 
-                setDays(visibleDays);
-                if (visibleDays.length > 0) {
-                    setFormData(prev => ({ ...prev, day: visibleDays[0] }));
-                }
+        if (rawSemesters.length > 0) {
+            const semNames = rawSemesters.map(s => s.name);
+            if (selectedSems.length === 0) setSelectedSems(semNames);
+            setQuickAssignData(prev => ({ ...prev, sem: rawSemesters[0].name }));
+        }
 
-                // Fetch Time Slots
-                const timeSlotsSnap = await getDocs(collection(db, 'timeslots'));
-                const slots = timeSlotsSnap.docs.map(d => d.data());
-                slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        // Process Days
+        const visibleDays = rawDays.filter(d => d.isVisible !== false).map(d => d.name);
+        setDays(visibleDays);
+        if (visibleDays.length > 0 && !formData.day) {
+            setFormData(prev => ({ ...prev, day: visibleDays[0] }));
+        }
 
-                const formatTime = (t) => new Date(`2000-01-01T${t}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                const formattedSlots = slots.map(s => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`);
-                setTimeSlots(formattedSlots);
+        // Process Time Slots
+        const formatTime = (t) => new Date(`2000-01-01T${t}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const formattedSlots = rawTimeSlots.map(s => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`);
+        setTimeSlots(formattedSlots);
 
-                if (formattedSlots.length > 0) {
-                    setFormData(prev => ({ ...prev, time: formattedSlots[0] }));
-                }
+        if (formattedSlots.length > 0 && !formData.time) {
+            setFormData(prev => ({ ...prev, time: formattedSlots[0] }));
+        }
 
-            } catch (err) {
-                console.error("Error loading master data:", err);
-            }
-        };
-
-        fetchMasterData();
-    }, []);
+    }, [rawRooms, rawFaculty, rawSubjects, rawDepartments, rawSemesters, rawGroups, rawDays, rawTimeSlots]);
 
     // Fetch Schedule (Real-time)
     useEffect(() => {
@@ -689,7 +684,7 @@ const Scheduler = () => {
                 @media print {
                     @page { 
                         size: A4 landscape; 
-                        margin: 5mm; 
+                        margin: 2mm; 
                     }
                     
                     body { 
@@ -697,132 +692,163 @@ const Scheduler = () => {
                         color: black !important; 
                         margin: 0 !important;
                         padding: 0 !important;
-                        width: 100% !important;
-                        height: 100% !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        overflow: hidden !important; 
                     }
                     
-                    /* Hide all screen-only elements */
-                    .glass-panel, .sidebar, .navbar, .btn, .glass-input, button, select, h2, div[style*="display: grid"] { 
-                        display: none !important; 
+                    /* Hide Everything Else */
+                    body > *:not(#print-area) {
+                        display: none !important;
                     }
 
-                    /* Show Print Area */
+                    /* Ensure Print Area is Visible */
                     #print-area {
                         display: flex !important;
-                        flex-direction: column;
+                        flex-direction: column !important;
+                        position: absolute;
+                        top: 0;
+                        left: 0;
                         width: 100% !important;
-                        height: 100% !important; /* Fill the printable area defined by @page margins */
+                        height: 100% !important;
                         background: white;
-                        box-sizing: border-box;
+                        z-index: 9999;
+                        visibility: visible !important;
                     }
 
-                    /* Compact Header */
-                    .print-header-section {
-                        display: flex;
+                    #print-area * {
+                        visibility: visible !important;
+                    }
+
+                    /* Header */
+                    .print-header {
+                        display: flex !important;
                         justify-content: space-between;
                         align-items: flex-end;
-                        padding-bottom: 5px;
-                        border-bottom: 3px solid black;
-                        margin-bottom: 5px;
+                        padding: 0 0 2px 0;
+                        border-bottom: 2px solid #000;
+                        margin-bottom: 2px;
                         flex-shrink: 0;
                     }
 
-                    .header-title {
-                        font-size: 16pt;
+                    .print-header h1 {
+                        font-size: 14pt;
                         font-weight: 900;
-                        text-transform: uppercase;
                         margin: 0;
+                        text-transform: uppercase;
+                    }
+
+                    .print-meta {
+                        font-size: 9pt;
+                        text-align: right;
                         line-height: 1.1;
                     }
 
-                    .header-sub {
-                        font-size: 12pt;
-                        font-weight: 600;
-                        margin: 0;
-                        text-align: right;
+                    /* Layout Table */
+                    .layout-table {
+                        width: 100%;
+                        height: 100%; 
+                        border-collapse: collapse;
+                        table-layout: fixed;
                     }
 
-                    /* Maximized Table */
-                    .print-table {
-                        width: 100%;
-                        flex-grow: 1; /* Fill remaining vertical space */
-                        border-collapse: collapse;
-                        table-layout: fixed; /* Equal column widths */
-                        border: 3px solid black; /* Outer border */
+                    .layout-table th, .layout-table td {
+                        border: 1px solid #000;
+                        padding: 0;
+                        margin: 0;
+                        box-sizing: border-box;
                     }
-                    
-                    .print-table th {
-                        border: 2px solid black;
-                        padding: 4px;
+
+                    /* Header Row */
+                    .layout-table th {
+                        height: 20px; 
+                        background: #eee !important;
+                        font-size: 8pt;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        text-align: center;
+                    }
+
+                    /* Day Column */
+                    .day-cell {
+                        width: 25px; 
+                        background: #eee !important;
                         text-align: center;
                         vertical-align: middle;
-                        overflow: hidden;
-                    }
-
-                    .print-table td {
-                        border: 2px solid black;
-                        padding: 4px;
-                        text-align: center;
-                        vertical-align: top;
-                        overflow: hidden;
-                    }
-
-                    /* Specific width for the Day column to fit "WEDNESDAY" */
-                    .print-table th:first-child,
-                    .print-table td:first-child {
-                        width: 140px !important;
-                        vertical-align: middle; /* Keep day names centered vertically */
-                    }
-
-                    .print-table th {
-                        background-color: #e0e0e0 !important;
-                        font-weight: 900;
+                        font-weight: bold;
+                        font-size: 10pt;
                         text-transform: uppercase;
-                        font-size: 14pt;
-                        height: 40px; /* Fixed header height */
-                        color: black;
                     }
 
-                    .print-table td {
-                        height: auto; /* Let rows distribute evenly */
+                    .vertical-text {
+                        writing-mode: vertical-rl;
+                        transform: rotate(180deg);
+                        white-space: nowrap;
+                        margin: 0 auto;
                     }
 
-                    /* Cell Content Styling */
-                    .cell-content {
-                        display: flex;
+                    /* Content Cells */
+                    .content-cell {
+                        height: auto; 
+                        vertical-align: top;
+                        position: relative;
+                    }
+
+                    .cell-inner {
+                        display: flex !important;
                         flex-direction: column;
-                        justify-content: flex-start;
-                        align-items: center;
                         width: 100%;
                         height: 100%;
-                        padding-top: 4px;
+                        justify-content: space-evenly; 
                     }
 
-                    .subject-text {
-                        font-size: 14pt; /* Slightly reduced to prevent overflow */
-                        font-weight: 800;
-                        line-height: 1.2;
-                        text-align: center;
+                    .print-assignment {
+                        width: 98%; 
+                        background: #fff;
+                        border: 1.5px solid #000;
+                        border-radius: 6px;
+                        padding: 2px 5px;
+                        margin: 2px 0 4px 0;
+                        box-sizing: border-box;
+                        text-align: left;
+                        display: flex !important; /* Flexbox for Left/Right alignment */
+                        justify-content: space-between;
+                        align-items: center;
+                        overflow: hidden;
+                        box-shadow: 2.5px 2.5px 0px rgba(0,0,0,1);
+                        font-family: 'Segoe UI', system-ui, sans-serif;
                     }
 
-                    .details-text {
-                        font-size: 10pt;
-                        font-weight: 600;
-                        margin-top: 2px;
-                        text-align: center;
+                    .print-details {
+                        overflow: hidden; 
+                        white-space: nowrap; 
+                        text-overflow: ellipsis; 
+                        padding-right: 4px;
+                        flex: 1; /* Allow taking available space */
                     }
 
-                    .faculty-text {
-                        font-size: 9pt;
-                        font-style: italic;
-                        margin-top: 2px;
-                        text-align: center;
+                    .vertical-mode .print-details {
+                        white-space: normal; /* Wrap text in vertical view */
+                        overflow: visible;
+                        line-height: 1.1;
                     }
+
+                    /* Dynamic Font Sizing - Optimized for single line */
+                    .density-low { font-size: 8.5pt; }
+                    .density-med { font-size: 7.5pt; }
+                    .density-high { font-size: 6.5pt; letter-spacing: -0.01em; }
+                    .density-extreme { font-size: 5.5pt; letter-spacing: -0.02em; }
+                    .density-ultra { font-size: 4.8pt; letter-spacing: -0.03em; line-height: 0.95; }
+
+                    /* Inline Elements */
+                    .print-sub { font-weight: 800; color: #000; }
+                    .print-meta { font-weight: 700; color: #000; }
+                    .print-fac { font-style: normal; font-weight: 700; color: #000; }
                 }
             `}</style>
 
             {/* Toolbar (Screen Only) */}
-            <div className="glass-panel" style={{
+            <div className="glass-panel no-print" style={{
                 padding: '16px',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -994,7 +1020,7 @@ const Scheduler = () => {
 
                     <button
                         className="btn"
-                        onClick={handlePrint}
+                        onClick={() => window.print()}
                         style={{
                             background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                             border: 'none',
@@ -1017,188 +1043,190 @@ const Scheduler = () => {
             </div>
 
             {/* Quick Assign Configuration Panel */}
-            {quickAssignMode && (
-                <div className="animate-fade-in" style={{
-                    padding: '20px',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(245, 158, 11, 0.3)',
-                    background: 'linear-gradient(to right, rgba(245, 158, 11, 0.05), rgba(30, 41, 59, 0.9))',
-                    backdropFilter: 'blur(12px)',
-                    marginTop: '8px',
-                    boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.3)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ padding: '8px', background: 'rgba(245, 158, 11, 0.2)', borderRadius: '10px' }}>
-                                <Zap size={20} color="#f59e0b" fill="#f59e0b" />
+            {
+                quickAssignMode && (
+                    <div className="animate-fade-in" style={{
+                        padding: '20px',
+                        borderRadius: '16px',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        background: 'linear-gradient(to right, rgba(245, 158, 11, 0.05), rgba(30, 41, 59, 0.9))',
+                        backdropFilter: 'blur(12px)',
+                        marginTop: '8px',
+                        boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.3)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '16px'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ padding: '8px', background: 'rgba(245, 158, 11, 0.2)', borderRadius: '10px' }}>
+                                    <Zap size={20} color="#f59e0b" fill="#f59e0b" />
+                                </div>
+                                <div>
+                                    <span style={{ fontWeight: 800, color: '#f59e0b', fontSize: '1rem', letterSpacing: '0.05em', display: 'block' }}>QUICK ASSIGN</span>
+                                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Configure class details to quickly add to schedule</span>
+                                </div>
                             </div>
-                            <div>
-                                <span style={{ fontWeight: 800, color: '#f59e0b', fontSize: '1rem', letterSpacing: '0.05em', display: 'block' }}>QUICK ASSIGN</span>
-                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Configure class details to quickly add to schedule</span>
-                            </div>
+                            <button
+                                onClick={() => setQuickAssignMode(false)}
+                                style={{
+                                    background: 'rgba(255,255,255,0.05)',
+                                    border: 'none',
+                                    color: '#94a3b8',
+                                    cursor: 'pointer',
+                                    padding: '8px',
+                                    borderRadius: '8px',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={e => { e.target.style.background = 'rgba(255,255,255,0.1)'; e.target.style.color = 'white'; }}
+                                onMouseLeave={e => { e.target.style.background = 'rgba(255,255,255,0.05)'; e.target.style.color = '#94a3b8'; }}
+                            >
+                                <X size={18} />
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setQuickAssignMode(false)}
-                            style={{
-                                background: 'rgba(255,255,255,0.05)',
-                                border: 'none',
-                                color: '#94a3b8',
-                                cursor: 'pointer',
-                                padding: '8px',
-                                borderRadius: '8px',
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={e => { e.target.style.background = 'rgba(255,255,255,0.1)'; e.target.style.color = 'white'; }}
-                            onMouseLeave={e => { e.target.style.background = 'rgba(255,255,255,0.05)'; e.target.style.color = '#94a3b8'; }}
-                        >
-                            <X size={18} />
-                        </button>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                        <Select
-                            options={departments}
-                            value={quickAssignData.dept}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, dept: val })}
-                            placeholder="Select Dept"
-                        />
-                        <Select
-                            options={semesters.map(s => ({ value: s.name, label: s.name }))}
-                            value={quickAssignData.sem}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, sem: val })}
-                            placeholder="Select Sem"
-                        />
-                        <Select
-                            options={subjectDetails.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))}
-                            value={quickAssignData.subject}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, subject: val })}
-                            placeholder="Select Subject"
-                        />
-                        <Select
-                            options={rooms}
-                            value={quickAssignData.room}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, room: val })}
-                            placeholder="Select Room"
-                        />
-                        <Select
-                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
-                            value={quickAssignData.faculty}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, faculty: val })}
-                            placeholder="Faculty 1"
-                        />
-                        <Select
-                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
-                            value={quickAssignData.faculty2}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, faculty2: val })}
-                            placeholder="Faculty 2"
-                        />
-                        <Select
-                            options={groups.map(g => ({ value: g.name, label: g.name }))}
-                            value={quickAssignData.section}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, section: val, group: '' })}
-                            placeholder="Group"
-                        />
-
-                        {quickAssignData.section && groups.find(g => g.name === quickAssignData.section)?.subGroups?.length > 0 ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                             <Select
-                                options={groups.find(g => g.name === quickAssignData.section)?.subGroups || []}
-                                value={quickAssignData.group}
-                                onChange={val => setQuickAssignData({ ...quickAssignData, group: val })}
-                                placeholder="Sub-Group"
+                                options={departments}
+                                value={quickAssignData.dept}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, dept: val })}
+                                placeholder="Select Dept"
                             />
-                        ) : (
-                            <div style={{ padding: '10px 12px', fontSize: '0.85rem', width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', color: '#64748b', display: 'flex', alignItems: 'center', height: '42px' }}>
-                                No Sub-Groups
-                            </div>
-                        )}
+                            <Select
+                                options={semesters.map(s => ({ value: s.name, label: s.name }))}
+                                value={quickAssignData.sem}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, sem: val })}
+                                placeholder="Select Sem"
+                            />
+                            <Select
+                                options={subjectDetails.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))}
+                                value={quickAssignData.subject}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, subject: val })}
+                                placeholder="Select Subject"
+                            />
+                            <Select
+                                options={rooms}
+                                value={quickAssignData.room}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, room: val })}
+                                placeholder="Select Room"
+                            />
+                            <Select
+                                options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
+                                value={quickAssignData.faculty}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, faculty: val })}
+                                placeholder="Faculty 1"
+                            />
+                            <Select
+                                options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
+                                value={quickAssignData.faculty2}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, faculty2: val })}
+                                placeholder="Faculty 2"
+                            />
+                            <Select
+                                options={groups.map(g => ({ value: g.name, label: g.name }))}
+                                value={quickAssignData.section}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, section: val, group: '' })}
+                                placeholder="Group"
+                            />
 
-                        <Select
-                            options={days}
-                            value={quickAssignData.day}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, day: val })}
-                            placeholder="Select Day"
-                        />
-                        <Select
-                            options={timeSlots}
-                            value={quickAssignData.time}
-                            onChange={val => setQuickAssignData({ ...quickAssignData, time: val })}
-                            placeholder="Select Time"
-                        />
-                    </div>
+                            {quickAssignData.section && groups.find(g => g.name === quickAssignData.section)?.subGroups?.length > 0 ? (
+                                <Select
+                                    options={groups.find(g => g.name === quickAssignData.section)?.subGroups || []}
+                                    value={quickAssignData.group}
+                                    onChange={val => setQuickAssignData({ ...quickAssignData, group: val })}
+                                    placeholder="Sub-Group"
+                                />
+                            ) : (
+                                <div style={{ padding: '10px 12px', fontSize: '0.85rem', width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', color: '#64748b', display: 'flex', alignItems: 'center', height: '42px' }}>
+                                    No Sub-Groups
+                                </div>
+                            )}
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
-                        <button
-                            className="btn"
-                            onClick={() => setQuickAssignMode(false)}
-                            style={{
-                                padding: '10px 20px',
-                                fontSize: '0.85rem',
-                                background: 'rgba(255,255,255,0.05)',
-                                color: '#94a3b8',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: '8px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            className="btn"
-                            onClick={(e) => {
-                                if (quickAssignData.day && quickAssignData.time) {
-                                    // Direct Add
-                                    if (!quickAssignData.subject || !quickAssignData.room || !quickAssignData.faculty) {
-                                        alert("Please select Subject, Room, and Faculty.");
-                                        return;
+                            <Select
+                                options={days}
+                                value={quickAssignData.day}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, day: val })}
+                                placeholder="Select Day"
+                            />
+                            <Select
+                                options={timeSlots}
+                                value={quickAssignData.time}
+                                onChange={val => setQuickAssignData({ ...quickAssignData, time: val })}
+                                placeholder="Select Time"
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
+                            <button
+                                className="btn"
+                                onClick={() => setQuickAssignMode(false)}
+                                style={{
+                                    padding: '10px 20px',
+                                    fontSize: '0.85rem',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    color: '#94a3b8',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '8px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn"
+                                onClick={(e) => {
+                                    if (quickAssignData.day && quickAssignData.time) {
+                                        // Direct Add
+                                        if (!quickAssignData.subject || !quickAssignData.room || !quickAssignData.faculty) {
+                                            alert("Please select Subject, Room, and Faculty.");
+                                            return;
+                                        }
+                                        handleSave(null, quickAssignData);
+                                        const btn = e.target;
+                                        const originalText = btn.innerText;
+                                        btn.innerText = "✓ Added";
+                                        btn.style.background = "#10b981";
+                                        btn.style.color = "white";
+                                        setTimeout(() => {
+                                            btn.innerText = originalText;
+                                            btn.style.background = "#f59e0b";
+                                            btn.style.color = "black";
+                                        }, 2000);
+                                    } else {
+                                        // Toggle Active Mode
+                                        const btn = e.target;
+                                        const originalText = btn.innerText;
+                                        btn.innerText = "Active!";
+                                        btn.style.background = "#10b981";
+                                        btn.style.color = "white";
+                                        setTimeout(() => {
+                                            btn.innerText = originalText;
+                                            btn.style.background = "#f59e0b";
+                                            btn.style.color = "black";
+                                        }, 2000);
                                     }
-                                    handleSave(null, quickAssignData);
-                                    const btn = e.target;
-                                    const originalText = btn.innerText;
-                                    btn.innerText = "✓ Added";
-                                    btn.style.background = "#10b981";
-                                    btn.style.color = "white";
-                                    setTimeout(() => {
-                                        btn.innerText = originalText;
-                                        btn.style.background = "#f59e0b";
-                                        btn.style.color = "black";
-                                    }, 2000);
-                                } else {
-                                    // Toggle Active Mode
-                                    const btn = e.target;
-                                    const originalText = btn.innerText;
-                                    btn.innerText = "Active!";
-                                    btn.style.background = "#10b981";
-                                    btn.style.color = "white";
-                                    setTimeout(() => {
-                                        btn.innerText = originalText;
-                                        btn.style.background = "#f59e0b";
-                                        btn.style.color = "black";
-                                    }, 2000);
-                                }
-                            }}
-                            style={{
-                                padding: '10px 24px',
-                                fontSize: '0.85rem',
-                                background: '#f59e0b',
-                                color: 'black',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
-                            }}
-                        >
-                            {quickAssignData.day && quickAssignData.time ? "Add Class" : "Save Settings"}
-                        </button>
+                                }}
+                                style={{
+                                    padding: '10px 24px',
+                                    fontSize: '0.85rem',
+                                    background: '#f59e0b',
+                                    color: 'black',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
+                                }}
+                            >
+                                {quickAssignData.day && quickAssignData.time ? "Add Class" : "Save Settings"}
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Screen Grid (Original) */}
             <div className="glass-panel" style={{ padding: 0, overflow: 'auto', flex: 1 }}>
@@ -1495,103 +1523,165 @@ const Scheduler = () => {
                 )}
             </div>
 
-            {/* DEDICATED PRINT AREA (Hidden on Screen) */}
-            <div id="print-area" style={{ display: 'none' }}>
-                <div className="print-header-section">
-                    <div>
-                        <h1 className="header-title">LAMS SCHEDULE {activeAcademicYear}</h1>
+            {/* DEDICATED PRINT AREA (Portal to Body for Print Visibility) */}
+            {createPortal(
+                <div id="print-area" style={{ display: 'none' }}>
+                    <div className="print-header">
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <h1 style={{ fontSize: '24pt', fontWeight: '800', margin: 0, letterSpacing: '-1px' }}>{activeAcademicYear || 'ACADEMIC SCHEDULE'}</h1>
+                        </div>
+                        <div className="print-meta">
+                            <div>
+                                <strong>FILTERS:</strong> {viewType === 'class' ? `Dept: ${selectedDepts.join(', ') || 'All'} | Sem: ${selectedSems.join(', ') || 'All'}` :
+                                    viewType === 'faculty' ? `Faculty: ${selectedFaculties.join(', ') || 'All'}` :
+                                        viewType === 'subject' ? `Subjects: ${selectedSubjects.join(', ')}` :
+                                            `Lab: ${selectedLabs.join(', ') || 'All'}`}
+                            </div>
+                            <div>Generated: {new Date().toLocaleString()}</div>
+                        </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                        <p className="header-sub">
-                            {viewType === 'class'
-                                ? `${selectedDepts.join(', ')} | ${selectedSems.join(', ')} SEM`
-                                : viewType === 'faculty'
-                                    ? `FACULTY: ${selectedFaculties.map(f => f.toUpperCase()).join(', ')}`
-                                    : viewType === 'subject'
-                                        ? `SUBJECTS: ${selectedSubjects.join(', ')}`
-                                        : `LABS: ${selectedLabs.join(', ')}`}
-                        </p>
-                    </div>
-                </div>
 
-                <table className="print-table">
-                    {viewMode === 'horizontal' ? (
-                        <>
-                            <thead>
-                                <tr>
-                                    <th style={{ width: '140px' }}>DAY / TIME</th>
-                                    {timeSlots.map(slot => (
-                                        <th key={slot}>{slot}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {days.map(day => (
-                                    <tr key={day}>
-                                        <th style={{ backgroundColor: '#f9f9f9', width: '140px' }}>{day.toUpperCase()}</th>
-                                        {timeSlots.map(time => {
-                                            const assignments = getAssignments(day, time);
-                                            return (
-                                                <td key={`${day}-${time}`}>
-                                                    {assignments.length > 0 ? assignments.map(a => (
-                                                        <div key={a.id} className="cell-content">
-                                                            <div className="subject-text">{getSubjectShortCode(a.subject)}</div>
-                                                            <div className="details-text">
-                                                                [{a.dept}-{a.section}{a.group ? `-${a.group}` : ''}] -{a.room} [{a.sem}] <span style={{ fontStyle: 'italic' }}>[{getFacultyShortCode(a.faculty)}{a.faculty2 ? `, ${getFacultyShortCode(a.faculty2)}` : ''}]</span>
-                                                            </div>
-                                                        </div>
-                                                    )) : (
-                                                        <div className="cell-content" style={{ opacity: 0.1, fontSize: '24pt' }}>
-                                                            -
-                                                        </div>
-                                                    )}
+                    <div className="print-table-container" style={{ flex: 1, position: 'relative' }}>
+                        <table className={`layout-table ${viewMode === 'vertical' ? 'vertical-mode' : ''}`}>
+                            {viewMode === 'horizontal' ? (
+                                <>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: '30px' }}></th> {/* Day Column Config */}
+                                            {timeSlots.map(time => (
+                                                <th key={time}>{time}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {days.map(day => (
+                                            <tr key={day} style={{ height: `${100 / days.length}%` }}>
+                                                <td className="day-cell">
+                                                    <div className="vertical-text">{day}</div>
                                                 </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </>
-                    ) : (
-                        <>
-                            <thead>
-                                <tr>
-                                    <th style={{ width: '140px' }}>TIME / DAY</th>
-                                    {days.map(day => (
-                                        <th key={day}>{day.toUpperCase()}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {timeSlots.map(time => (
-                                    <tr key={time}>
-                                        <th style={{ backgroundColor: '#f9f9f9', width: '140px' }}>{time}</th>
-                                        {days.map(day => {
-                                            const assignments = getAssignments(day, time);
-                                            return (
-                                                <td key={`${day}-${time}`}>
-                                                    {assignments.length > 0 ? assignments.map(a => (
-                                                        <div key={a.id} className="cell-content">
-                                                            <div className="subject-text">{getSubjectShortCode(a.subject)}</div>
-                                                            <div className="details-text">
-                                                                [{a.dept}-{a.section}{a.group ? `-${a.group}` : ''}] -{a.room} [{a.sem}] <span style={{ fontStyle: 'italic' }}>[{getFacultyShortCode(a.faculty)}]</span>
+                                                {timeSlots.map(time => {
+                                                    const assignments = getAssignments(day, time).sort((a, b) => parseInt(a.sem) - parseInt(b.sem));
+                                                    const count = assignments.length;
+                                                    let densityClass = 'density-low';
+                                                    if (count > 10) densityClass = 'density-ultra';
+                                                    else if (count > 8) densityClass = 'density-extreme';
+                                                    else if (count > 5) densityClass = 'density-high';
+                                                    else if (count > 3) densityClass = 'density-med';
+
+                                                    return (
+                                                        <td key={`${day}-${time}`} className={`content-cell ${densityClass}`}>
+                                                            <div className="cell-inner">
+                                                                {assignments.map(assignment => {
+                                                                    const conflict = assignments.some(other => other.id !== assignment.id && (other.room === assignment.room || other.faculty === assignment.faculty || (other.faculty2 && other.faculty2 === assignment.faculty) || (assignment.faculty2 && (other.faculty === assignment.faculty2 || other.faculty2 === assignment.faculty2))));
+                                                                    return (
+                                                                        <div key={assignment.id} className="print-assignment" style={conflict ? { borderColor: 'red', borderWidth: '2px' } : {}}>
+                                                                            <div className="print-details">
+                                                                                <span className="print-sub">{getSubjectShortCode(assignment.subject)}</span>
+                                                                                <span className="print-meta"> [{assignment.dept}-{assignment.section}-{assignment.group && assignment.group !== 'All' ? assignment.group : '1'}]</span>
+                                                                                <span className="print-fac"> [{getFacultyShortCode(assignment.faculty)}{assignment.faculty2 ? `,${getFacultyShortCode(assignment.faculty2)}` : ''}]</span>
+                                                                                <span className="print-meta"> ➜ {assignment.room}</span>
+                                                                            </div>
+                                                                            <div style={{ flexShrink: 0, fontWeight: 800, fontSize: '0.95em', display: 'flex', alignItems: 'center', lineHeight: 1 }}>
+
+                                                                                {(() => {
+                                                                                    const match = assignment.sem.toUpperCase().match(/(\d+)(ST|ND|RD|TH)/);
+                                                                                    if (match) {
+                                                                                        return (
+                                                                                            <>
+                                                                                                <span style={{ fontSize: '1.2em', marginRight: '1px' }}>{match[1]}</span>
+                                                                                                <sup style={{ fontSize: '0.7em', top: '-0.4em', position: 'relative' }}>{match[2]}</sup>
+                                                                                                <span style={{ fontSize: '0.8em', marginLeft: '2px' }}>SEM</span>
+                                                                                            </>
+                                                                                        );
+                                                                                    }
+                                                                                    // Fallback if format is just "1" or "Semester 1" without ordinal (unlikely given your data but safe)
+                                                                                    return <span>{assignment.sem.toUpperCase().replace('SEMESTER', 'SEM')}</span>;
+                                                                                })()}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
-                                                        </div>
-                                                    )) : (
-                                                        <div className="cell-content" style={{ opacity: 0.1, fontSize: '24pt' }}>
-                                                            -
-                                                        </div>
-                                                    )}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </>
+                            ) : (
+                                <>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: '80px', fontSize: '9pt' }}>TIME</th>
+                                            {days.map(day => (
+                                                <th key={day}>{day}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {timeSlots.map(time => (
+                                            <tr key={time} style={{ height: `${100 / timeSlots.length}%` }}>
+                                                <td className="day-cell" style={{ width: '80px', verticalAlign: 'middle' }}>
+                                                    <div style={{ fontWeight: '800', fontSize: '9pt', padding: '2px', textAlign: 'center' }}>
+                                                        {time.replace(/ - /g, '-').replace(/ AM/g, '').replace(/ PM/g, '')}
+                                                    </div>
                                                 </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </>
-                    )}
-                </table>
-            </div >
+                                                {days.map(day => {
+                                                    const assignments = getAssignments(day, time).sort((a, b) => parseInt(a.sem) - parseInt(b.sem));
+                                                    const count = assignments.length;
+                                                    let densityClass = 'density-low';
+                                                    if (count > 10) densityClass = 'density-ultra';
+                                                    else if (count > 8) densityClass = 'density-extreme';
+                                                    else if (count > 5) densityClass = 'density-high';
+                                                    else if (count > 3) densityClass = 'density-med';
+
+                                                    return (
+                                                        <td key={`${day}-${time}`} className={`content-cell ${densityClass}`}>
+                                                            <div className="cell-inner">
+                                                                {assignments.map(assignment => {
+                                                                    const conflict = assignments.some(other => other.id !== assignment.id && (other.room === assignment.room || other.faculty === assignment.faculty || (other.faculty2 && other.faculty2 === assignment.faculty) || (assignment.faculty2 && (other.faculty === assignment.faculty2 || other.faculty2 === assignment.faculty2))));
+                                                                    return (
+                                                                        <div key={assignment.id} className="print-assignment" style={conflict ? { borderColor: 'red', borderWidth: '2px' } : {}}>
+                                                                            <div className="print-details">
+                                                                                <span className="print-sub">{getSubjectShortCode(assignment.subject)}</span>
+                                                                                <span className="print-meta"> [{assignment.dept}-{assignment.section}-{assignment.group && assignment.group !== 'All' ? assignment.group : '1'}]</span>
+                                                                                <span className="print-fac"> [{getFacultyShortCode(assignment.faculty)}{assignment.faculty2 ? `,${getFacultyShortCode(assignment.faculty2)}` : ''}]</span>
+                                                                                <span className="print-meta"> ➜ {assignment.room}</span>
+                                                                            </div>
+                                                                            <div style={{ flexShrink: 0, fontWeight: 800, fontSize: '0.95em', display: 'flex', alignItems: 'center', lineHeight: 1 }}>
+
+                                                                                {(() => {
+                                                                                    const match = assignment.sem.toUpperCase().match(/(\d+)(ST|ND|RD|TH)/);
+                                                                                    if (match) {
+                                                                                        return (
+                                                                                            <>
+                                                                                                <span style={{ fontSize: '1.2em', marginRight: '1px' }}>{match[1]}</span>
+                                                                                                <sup style={{ fontSize: '0.7em', top: '-0.4em', position: 'relative' }}>{match[2]}</sup>
+                                                                                                <span style={{ fontSize: '0.8em', marginLeft: '2px' }}>SEM</span>
+                                                                                            </>
+                                                                                        );
+                                                                                    }
+                                                                                    return <span>{assignment.sem.toUpperCase().replace('SEMESTER', 'SEM')}</span>;
+                                                                                })()}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </>
+                            )}
+                        </table>
+                    </div>
+                </div>,
+                document.body
+            )}
 
             {/* Booking Modal */}
             {

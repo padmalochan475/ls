@@ -449,7 +449,7 @@ const Dashboard = () => {
                                                 {upcoming.subject}
                                             </h2>
                                             <div style={{ fontSize: '1.2rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
-                                                {upcoming.dept} • {upcoming.group}
+                                                {upcoming.dept} - {upcoming.section}{upcoming.group && upcoming.group !== 'All' ? ` - ${upcoming.group}` : ''} - {upcoming.sem}
                                             </div>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
@@ -629,54 +629,89 @@ const Dashboard = () => {
                                     {todaySchedule.sort((a, b) => (a.time || '').localeCompare(b.time || '')).map((item, index) => {
                                         const status = getClassStatus(item.time);
                                         return (
-                                            <div key={index} className="glass-panel" style={{
-                                                padding: '1.5rem',
-                                                background: 'rgba(255,255,255,0.02)',
-                                                border: '1px solid rgba(255,255,255,0.05)',
-                                                position: 'relative',
-                                                overflow: 'hidden',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '1rem'
-                                            }}>
-                                                {/* Status Badge */}
-                                                <div style={{
-                                                    position: 'absolute', top: '1rem', right: '1rem',
-                                                    padding: '0.25rem 0.75rem', borderRadius: '20px',
-                                                    background: status.bg, color: status.color,
-                                                    fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase'
-                                                }}>
-                                                    {status.label}
+                                            <div key={index} className="glass-panel"
+                                                style={{
+                                                    padding: '1.5rem',
+                                                    background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)',
+                                                    border: '1px solid rgba(255,255,255,0.08)',
+                                                    position: 'relative',
+                                                    overflow: 'hidden',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '1.25rem',
+                                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)',
+                                                    transition: 'transform 0.2s, box-shadow 0.2s'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = 'translateY(-4px)';
+                                                    e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.15)';
+                                                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)';
+                                                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                                                }}
+                                            >
+                                                {/* Accent Bar */}
+                                                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: status.color }}></div>
+
+                                                {/* Header: Time, Badge */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                                        <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '10px' }}>
+                                                            <Clock size={18} color="white" />
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'white', letterSpacing: '0.5px' }}>{item.time}</span>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                                                                <MapPin size={14} color="#f59e0b" />
+                                                                {item.room}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        padding: '0.35rem 0.85rem', borderRadius: '20px',
+                                                        background: status.bg, color: status.color,
+                                                        fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase',
+                                                        letterSpacing: '0.5px', boxShadow: `0 2px 8px ${status.bg.replace('0.1', '0.2')}`
+                                                    }}>
+                                                        {status.label}
+                                                    </div>
                                                 </div>
 
-                                                {/* Time & Room */}
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                        <Clock size={16} color="var(--color-accent)" />
-                                                        <span style={{ color: 'white', fontWeight: 600 }}>{item.time}</span>
-                                                    </div>
-                                                    <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.2)' }}></div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                        <MapPin size={16} color="#f59e0b" />
-                                                        <span>{item.room}</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Subject Info */}
+                                                {/* Body: Subject */}
                                                 <div>
-                                                    <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1.25rem', fontWeight: 700 }}>{item.subject}</h4>
-                                                    <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
-                                                        {item.dept} • Sem {item.sem} • Group {item.group}
+                                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1.4rem', fontWeight: 800, color: 'white', lineHeight: 1.3 }}>{item.subject}</h4>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                        <span style={{ background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.75rem', borderRadius: '6px', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 500 }}>
+                                                            {item.dept}
+                                                        </span>
+                                                        <span style={{ background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.75rem', borderRadius: '6px', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 500 }}>
+                                                            {item.section}{item.group && item.group !== 'All' ? ` - ${item.group}` : ''}
+                                                        </span>
+                                                        <span style={{ background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.75rem', borderRadius: '6px', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 500 }}>
+                                                            {item.sem}
+                                                        </span>
                                                     </div>
                                                 </div>
 
-                                                {/* Faculty (if viewing all) */}
-                                                {dashboardView === 'admin' && (
-                                                    <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                        <UserCircle size={16} />
-                                                        <span style={{ fontSize: '0.9rem' }}>{item.faculty}</span>
+                                                {/* Footer: Faculty (Always Visible) */}
+                                                <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                                                        <div style={{ padding: '0.5rem', background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)', borderRadius: '50%', color: 'white', display: 'flex', boxShadow: '0 2px 5px rgba(59, 130, 246, 0.4)' }}>
+                                                            <UserCircle size={18} />
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'white' }}>{item.faculty}</span>
+                                                            {item.faculty2 && (
+                                                                <span style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                                    <span style={{ opacity: 0.6 }}>&</span> {item.faculty2}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                )}
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -732,8 +767,81 @@ const Dashboard = () => {
                                     const classes = weeklySchedule[dayName] || [];
                                     const isToday = dayName === currentDayName;
 
+                                    // Helper functions for time parsing
+                                    const parseTime = (t) => {
+                                        if (!t) return 8;
+                                        try {
+                                            const [timePart, modifier] = t.split(' - ')[0].split(' ');
+                                            let [h, m] = timePart.split(':').map(Number);
+                                            if (modifier === 'PM' && h < 12) h += 12;
+                                            if (modifier === 'AM' && h === 12) h = 0;
+                                            return h + (m / 60);
+                                        } catch (e) {
+                                            return 8;
+                                        }
+                                    };
+                                    const parseDuration = (t) => {
+                                        if (!t) return 1;
+                                        try {
+                                            const [startStr, endStr] = t.split(' - ');
+
+                                            const getHours = (timeStr) => {
+                                                const [timePart, modifier] = timeStr.split(' ');
+                                                let [h, m] = timePart.split(':').map(Number);
+                                                if (modifier === 'PM' && h < 12) h += 12;
+                                                if (modifier === 'AM' && h === 12) h = 0;
+                                                return h + (m / 60);
+                                            };
+
+                                            return getHours(endStr) - getHours(startStr);
+                                        } catch (e) {
+                                            return 1;
+                                        }
+                                    };
+
+                                    // Process overlaps to assign lanes
+                                    const processOverlaps = (items) => {
+                                        // Sort by start time, then duration (longest first)
+                                        const sorted = [...items].map(item => ({
+                                            ...item,
+                                            start: parseTime(item.time),
+                                            duration: parseDuration(item.time),
+                                            end: parseTime(item.time) + parseDuration(item.time)
+                                        })).sort((a, b) => {
+                                            if (a.start !== b.start) return a.start - b.start;
+                                            return b.duration - a.duration;
+                                        });
+
+                                        const lanes = []; // Stores the end time of the last item in each lane
+
+                                        const processed = sorted.map(item => {
+                                            let laneIndex = -1;
+                                            // Find the first lane where this item fits
+                                            for (let i = 0; i < lanes.length; i++) {
+                                                if (item.start >= lanes[i]) {
+                                                    laneIndex = i;
+                                                    lanes[i] = item.end;
+                                                    break;
+                                                }
+                                            }
+                                            // If no lane found, create a new one
+                                            if (laneIndex === -1) {
+                                                laneIndex = lanes.length;
+                                                lanes.push(item.end);
+                                            }
+                                            return { ...item, laneIndex };
+                                        });
+
+                                        return { items: processed, maxLanes: lanes.length };
+                                    };
+
+                                    const { items: processedClasses, maxLanes } = processOverlaps(classes);
+                                    const laneHeight = 55; // Height per concurrent event
+                                    const minHeight = 60;
+                                    const rowHeight = Math.max(minHeight, maxLanes * laneHeight);
+
                                     return (
-                                        <div key={dayName} style={{ display: 'flex', alignItems: 'center', height: '60px', position: 'relative' }}>
+                                        <div key={dayName} style={{ display: 'flex', alignItems: 'flex-start', minHeight: `${rowHeight}px`, position: 'relative' }}>
                                             {/* Day Label */}
                                             <div style={{
                                                 width: '100px',
@@ -743,6 +851,7 @@ const Dashboard = () => {
                                                 justifyContent: 'center',
                                                 borderRight: '1px solid rgba(255,255,255,0.1)',
                                                 paddingRight: '1rem',
+                                                height: `${rowHeight}px`, // Match row height
                                                 opacity: isToday ? 1 : 0.7
                                             }}>
                                                 <div style={{ fontWeight: 700, color: isToday ? 'var(--color-accent)' : 'white' }}>{dayName.substring(0, 3)}</div>
@@ -750,42 +859,23 @@ const Dashboard = () => {
                                             </div>
 
                                             {/* Timeline Track */}
-                                            <div style={{ flex: 1, position: 'relative', height: '100%', background: isToday ? 'rgba(255,255,255,0.02)' : 'transparent', borderRadius: '8px' }}>
+                                            <div style={{ flex: 1, position: 'relative', height: `${rowHeight}px`, background: isToday ? 'rgba(255,255,255,0.02)' : 'transparent', borderRadius: '8px' }}>
                                                 {/* Grid Lines */}
                                                 {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
                                                     <div key={i} style={{ position: 'absolute', left: `${i * 10}%`, top: 0, bottom: 0, width: '1px', background: 'rgba(255,255,255,0.03)' }}></div>
                                                 ))}
 
                                                 {/* Classes */}
-                                                {classes.map((item, idx) => {
-                                                    // Calculate Position
-                                                    // Assuming 8 AM to 6 PM (10 hours)
-                                                    const parseTime = (t) => {
-                                                        if (!t) return 8;
-                                                        const [start] = t.split(' - ');
-                                                        const [h, m] = start.split(':').map(Number);
-                                                        return h + (m / 60);
-                                                    };
-                                                    const parseDuration = (t) => {
-                                                        if (!t) return 1;
-                                                        const [start, end] = t.split(' - ');
-                                                        const [h1, m1] = start.split(':').map(Number);
-                                                        const [h2, m2] = end.split(':').map(Number);
-                                                        return (h2 + m2 / 60) - (h1 + m1 / 60);
-                                                    };
-
-                                                    const startHour = parseTime(item.time);
-                                                    const duration = parseDuration(item.time);
-                                                    const startOffset = startHour - 8; // Start at 8 AM
-
+                                                {processedClasses.map((item, idx) => {
+                                                    const startOffset = item.start - 8; // Start at 8 AM
                                                     // 10 hours total width (8am to 6pm)
                                                     const left = (startOffset / 10) * 100;
-                                                    const width = (duration / 10) * 100;
+                                                    const width = (item.duration / 10) * 100;
 
                                                     // Determine Status
                                                     const now = new Date();
                                                     // Construct class start/end times using the row's date
-                                                    const classStart = new Date(fullDate); // This is 00:00 of that day
+                                                    const classStart = new Date(fullDate);
                                                     const [sH, sM] = item.time.split(' - ')[0].split(':').map(Number);
                                                     classStart.setHours(sH, sM, 0);
 
@@ -798,23 +888,19 @@ const Dashboard = () => {
                                                     else if (now >= classStart && now <= classEnd) status = 'ongoing';
 
                                                     // Styles based on Status
-                                                    let bg, border, glow;
-                                                    if (status === 'completed') {
-                                                        bg = 'linear-gradient(90deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.2))';
-                                                        border = 'rgba(16, 185, 129, 0.3)';
-                                                        glow = 'none';
-                                                    } else if (status === 'ongoing') {
-                                                        bg = 'linear-gradient(90deg, rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.5))';
-                                                        border = 'rgba(245, 158, 11, 0.6)';
-                                                        glow = '0 0 15px rgba(245, 158, 11, 0.3)';
-                                                    } else {
-                                                        bg = 'linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.3))';
-                                                        border = 'rgba(59, 130, 246, 0.3)';
-                                                        glow = 'none';
-                                                    }
+                                                    let bg = 'rgba(59, 130, 246, 0.15)';
+                                                    let border = 'rgba(59, 130, 246, 0.3)';
+                                                    let text = '#93c5fd';
 
-                                                    // Lab Distinction
-                                                    const isLab = item.room.includes('Lab') || item.subject.includes('Lab');
+                                                    if (status === 'completed') {
+                                                        bg = 'rgba(16, 185, 129, 0.1)';
+                                                        border = 'rgba(16, 185, 129, 0.2)';
+                                                        text = '#6ee7b7';
+                                                    } else if (status === 'ongoing') {
+                                                        bg = 'rgba(245, 158, 11, 0.2)';
+                                                        border = 'rgba(245, 158, 11, 0.4)';
+                                                        text = '#fcd34d';
+                                                    }
 
                                                     return (
                                                         <div
@@ -824,36 +910,38 @@ const Dashboard = () => {
                                                                 position: 'absolute',
                                                                 left: `${left}%`,
                                                                 width: `${width}%`,
-                                                                top: '5px',
-                                                                bottom: '5px',
+                                                                top: `${item.laneIndex * laneHeight + 5}px`, // Dynamic Top Position
+                                                                height: `${laneHeight - 10}px`, // Fixed height per item with gap
+                                                                padding: '0.5rem',
                                                                 background: bg,
                                                                 border: `1px solid ${border}`,
-                                                                borderLeft: isLab ? `4px solid ${border}` : `1px solid ${border}`,
                                                                 borderRadius: '6px',
-                                                                padding: '0.25rem 0.5rem',
-                                                                fontSize: '0.75rem',
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                justifyContent: 'center',
                                                                 overflow: 'hidden',
-                                                                whiteSpace: 'nowrap',
-                                                                textOverflow: 'ellipsis',
                                                                 cursor: 'pointer',
                                                                 transition: 'all 0.2s',
-                                                                zIndex: status === 'ongoing' ? 20 : 10,
-                                                                boxShadow: glow
+                                                                zIndex: 10
                                                             }}
-                                                            title={`${item.subject} (${item.time}) in ${item.room} - ${status.toUpperCase()}`}
+                                                            title={`${item.subject} (${item.time})`}
                                                             onMouseEnter={(e) => {
-                                                                e.currentTarget.style.zIndex = 100;
-                                                                e.currentTarget.style.transform = 'scale(1.05)';
+                                                                e.currentTarget.style.zIndex = 20;
+                                                                e.currentTarget.style.transform = 'scale(1.02)';
                                                                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
                                                             }}
                                                             onMouseLeave={(e) => {
-                                                                e.currentTarget.style.zIndex = status === 'ongoing' ? 20 : 10;
+                                                                e.currentTarget.style.zIndex = 10;
                                                                 e.currentTarget.style.transform = 'scale(1)';
-                                                                e.currentTarget.style.boxShadow = glow;
+                                                                e.currentTarget.style.boxShadow = 'none';
                                                             }}
                                                         >
-                                                            <div style={{ fontWeight: 700, color: 'white' }}>{item.subject}</div>
-                                                            <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>{item.room}</div>
+                                                            <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {item.subject}
+                                                            </div>
+                                                            <div style={{ fontSize: '0.7rem', color: text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {item.room}
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}

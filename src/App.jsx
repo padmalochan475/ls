@@ -1,5 +1,6 @@
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { MasterDataProvider } from './contexts/MasterDataContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -51,70 +52,72 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
+        <MasterDataProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
 
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Dashboard />
+                  </Layout>
+                </ProtectedRoute>
+              } />
 
-            <Route path="/schedule" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Scheduler />
-                </Layout>
-              </ProtectedRoute>
-            } />
+              <Route path="/schedule" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Scheduler />
+                  </Layout>
+                </ProtectedRoute>
+              } />
 
-            <Route path="/assignments" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Assignments />
-                </Layout>
-              </ProtectedRoute>
-            } />
+              <Route path="/assignments" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Assignments />
+                  </Layout>
+                </ProtectedRoute>
+              } />
 
-            <Route path="/master-data" element={
-              <ProtectedRoute>
-                <Layout>
-                  <MasterData />
-                </Layout>
-              </ProtectedRoute>
-            } />
+              <Route path="/master-data" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <MasterData />
+                  </Layout>
+                </ProtectedRoute>
+              } />
 
 
-            <Route path="/analytics" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Analytics />
-                </Layout>
-              </ProtectedRoute>
-            } />
+              <Route path="/analytics" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Analytics />
+                  </Layout>
+                </ProtectedRoute>
+              } />
 
-            <Route path="/admin" element={
-              <ProtectedRoute requiredRole="admin">
-                <Layout>
-                  <AdminPanel />
-                </Layout>
-              </ProtectedRoute>
-            } />
+              <Route path="/admin" element={
+                <ProtectedRoute requiredRole="admin">
+                  <Layout>
+                    <AdminPanel />
+                  </Layout>
+                </ProtectedRoute>
+              } />
 
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Profile />
-                </Layout>
-              </ProtectedRoute>
-            } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Profile />
+                  </Layout>
+                </ProtectedRoute>
+              } />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </MasterDataProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
