@@ -936,8 +936,13 @@ const Dashboard = () => {
                                                                 e.currentTarget.style.boxShadow = 'none';
                                                             }}
                                                         >
-                                                            <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                                {item.subject}
+                                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', overflow: 'hidden' }}>
+                                                                <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                    {item.subject}
+                                                                </span>
+                                                                <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                                                    {item.dept}-{item.section}-{item.group === 'All' ? 'All' : item.group}
+                                                                </span>
                                                             </div>
                                                             <div style={{ fontSize: '0.7rem', color: text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                                 {item.room}
