@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Users, Clock, MapPin, CalendarDays, Zap, BookOpen, GraduationCap, ChevronLeft, ChevronRight, LayoutTemplate, UserCircle, Check } from 'lucide-react';
 

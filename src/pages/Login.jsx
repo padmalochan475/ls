@@ -467,6 +467,15 @@ const Login = () => {
             {isLogin ? 'Sign Up' : 'Sign In'}
           </button>
         </div>
+
+        <div style={{
+          marginTop: '2rem',
+          fontSize: '0.65rem',
+          color: 'rgba(255,255,255,0.2)',
+          letterSpacing: '0.05em'
+        }}>
+          Created by <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>Padmalochan Maharana</span>
+        </div>
       </div>
 
       <style>{`

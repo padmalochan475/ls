@@ -248,6 +248,21 @@ const Layout = ({ children }) => {
                         )}
                     </div>
                 </div>
+
+                {/* Credits */}
+                {(isSidebarOpen || isMobile) && (
+                    <div style={{
+                        marginTop: '1rem',
+                        paddingTop: '1rem',
+                        borderTop: '1px solid rgba(255,255,255,0.05)',
+                        textAlign: 'center',
+                        fontSize: '0.65rem',
+                        color: 'rgba(255,255,255,0.3)',
+                        letterSpacing: '0.05em'
+                    }}>
+                        Created by <span style={{ color: 'var(--color-accent)', fontWeight: 500 }}>Padmalochan Maharana</span>
+                    </div>
+                )}
             </aside>
 
             {/* Main Content */}
