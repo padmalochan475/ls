@@ -13,6 +13,8 @@ const AdminPanel = () => {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // 'all', 'pending', 'approved'
     const [selectedUser, setSelectedUser] = useState(null);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Real-Time Users Listener
     useEffect(() => {
@@ -33,9 +35,14 @@ const AdminPanel = () => {
     }, []);
 
     const handleStatusChange = async (userId, newStatus) => {
+        // Prevent modifying yourself
+        if (userId === auth.currentUser?.uid) {
+            alert("Security Alert: You cannot modify your own status.");
+            return;
+        }
+
         try {
             await updateDoc(doc(db, 'users', userId), { status: newStatus });
-            // fetchUsers(); // Refresh list
         } catch (error) {
             console.error("Error updating status: ", error);
             alert("Failed to update status.");
@@ -43,18 +50,26 @@ const AdminPanel = () => {
     };
 
     const handleRoleChange = async (userId, newRole) => {
+        // Prevent modifying yourself
+        if (userId === auth.currentUser?.uid) {
+            alert("Security Alert: You cannot modify your own role.");
+            return;
+        }
+
         try {
             await updateDoc(doc(db, 'users', userId), { role: newRole });
-            // fetchUsers();
         } catch (error) {
             console.error("Error updating role: ", error);
             alert("Failed to update role.");
         }
     };
 
-    const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
-
     const handleDeleteUser = (userId) => {
+        // Prevent deleting yourself
+        if (userId === auth.currentUser?.uid) {
+            alert("Security Alert: You cannot delete your own account.");
+            return;
+        }
         setConfirmModal({ isOpen: true, id: userId });
     };
 
@@ -65,15 +80,11 @@ const AdminPanel = () => {
 
         try {
             await deleteDoc(doc(db, 'users', userId));
-            // fetchUsers();
         } catch (error) {
             console.error("Error deleting user: ", error);
             alert("Failed to delete user.");
         }
     };
-
-
-    const [searchTerm, setSearchTerm] = useState('');
 
     const filteredUsers = users.filter(user => {
         const matchesFilter = filter === 'all' || user.status === filter;
@@ -90,8 +101,6 @@ const AdminPanel = () => {
     return (
         <div style={{ paddingBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: 'var(--space-lg)' }}>Admin Panel</h2>
-
-
 
             {/* Stats Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
@@ -207,8 +216,7 @@ const AdminPanel = () => {
                                             value={user.role}
                                             onChange={(e) => handleRoleChange(user.id, e.target.value)}
                                             className="glass-input"
-                                            style={{ padding: '0.25rem', fontSize: '0.9rem', width: 'auto', opacity: user.email === 'padmalochan.maharana@tat.ac.in' ? 0.5 : 1 }}
-                                            disabled={user.email === 'padmalochan.maharana@tat.ac.in'}
+                                            style={{ padding: '0.25rem', fontSize: '0.9rem', width: 'auto' }}
                                         >
                                             <option value="user" style={{ background: '#1e293b', color: 'white' }}>User</option>
                                             <option value="admin" style={{ background: '#1e293b', color: 'white' }}>Admin</option>
@@ -227,8 +235,8 @@ const AdminPanel = () => {
                                         <button
                                             onClick={() => handleDeleteUser(user.id)}
                                             className="btn"
-                                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: '#ef4444', opacity: user.email === 'padmalochan.maharana@tat.ac.in' ? 0.5 : 1 }}
-                                            disabled={user.email === 'padmalochan.maharana@tat.ac.in'}
+                                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: '#ef4444', opacity: user.id === userProfile?.uid ? 0.5 : 1 }}
+                                            disabled={user.id === userProfile?.uid}
                                         >
                                             Delete
                                         </button>
@@ -301,7 +309,7 @@ const AdminPanel = () => {
             {createPortal(
                 <ConfirmModal
                     isOpen={confirmModal.isOpen}
-                    onClose={() => setConfirmModal({ isOpen: false, id: null })}
+                    onCancel={() => setConfirmModal({ isOpen: false, id: null })}
                     onConfirm={executeDeleteUser}
                     title="Delete User"
                     message="Are you sure you want to PERMANENTLY delete this user? This cannot be undone."

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
+import { useAuth } from './AuthContext';
+
 const MasterDataContext = createContext();
 
 export const useMasterData = () => {
@@ -9,6 +11,7 @@ export const useMasterData = () => {
 };
 
 export const MasterDataProvider = ({ children }) => {
+    const { currentUser } = useAuth();
     const [departments, setDepartments] = useState([]);
     const [semesters, setSemesters] = useState([]);
     const [subjects, setSubjects] = useState([]);
@@ -20,6 +23,19 @@ export const MasterDataProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!currentUser) {
+            setDepartments([]);
+            setSemesters([]);
+            setSubjects([]);
+            setFaculty([]);
+            setRooms([]);
+            setDays([]);
+            setTimeSlots([]);
+            setGroups([]);
+            setLoading(false);
+            return;
+        }
+
         const unsubscribes = [];
 
         // Helper to create listener
@@ -51,17 +67,12 @@ export const MasterDataProvider = ({ children }) => {
         subscribe('timeslots', setTimeSlots, (a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
         subscribe('groups', setGroups);
 
-        // We can consider loading done once listeners are attached, 
-        // though strictly we might want to wait for first emission.
-        // For simplicity, we'll set loading false after a short tick or assume initial empty state is fine.
-        // Better: count how many returned. But onSnapshot is async.
-        // We'll just set loading to false immediately as the UI handles empty arrays gracefully.
         setLoading(false);
 
         return () => {
             unsubscribes.forEach(unsub => unsub());
         };
-    }, []);
+    }, [currentUser]);
 
     // Create a simplified value object for consumers, stripping IDs where only names were used previously if needed,
     // but better to provide full objects and let consumers map.

@@ -249,18 +249,28 @@ const Layout = ({ children }) => {
                     </div>
                 </div>
 
-                {/* Credits */}
+                {/* Content Minimalist Credits */}
                 {(isSidebarOpen || isMobile) && (
                     <div style={{
                         marginTop: '1rem',
-                        paddingTop: '1rem',
-                        borderTop: '1px solid rgba(255,255,255,0.05)',
                         textAlign: 'center',
-                        fontSize: '0.65rem',
-                        color: 'rgba(255,255,255,0.3)',
-                        letterSpacing: '0.05em'
+                        padding: '0.5rem 0'
                     }}>
-                        Created by <span style={{ color: 'var(--color-accent)', fontWeight: 500 }}>Padmalochan Maharana</span>
+                        <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '2px' }}>
+                            Designed by
+                        </span>
+                        <span style={{
+                            fontSize: '0.85rem',
+                            fontWeight: '700',
+                            background: 'linear-gradient(to right, #38bdf8, #c084fc, #f472b6, #38bdf8)',
+                            backgroundSize: '200% auto',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            animation: 'shine 5s linear infinite',
+                            letterSpacing: '0.01em',
+                        }}>
+                            Padmalochan Maharana
+                        </span>
                     </div>
                 )}
             </aside>

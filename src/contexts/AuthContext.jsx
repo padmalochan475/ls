@@ -29,19 +29,27 @@ export const AuthProvider = ({ children }) => {
 
         // Check if input is NOT an email (assume it is EmpID)
         if (!identifier.includes('@')) {
-            // Query Firestore to find email associated with this EmpID
-            const q = query(collection(db, 'users'), where('empId', '==', identifier));
-            const querySnapshot = await getDocs(q);
+            try {
+                // 1. Try Secure "Lookup Doc" (Best Logic / Zero-Cost)
+                // We read a single doc from 'emp_lookups' where ID is the EmpID.
+                // Security Rules allow 'get' but deny 'list', preventing scraping.
+                const lookupDoc = await getDoc(doc(db, 'emp_lookups', identifier));
 
-            if (querySnapshot.empty) {
-                throw new Error("Employee ID not found.");
+                if (lookupDoc.exists()) {
+                    email = lookupDoc.data().email;
+                } else {
+                    // "Best Logic" for Spark Plan:
+                    // If secure lookup fails, do NOT fallback to insecure methods or paid Cloud Functions.
+                    // Instead, enforce data consistency.
+                    console.warn(`EmpID ${identifier} not found in secure lookup.`);
+                    throw new Error("Employee ID not linked. Please ask Admin to link your profile.");
+                }
+            } catch (err) {
+                console.error("Login Lookup Error:", err);
+                // Preserve the specific error message if we threw it above
+                if (err.message.includes("not linked")) throw err;
+                throw new Error("Login failed. Please use your Email Address.");
             }
-
-            const userData = querySnapshot.docs[0].data();
-            if (!userData.email) {
-                throw new Error("No email linked to this Employee ID.");
-            }
-            email = userData.email;
         }
 
         return signInWithEmailAndPassword(auth, email, password);
@@ -66,6 +74,14 @@ export const AuthProvider = ({ children }) => {
             createdAt: new Date().toISOString()
         });
 
+        // Create Secure Lookup Entry (for Login)
+        if (empId) {
+            await setDoc(doc(db, 'emp_lookups', empId), {
+                email: recoveryEmail,
+                uid: user.uid
+            });
+        }
+
         return user;
     };
 
@@ -79,7 +95,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const handleSetSelectedYear = (year) => {
-        console.log("Setting Selected Year:", year);
+
         setSelectedAcademicYear(year);
     };
 
@@ -127,7 +143,6 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            console.log("Auth State Changed:", user ? user.uid : "No User");
             setCurrentUser(user);
 
             if (!user) {
@@ -150,7 +165,7 @@ export const AuthProvider = ({ children }) => {
                     // Standard Profile Processing
                     // (Hardcoded overrides removed for authenticity)
 
-                    console.log("User Profile Updated:", data);
+
                     setUserProfile(data);
                 } else {
                     console.error("No user profile found in Firestore!");

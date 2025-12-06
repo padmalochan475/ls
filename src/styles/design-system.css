@@ -175,18 +175,6 @@ h6 {
 }
 
 .glass-input:focus {
-  background: rgba(0, 0, 0, 0.2);
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 4px var(--color-accent-subtle), inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  transform: translateY(-1px);
-}
-
-/* Custom Select Dropdown Styling */
-select.glass-input {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%232997ff' stroke-width='2'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3e%3c/svg%3e");
-  background-position: right 1rem center;
-  background-repeat: no-repeat;
   background-size: 1.25em;
   padding-right: 3rem;
 }
@@ -402,4 +390,63 @@ select.glass-input {
 
 .glass-input::placeholder {
   color: rgba(255, 255, 255, 0.3);
+}
+
+/* Premium Animations for Credit Box */
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* Print Optimization */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print,
+  nav,
+  aside,
+  .sidebar,
+  .mobile-menu-btn,
+  .header-actions {
+    display: none !important;
+  }
+
+  .glass-panel {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .print-assignment {
+    border: 1px solid #000 !important;
+  }
+}
+
+/* Utils */
+.spin-animation {
+  animation: rotate 1s linear infinite;
 }

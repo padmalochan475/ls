@@ -175,19 +175,22 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
     const dropdownRef = useRef(null);
     const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
 
+    const [uniqueId] = useState(() => Math.random().toString(36).substr(2, 9));
+    const portalId = `select-portal-${uniqueId}`;
+
     // Close on click outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 // Check if click is inside the portal
-                const portal = document.getElementById(`select-portal-${placeholder}`);
+                const portal = document.getElementById(portalId);
                 if (portal && portal.contains(event.target)) return;
                 setIsOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [placeholder]);
+    }, [portalId]);
 
     // Update coords on open and scroll
     useEffect(() => {
@@ -256,7 +259,7 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
 
             {isOpen && !disabled && createPortal(
                 <div
-                    id={`select-portal-${placeholder}`}
+                    id={portalId}
                     className="animate-fade-in"
                     style={{
                         position: 'fixed',
@@ -444,7 +447,6 @@ const Scheduler = () => {
             return;
         }
 
-        console.log("Setting up real-time schedule listener for:", activeAcademicYear);
         setLoading(true);
 
         const q = query(
@@ -457,7 +459,6 @@ const Scheduler = () => {
             snapshot.forEach((doc) => {
                 items.push({ id: doc.id, ...doc.data() });
             });
-            console.log("Real-time update: fetched", items.length, "items");
             setSchedule(items);
             setLoading(false);
         }, (err) => {
@@ -506,9 +507,32 @@ const Scheduler = () => {
             ? schedule.filter(item => item.id !== ignoreId)
             : schedule;
 
-        // Filter for same day and time first to optimize
+        const checkTimeOverlap = (t1, t2) => {
+            if (t1 === t2) return true;
+            try {
+                // Normalize and parse times
+                const parse = (t) => {
+                    const parts = t.replace(/\s+/g, ' ').split(' - ');
+                    if (parts.length !== 2) throw new Error("Invalid format");
+                    const base = '2000/01/01 ';
+                    let sTime = new Date(base + parts[0]).getTime();
+                    let eTime = new Date(base + parts[1]).getTime();
+                    if (eTime < sTime) {
+                        eTime += 24 * 60 * 60 * 1000;
+                    }
+                    return { start: sTime, end: eTime };
+                };
+                const a = parse(t1);
+                const b = parse(t2);
+                return a.start < b.end && a.end > b.start;
+            } catch (e) {
+                return t1 === t2;
+            }
+        };
+
+        // Filter for conflicting day/time
         const sameSlotBookings = otherBookings.filter(item =>
-            item.day === newBooking.day && item.time === newBooking.time
+            item.day === newBooking.day && checkTimeOverlap(item.time, newBooking.time)
         );
 
         if (sameSlotBookings.length === 0) return null;
@@ -533,7 +557,7 @@ const Scheduler = () => {
             // Must be same Department and Semester to conflict (usually)
             if (item.dept === newBooking.dept && item.sem === newBooking.sem) {
                 // Check Section/Group overlap
-                if (item.section === newBooking.section) {
+                if (item.section === newBooking.section || item.section === 'All' || newBooking.section === 'All') {
                     // If either is for the whole section (no group or "All"), they conflict
                     const itemIsWholeSection = !item.group || item.group === 'All';
                     const newIsWholeSection = !newBooking.group || newBooking.group === 'All';
@@ -563,6 +587,15 @@ const Scheduler = () => {
         }
 
         const dataToSave = overrideData || formData;
+
+        // Validation: Enforce Sub-Group selection if available
+        const grpObj = groups.find(g => g.name === dataToSave.section);
+        if (grpObj && grpObj.subGroups && grpObj.subGroups.length > 0 && !dataToSave.group) {
+            const msg = "Please choose a Sub-Group.";
+            setError(msg);
+            if (overrideData) alert(msg);
+            return;
+        }
 
         // Basic Validation
         if (!dataToSave.subject || !dataToSave.room || !dataToSave.faculty || !dataToSave.day || !dataToSave.time) {
@@ -1616,7 +1649,11 @@ const Scheduler = () => {
                                                     <div className="vertical-text">{day}</div>
                                                 </td>
                                                 {timeSlots.map(time => {
-                                                    const assignments = getAssignments(day, time).sort((a, b) => parseInt(a.sem) - parseInt(b.sem));
+                                                    const getSemNumber = (semStr) => {
+                                                        const match = String(semStr).match(/\d+/);
+                                                        return match ? parseInt(match[0]) : 0;
+                                                    };
+                                                    const assignments = getAssignments(day, time).sort((a, b) => getSemNumber(a.sem) - getSemNumber(b.sem));
                                                     const count = assignments.length;
                                                     let densityClass = 'density-low';
                                                     if (count > 10) densityClass = 'density-ultra';
@@ -1823,7 +1860,11 @@ const Scheduler = () => {
                                             options={formData.section && groups.find(g => g.name === formData.section)?.subGroups || []}
                                             value={formData.group}
                                             onChange={val => setFormData({ ...formData, group: val })}
-                                            placeholder="Select Sub-Group"
+                                            placeholder={
+                                                formData.section && (!groups.find(g => g.name === formData.section)?.subGroups?.length)
+                                                    ? "No Sub-Groups"
+                                                    : "Select Sub-Group"
+                                            }
                                             disabled={!formData.section || !groups.find(g => g.name === formData.section)?.subGroups?.length}
                                         />
                                     </div>

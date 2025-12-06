@@ -219,7 +219,6 @@ const Dashboard = () => {
         }
 
         setLoading(true);
-        console.log("Setting up Dashboard real-time listener...");
 
         const q = query(
             collection(db, 'schedule'),
@@ -421,10 +420,23 @@ const Dashboard = () => {
                             const now = new Date();
                             // Simple time parser for comparison
                             const parseTime = (t) => {
-                                const [time, period] = t.split(' '); // "10:00 AM" -> ["10:00", "AM"] - Wait, format is "10:00" (24h) or "10:00 - 11:00"
-                                // The format in DB is likely "HH:mm - HH:mm"
-                                const [start] = t.split(' - ');
-                                const [h, m] = start.split(':').map(Number);
+                                if (!t) return new Date();
+                                // Handle "10:00 AM - 11:00 AM" or "10:00 - 11:00"
+                                const [rangeStart] = t.split(' - ');
+                                // Remove AM/PM if present to get raw HH:MM
+                                const timeOnly = rangeStart.replace(/(AM|PM)/i, '').trim();
+                                const [hStr, mStr] = timeOnly.split(':');
+
+                                let h = parseInt(hStr);
+                                const m = parseInt(mStr);
+
+                                // Adjust for PM if needed (12 PM is 12, 1 PM is 13)
+                                const isPM = rangeStart.toUpperCase().includes('PM');
+                                const isAM = rangeStart.toUpperCase().includes('AM');
+
+                                if (isPM && h < 12) h += 12;
+                                if (isAM && h === 12) h = 0;
+
                                 const d = new Date();
                                 d.setHours(h, m, 0);
                                 return d;

@@ -87,7 +87,7 @@ function App() {
               } />
 
               <Route path="/master-data" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="admin">
                   <Layout>
                     <MasterData />
                   </Layout>

@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Helper Functions ---
+    
+    // Check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    // Check if user is Admin
+    // We look up the 'users' collection for the current user's ID and check the 'role' field
+    function isAdmin() {
+      return isAuth() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Master Data Collections
+    // Everyone (Auth) can READ to populate dropdowns.
+    // Only ADMIN can WRITE (Add/Edit/Delete).
+    match /departments/{docId} { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /semesters/{docId}   { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /subjects/{docId}    { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /faculty/{docId}     { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /rooms/{docId}       { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /groups/{docId}      { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /days/{docId}        { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /timeslots/{docId}   { allow read: if isAuth(); allow write: if isAdmin(); }
+
+    // 2. Schedule Collection
+    // Auth users can READ (View Only).
+    // Only ADMIN can CREATE/UPDATE/DELETE.
+    match /schedule/{docId} {
+      allow read: if isAuth();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 4. User Profiles
+    // SECURED: Only authenticated users can read profiles.
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // 5. Secure Login Lookup (The "Best Logic" Pattern)
+    // Allows looking up an EMAIL by EmpID without exposing the list of users.
+    // - allow get: Permits reading a single file if you know its ID (the EmpID).
+    // - allow list: false (Denies browsing/scraping the collection).
+    match /emp_lookups/{empId} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if isAdmin();
+    }
+
+    // 6. Config/Settings
+    match /settings/{docId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
 import { collection, addDoc, getDocs, query, where, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
@@ -21,8 +21,9 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
     const listRef = useRef(null);
     const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
 
-    // Generate a safe ID for the portal
-    const portalId = `select-portal-${placeholder.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    // Generate a unique ID for the portal
+    const uniqueId = useRef(`select-${Math.random().toString(36).substr(2, 9)}`).current;
+    const portalId = `portal-${uniqueId}`;
 
     // Normalize options
     const normalizedOptions = options.map(opt => {
@@ -460,7 +461,7 @@ const MultiSelectDropdown = ({ options, selected, onChange, label, icon: Icon })
 };
 
 const Assignments = () => {
-    const { activeAcademicYear, userProfile, maxFacultyLoad } = useAuth();
+    const { activeAcademicYear, userProfile, maxFacultyLoad, currentUser } = useAuth();
     const isAdmin = userProfile && userProfile.role === 'admin';
 
     // Master Data State
@@ -609,7 +610,7 @@ const Assignments = () => {
         setDepartments(rawDepartments.map(d => d.code || d.name).sort());
         setSemesters(rawSemesters.map(d => d.name)); // Context sorts by number already? Check context: yes. But local sort used parseInt? It's fine.
         setSubjects(rawSubjects.map(d => ({ name: d.name, shortCode: d.shortCode || '' })).sort((a, b) => a.name.localeCompare(b.name)));
-        setFaculty(rawFaculty.map(d => ({ name: d.name, empId: d.empId, shortCode: d.shortCode || '' })).sort((a, b) => a.name.localeCompare(b.name)));
+        setFaculty(rawFaculty.map(d => ({ name: d.name, empId: d.empId, shortCode: d.shortCode || '', uid: d.uid, id: d.id })).sort((a, b) => a.name.localeCompare(b.name)));
         setRooms(rawRooms.map(d => d.name).sort());
 
         const visibleDays = rawDays.filter(d => d.isVisible !== false).map(d => d.name);
@@ -656,18 +657,63 @@ const Assignments = () => {
     }, [activeAcademicYear]);
 
     // Conflict Logic
+    // Helper: Parse time slot duration and range
+    const parseTimeSlot = useCallback((timeStr) => {
+        try {
+            const parts = timeStr.replace(/\s+/g, ' ').split(' - ');
+            if (parts.length !== 2) return null;
+
+            const base = '2000/01/01 '; // Arbitrary date for time comparison
+            const start = new Date(base + parts[0]);
+            const end = new Date(base + parts[1]);
+
+            let startTime = start.getTime();
+            let endTime = end.getTime();
+
+            if (isNaN(startTime) || isNaN(endTime)) return null;
+
+            // Handle cross-midnight (e.g., 11 PM - 1 AM)
+            if (endTime < startTime) {
+                endTime += 24 * 60 * 60 * 1000;
+            }
+
+            const durationHours = (endTime - startTime) / (1000 * 60 * 60);
+
+            return { start: startTime, end: endTime, duration: durationHours };
+        } catch (e) {
+            return null;
+        }
+    }, []);
+
+    // Conflict Logic
     const checkConflict = useCallback(() => {
         if (!selectedDay || !selectedTime) return null;
+
+        const currentSlot = parseTimeSlot(selectedTime);
+        if (!currentSlot) return null;
+
+        const checkTimeOverlap = (t1) => {
+            if (t1 === selectedTime) return true;
+            const otherSlot = parseTimeSlot(t1);
+            if (!otherSlot) return t1 === selectedTime; // Fallback
+            return currentSlot.start < otherSlot.end && currentSlot.end > otherSlot.start;
+        };
+
         const effectiveGroup = getEffectiveGroup();
 
         // 1. Student Conflict
         const studentBusy = fullSchedule.find(s => {
-            if (s.day !== selectedDay || s.time !== selectedTime || s.dept !== selectedDept || s.sem !== selectedSem) return false;
+            if (s.day !== selectedDay) return false;
+            // Dept Check
+            if (s.dept !== selectedDept || s.sem !== selectedSem) return false;
 
-            // Check Section (Main Group)
-            if (s.section !== selectedMainGroup) return false;
+            // Time Check
+            if (!checkTimeOverlap(s.time)) return false;
 
-            // Check Sub-Group
+            // Section/Group Check
+            if (s.section !== selectedMainGroup && s.section !== 'All' && selectedMainGroup !== 'All') return false;
+
+            // Sub-Group Check
             if (!s.group || s.group === 'All') return true;
             if (!selectedSubGroup || selectedSubGroup === 'All') return true;
             if (s.group === selectedSubGroup) return true;
@@ -680,64 +726,117 @@ const Assignments = () => {
         };
 
         // 2. Faculty Conflict
-        const checkFacultyBusy = (facName) => {
-            if (!facName) return null;
-            const facObj = faculty.find(f => f.name === facName);
-            const empId = facObj ? facObj.empId : null;
+        const checkFacultyBusy = (facId) => {
+            if (!facId) return null;
+            const facObj = faculty.find(f => f.id === facId);
+            if (!facObj) return null;
+
+            const { name, empId } = facObj;
 
             return fullSchedule.find(s => {
-                if (s.day !== selectedDay || s.time !== selectedTime) return false;
-                if (s.faculty === facName || s.faculty2 === facName) return true;
-                if (empId && s.facultyEmpId === empId) return true;
+                if (s.day !== selectedDay) return false;
+                if (!checkTimeOverlap(s.time)) return false;
+
+                // 1. Strict EmpID Check (Prioritized)
+                // If both the candidate and the schedule entry have EmpIDs, rely on them.
+                if (empId) {
+                    if (s.facultyEmpId) {
+                        if (s.facultyEmpId === empId) return true; // Conflict
+                        if (s.faculty2EmpId === empId) return true; // Conflict
+                        // If IDs present but mismatch, it's NOT a conflict (even if names match)
+                        return false;
+                    }
+                    // If schedule has no facultyEmpId (old data), check faculty2
+                    if (s.faculty2EmpId && s.faculty2EmpId === empId) return true;
+                }
+
+                // 2. Fallback Name Check (If EmpIDs missing or old data)
+                if (s.faculty === name || s.faculty2 === name) return true;
+
                 return false;
             });
         };
 
         const f1Busy = checkFacultyBusy(selectedFaculty);
-        if (f1Busy) return {
-            type: 'faculty',
-            message: `⚠️ Conflict: ${selectedFaculty} is teaching ${f1Busy.subject} (${f1Busy.dept}-${f1Busy.sem}) at this time.`
-        };
-
-        const f2Busy = checkFacultyBusy(selectedFaculty2);
-        if (f2Busy) return {
-            type: 'faculty',
-            message: `⚠️ Conflict: ${selectedFaculty2} is teaching ${f2Busy.subject} (${f2Busy.dept}-${f2Busy.sem}) at this time.`
-        };
-
-        // 3. Room Conflict
-        if (selectedRoom) {
-            const roomBusy = fullSchedule.find(s => s.day === selectedDay && s.time === selectedTime && s.room === selectedRoom);
-            if (roomBusy) return {
-                type: 'room',
-                message: `⚠️ Conflict: Room ${selectedRoom} is booked for ${roomBusy.subject} (${roomBusy.dept}-${roomBusy.sem}).`
+        if (f1Busy) {
+            const f1Name = faculty.find(f => f.id === selectedFaculty)?.name || selectedFaculty;
+            return {
+                type: 'faculty',
+                message: `⚠️ Conflict: ${f1Name} is teaching ${f1Busy.subject} (${f1Busy.dept}-${f1Busy.sem}) during this time.`
             };
         }
 
-        // 4. Self-Conflict (Same Faculty)
-        if (selectedFaculty && selectedFaculty2 && selectedFaculty === selectedFaculty2) {
-            return { type: 'faculty', message: `⚠️ Invalid: Cannot select the same faculty (${selectedFaculty}) twice.` };
+        const f2Busy = checkFacultyBusy(selectedFaculty2);
+        if (f2Busy) {
+            const f2Name = faculty.find(f => f.id === selectedFaculty2)?.name || selectedFaculty2;
+            return {
+                type: 'faculty',
+                message: `⚠️ Conflict: ${f2Name} is teaching ${f2Busy.subject} (${f2Busy.dept}-${f2Busy.sem}) during this time.`
+            };
+        }
+
+        // 3. Room Conflict
+        if (selectedRoom) {
+            const roomBusy = fullSchedule.find(s => s.day === selectedDay && checkTimeOverlap(s.time) && s.room === selectedRoom);
+            if (roomBusy) return {
+                type: 'room',
+                message: `⚠️ Conflict: Room ${selectedRoom} is booked for ${roomBusy.subject} (${roomBusy.dept}-${roomBusy.sem}) during this time.`
+            };
+        }
+
+        // 4. Self-Conflict
+        if (selectedFaculty && selectedFaculty2) {
+            if (selectedFaculty === selectedFaculty2) {
+                return { type: 'faculty', message: `⚠️ Invalid: Cannot select the same faculty twice.` };
+            }
+            const f1Obj = faculty.find(f => f.id === selectedFaculty);
+            const f2Obj = faculty.find(f => f.id === selectedFaculty2);
+            if (f1Obj && f2Obj && f1Obj.empId && f2Obj.empId && f1Obj.empId === f2Obj.empId) {
+                return { type: 'faculty', message: `⚠️ Invalid: Selected faculty members have the same Employee ID (${f1Obj.empId}).` };
+            }
         }
 
         return null;
-    }, [fullSchedule, selectedDay, selectedTime, selectedDept, selectedSem, selectedMainGroup, selectedSubGroup, selectedFaculty, selectedFaculty2, selectedRoom, faculty, getEffectiveGroup]);
+    }, [fullSchedule, selectedDay, selectedTime, selectedDept, selectedSem, selectedMainGroup, selectedSubGroup, selectedFaculty, selectedFaculty2, selectedRoom, faculty, getEffectiveGroup, parseTimeSlot]);
 
     const conflict = checkConflict();
 
-    // Faculty Load Monitor
-    const renderFacultyLoad = (facultyName) => {
-        if (!facultyName) return null;
-        const load = fullSchedule.filter(s => s.faculty === facultyName || s.faculty2 === facultyName).length;
+    // Faculty Load Monitor (Calculates HOURS)
+    const renderFacultyLoad = (facultyId) => {
+        if (!facultyId) return null;
+        const facObj = faculty.find(f => f.id === facultyId);
+        const facultyName = facObj ? facObj.name : '';
+        const empId = facObj ? facObj.empId : null;
+
+        let totalHours = 0;
+        fullSchedule.forEach(s => {
+            let match = false;
+            // logic matches checkFacultyBusy
+            if (empId && (s.facultyEmpId === empId || s.faculty2EmpId === empId)) {
+                match = true;
+            } else if (s.faculty === facultyName || s.faculty2 === facultyName) {
+                match = true;
+            }
+
+            if (match) {
+                const info = parseTimeSlot(s.time);
+                totalHours += info ? info.duration : 1;
+            }
+        });
+
+        // Round to 1 decimal place for neatness
+        totalHours = Math.round(totalHours * 10) / 10;
+
         const max = maxFacultyLoad || 18;
-        const percentage = Math.min((load / max) * 100, 100);
+        const percentage = Math.min((totalHours / max) * 100, 100);
 
         let statusColor = '#4ade80'; // Green
         let statusText = 'Optimal';
 
-        if (load >= max) {
+        if (totalHours >= max) {
             statusColor = '#ef4444'; // Red
             statusText = 'Overloaded';
-        } else if (load >= max * 0.8) {
+        } else if (totalHours >= max * 0.8) {
             statusColor = '#facc15'; // Yellow
             statusText = 'Heavy';
         }
@@ -746,7 +845,7 @@ const Assignments = () => {
             <div className="animate-fade-in" style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', fontSize: '0.8rem' }}>
                     <span style={{ color: '#94a3b8' }}>Weekly Load</span>
-                    <span style={{ color: statusColor, fontWeight: 600 }}>{load} / {max} Hours ({statusText})</span>
+                    <span style={{ color: statusColor, fontWeight: 600 }}>{totalHours} / {max} Hours ({statusText})</span>
                 </div>
                 <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                     <div style={{ width: `${percentage}%`, height: '100%', background: statusColor, transition: 'width 0.5s ease' }} />
@@ -756,6 +855,15 @@ const Assignments = () => {
     };
 
     const handleAssign = async () => {
+        // Validation: Enforce Sub-Group selection if available
+        const groupObj = rawGroups.find(g => g.name === selectedMainGroup);
+        const hasSubGroups = groupObj && groupObj.subGroups && groupObj.subGroups.length > 0;
+
+        if (hasSubGroups && !selectedSubGroup) {
+            alert("Please choose a Sub Group.");
+            return;
+        }
+
         if (!navigator.onLine) {
             alert("You are offline. Cannot save assignments.");
             return;
@@ -773,7 +881,8 @@ const Assignments = () => {
 
         setSaving(true);
         try {
-            const facultyObj = faculty.find(f => f.name === selectedFaculty);
+            const facultyObj = faculty.find(f => f.id === selectedFaculty);
+            const faculty2Obj = selectedFaculty2 ? faculty.find(f => f.id === selectedFaculty2) : null;
             const effectiveGroup = getEffectiveGroup();
 
             await addDoc(collection(db, 'schedule'), {
@@ -781,14 +890,17 @@ const Assignments = () => {
                 dept: selectedDept,
                 sem: selectedSem,
                 subject: selectedSubject,
-                faculty: selectedFaculty,
-                facultyEmpId: facultyObj ? facultyObj.empId : null,
-                faculty2: selectedFaculty2 || null,
+                faculty: facultyObj ? facultyObj.name : '',
+                facultyEmpId: facultyObj?.empId || null,
+                faculty2: faculty2Obj ? faculty2Obj.name : null,
+                faculty2EmpId: faculty2Obj?.empId || null,
                 room: selectedRoom,
                 group: selectedSubGroup,
                 section: selectedMainGroup,
                 day: selectedDay,
                 time: selectedTime,
+                createdBy: currentUser ? currentUser.uid : 'system',
+                createdByName: userProfile ? userProfile.name : 'Unknown',
                 createdAt: new Date().toISOString()
             });
 
@@ -816,10 +928,22 @@ const Assignments = () => {
     // Modal State
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
 
-    const handleDelete = (e, id) => {
+    // Helper to check delete permission
+    const canDelete = useCallback((assignment) => {
+        if (!assignment) return false;
+        return isAdmin;
+    }, [isAdmin]);
+
+    const handleDelete = (e, assignment) => {
         e.stopPropagation();
-        if (!id) return;
-        setConfirmModal({ isOpen: true, id });
+        if (!assignment) return;
+
+        if (!canDelete(assignment)) {
+            alert("Permission denied.");
+            return;
+        }
+
+        setConfirmModal({ isOpen: true, id: assignment.id });
     };
 
     const executeDelete = async () => {
@@ -846,38 +970,54 @@ const Assignments = () => {
         }
     };
 
-    const filteredAssignments = fullSchedule.filter(s => {
-        const search = searchTerm.toLowerCase().trim();
+    const filteredAssignments = useMemo(() => {
+        return fullSchedule.filter(s => {
+            const search = searchTerm.toLowerCase().trim();
 
-        // 1. Filter by Department
-        if (filterDepts.length > 0 && !filterDepts.includes(s.dept)) return false;
+            // 1. Filter by Department
+            if (filterDepts.length > 0 && !filterDepts.includes(s.dept)) return false;
 
-        // 2. Filter by Semester
-        if (filterSems.length > 0 && !filterSems.includes(s.sem)) return false;
+            // 2. Filter by Semester
+            if (filterSems.length > 0 && !filterSems.includes(s.sem)) return false;
 
-        // 3. Filter by Group
-        if (filterGroups.length > 0 && !filterGroups.includes(s.section)) return false;
+            // 3. Filter by Group
+            if (filterGroups.length > 0 && !filterGroups.includes(s.section)) return false;
 
-        // 4. Filter by Subject
-        if (filterSubjects.length > 0 && !filterSubjects.includes(s.subject)) return false;
+            // 4. Filter by Subject
+            if (filterSubjects.length > 0 && !filterSubjects.includes(s.subject)) return false;
 
-        // 3. Search Filter
-        if (!search) return true;
+            // 5. Search Filter
+            if (!search) return true;
 
-        return (
-            (s.subject && s.subject.toLowerCase().includes(search)) ||
-            (s.faculty && s.faculty.toLowerCase().includes(search)) ||
-            (s.faculty2 && s.faculty2.toLowerCase().includes(search)) ||
-            (s.group && s.group.toLowerCase().includes(search)) ||
-            (s.room && s.room.toLowerCase().includes(search)) ||
-            (s.day && s.day.toLowerCase().includes(search)) ||
-            (s.time && s.time.toLowerCase().includes(search))
-        );
-    }).sort((a, b) => {
-        const dayOrder = days.indexOf(a.day) - days.indexOf(b.day);
-        if (dayOrder !== 0) return dayOrder;
-        return timeSlots.indexOf(a.time) - timeSlots.indexOf(b.time);
-    });
+            return (
+                (s.subject && s.subject.toLowerCase().includes(search)) ||
+                (s.faculty && s.faculty.toLowerCase().includes(search)) ||
+                (s.faculty2 && s.faculty2.toLowerCase().includes(search)) ||
+                (s.group && s.group.toLowerCase().includes(search)) ||
+                (s.room && s.room.toLowerCase().includes(search)) ||
+                (s.day && s.day.toLowerCase().includes(search)) ||
+                (s.time && s.time.toLowerCase().includes(search))
+            );
+        }).sort((a, b) => {
+            const getDayIndex = (dName) => {
+                if (!days) return -1;
+                return days.findIndex(d => d.name === dName);
+            };
+
+            const ia = getDayIndex(a.day);
+            const ib = getDayIndex(b.day);
+            if (ia !== ib) return ia - ib;
+
+            // Sort by Start Time
+            try {
+                const timeA = new Date('2000/01/01 ' + a.time.split(' - ')[0]).getTime();
+                const timeB = new Date('2000/01/01 ' + b.time.split(' - ')[0]).getTime();
+                return timeA - timeB;
+            } catch (e) {
+                return 0;
+            }
+        });
+    }, [fullSchedule, searchTerm, filterDepts, filterSems, filterGroups, filterSubjects, days]);
 
     const availableSubGroups = React.useMemo(() => {
         const groupObj = rawGroups.find(g => g.name === selectedMainGroup);
@@ -898,7 +1038,7 @@ const Assignments = () => {
                 confirmText="Delete Permanently"
             />
             {/* Header */}
-            < div className="assignments-header" >
+            <div className="assignments-header">
                 <div>
                     <h2 className="page-title">
                         {isAdmin ? 'Create Assignment' : 'Assignments'} <span className="academic-year-badge">({activeAcademicYear})</span>
@@ -912,402 +1052,114 @@ const Assignments = () => {
                         <Settings size={16} /> <span className="hide-on-mobile">Manage Master Data</span>
                     </button>
                 )}
-            </div >
+            </div>
 
             {/* Main Content Grid */}
-            < div className="assignments-content" style={!isAdmin ? { gridTemplateColumns: '1fr' } : {}}>
+            <div className="assignments-content" style={!isAdmin ? { gridTemplateColumns: '1fr' } : {}}>
 
                 {/* Left Column: Form */}
-                {
-                    isAdmin && (
-                        <div className="glass-panel form-panel">
-
-                            {/* Section 1: Schedule */}
-                            <div className="form-section">
-                                <h3 className="section-title" style={{ color: '#60a5fa' }}>
-                                    <Clock size={16} /> Schedule
-                                </h3>
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Day</label>
-                                        <Select
-                                            options={days}
-                                            value={selectedDay}
-                                            onChange={setSelectedDay}
-                                            placeholder="Select Day..."
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Time</label>
-                                        <Select
-                                            options={timeSlots}
-                                            value={selectedTime}
-                                            onChange={setSelectedTime}
-                                            placeholder="Select Time..."
-                                        />
-                                    </div>
+                {isAdmin && (
+                    <div className="glass-panel form-panel">
+                        {/* Section 1: Schedule */}
+                        <div className="form-section">
+                            <h3 className="section-title" style={{ color: '#60a5fa' }}>
+                                <Clock size={16} /> Schedule
+                            </h3>
+                            <div className="form-grid-2">
+                                <div className="form-group">
+                                    <label>Day</label>
+                                    <Select options={days} value={selectedDay} onChange={setSelectedDay} placeholder="Select Day..." />
                                 </div>
-
-                                {/* AI Insight Banner */}
-                                {(selectedDay && selectedTime) && (
-                                    <div className="glass-panel" style={{
-                                        marginTop: '1rem',
-                                        padding: '0.75rem',
-                                        background: isAnalyzing ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.2)',
-                                        border: isAnalyzing ? '1px solid rgba(255,255,255,0.1)' : `1px solid ${aiInsight?.color || 'transparent'}`,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px',
-                                        borderRadius: '12px',
-                                        transition: 'all 0.3s ease'
-                                    }}>
-                                        {isAnalyzing ? (
-                                            <RefreshCw size={18} className="spin-slow" style={{ color: '#94a3b8' }} />
-                                        ) : (
-                                            <Brain size={18} style={{ color: aiInsight?.color }} className={aiInsight?.status === 'optimal' ? 'pulse-slow' : ''} />
-                                        )}
-
-                                        <div style={{ flex: 1 }}>
-                                            {isAnalyzing ? (
-                                                <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                                    AI Analysis running...
-                                                </span>
-                                            ) : (
-                                                <div className="animate-fade-in">
-                                                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: aiInsight?.color }}>
-                                                        {aiInsight?.message}
-                                                    </div>
-                                                    {aiInsight?.utilization > 0 && (
-                                                        <div style={{
-                                                            height: '4px',
-                                                            background: 'rgba(255,255,255,0.1)',
-                                                            borderRadius: '2px',
-                                                            marginTop: '6px',
-                                                            overflow: 'hidden'
-                                                        }}>
-                                                            <div style={{
-                                                                height: '100%',
-                                                                width: `${aiInsight.utilization}%`,
-                                                                background: aiInsight.color,
-                                                                transition: 'width 1s ease-out'
-                                                            }} />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Section 2: Class Info */}
-                            <div className="form-section">
-                                <h3 className="section-title" style={{ color: '#34d399' }}>
-                                    <Layers size={16} /> Class Info
-                                </h3>
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Dept</label>
-                                        <Select
-                                            options={departments}
-                                            value={selectedDept}
-                                            onChange={setSelectedDept}
-                                            placeholder="Select..."
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Sem</label>
-                                        <Select
-                                            options={semesters}
-                                            value={selectedSem}
-                                            onChange={setSelectedSem}
-                                            placeholder="Select..."
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Group</label>
-                                        <Select
-                                            options={rawGroups.map(g => ({ value: g.name, label: g.name }))}
-                                            value={selectedMainGroup}
-                                            onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }}
-                                            placeholder="Select Group..."
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Sub Group</label>
-                                        <Select
-                                            options={availableSubGroups}
-                                            value={selectedSubGroup}
-                                            onChange={setSelectedSubGroup}
-                                            placeholder="Select Sub Group..."
-                                            disabled={!selectedMainGroup || selectedMainGroup === 'All' || availableSubGroups.length === 0}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 3: Details */}
-                            <div className="form-section">
-                                <h3 className="section-title" style={{ color: '#f472b6' }}>
-                                    <BookOpen size={16} /> Details
-                                </h3>
-                                <div className="form-grid-2">
-                                    <div className="form-group full-width">
-                                        <label>Subject</label>
-                                        <Select
-                                            options={subjects.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))}
-                                            value={selectedSubject}
-                                            onChange={setSelectedSubject}
-                                            placeholder="Select Subject..."
-                                        />
-                                    </div>
-                                    <div className="form-group full-width">
-                                        <label>Room</label>
-                                        <Select
-                                            options={rooms}
-                                            value={selectedRoom}
-                                            onChange={setSelectedRoom}
-                                            placeholder="Select Room..."
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 4: Faculty */}
-                            <div className="form-section">
-                                <h3 className="section-title" style={{ color: '#fbbf24' }}>
-                                    <Users size={16} /> Faculty
-                                </h3>
-                                <div className="form-grid-1">
-                                    <div className="form-group">
-                                        <label>Faculty 1</label>
-                                        <Select
-                                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
-                                            value={selectedFaculty}
-                                            onChange={setSelectedFaculty}
-                                            placeholder="Select Faculty..."
-                                        />
-                                        {renderFacultyLoad(selectedFaculty)}
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Faculty 2</label>
-                                        <Select
-                                            options={faculty.map(f => ({ value: f.name, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))}
-                                            value={selectedFaculty2}
-                                            onChange={setSelectedFaculty2}
-                                            placeholder="Select Faculty..."
-                                        />
-                                        {renderFacultyLoad(selectedFaculty2)}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="form-actions">
-                                {/* Conflict Alert */}
-                                {conflict && !saving && !successMsg && (
-                                    <div className="alert-box error animate-fade-in">
-                                        <AlertTriangle size={18} className="alert-icon" />
-                                        <div className="alert-content">{conflict.message}</div>
-                                    </div>
-                                )}
-
-                                {/* Success Message */}
-                                {successMsg && (
-                                    <div className="alert-box success animate-fade-in">
-                                        <Check size={18} className="alert-icon" />
-                                        <div className="alert-content">{successMsg}</div>
-                                        <button onClick={() => setSuccessMsg('')} className="alert-close">
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                )}
-
-                                <div className="button-group">
-                                    <button className="btn btn-secondary" onClick={() => {
-                                        setSelectedSubject(''); setSelectedFaculty(''); setSelectedRoom(''); setSelectedFaculty2('');
-                                    }}>
-                                        Clear
-                                    </button>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={handleAssign}
-                                        disabled={saving || !!conflict}
-                                    >
-                                        {saving ? <RefreshCw className="spin" size={18} /> : <Check size={18} />}
-                                        {saving ? 'Creating...' : 'Create Assignment'}
-                                    </button>
+                                <div className="form-group">
+                                    <label>Time</label>
+                                    <Select options={timeSlots} value={selectedTime} onChange={setSelectedTime} placeholder="Select Time..." />
                                 </div>
                             </div>
                         </div>
-                    )
-                }
 
-                {/* Right Column: Existing Assignments Table */}
+                        {/* Section 2: Class Info */}
+                        <div className="form-section">
+                            <h3 className="section-title" style={{ color: '#34d399' }}><Layers size={16} /> Class Info</h3>
+                            <div className="form-grid-2">
+                                <div className="form-group"><label>Dept</label><Select options={departments} value={selectedDept} onChange={setSelectedDept} placeholder="Select..." /></div>
+                                <div className="form-group"><label>Sem</label><Select options={semesters} value={selectedSem} onChange={setSelectedSem} placeholder="Select..." /></div>
+                                <div className="form-group"><label>Group</label><Select options={rawGroups.map(g => ({ value: g.name, label: g.name }))} value={selectedMainGroup} onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }} placeholder="Select Group..." /></div>
+                                <div className="form-group"><label>Sub Group</label><Select options={availableSubGroups} value={selectedSubGroup} onChange={setSelectedSubGroup} placeholder={selectedMainGroup && availableSubGroups.length === 0 ? "No Sub-Groups (Whole Class)" : "Select Sub Group..."} disabled={!selectedMainGroup || availableSubGroups.length === 0} /></div>
+                            </div>
+                        </div>
+
+                        {/* Section 3: Details */}
+                        <div className="form-section">
+                            <h3 className="section-title" style={{ color: '#f472b6' }}><BookOpen size={16} /> Details</h3>
+                            <div className="form-grid-2">
+                                <div className="form-group full-width"><label>Subject</label><Select options={subjects.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))} value={selectedSubject} onChange={setSelectedSubject} placeholder="Select Subject..." /></div>
+                                <div className="form-group full-width"><label>Room</label><Select options={rooms} value={selectedRoom} onChange={setSelectedRoom} placeholder="Select Room..." /></div>
+                            </div>
+                        </div>
+
+                        {/* Section 4: Faculty */}
+                        <div className="form-section">
+                            <h3 className="section-title" style={{ color: '#fbbf24' }}><Users size={16} /> Faculty</h3>
+                            <div className="form-grid-1">
+                                <div className="form-group"><label>Faculty 1</label><Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty} onChange={setSelectedFaculty} placeholder="Select Faculty..." />{renderFacultyLoad(selectedFaculty)}</div>
+                                <div className="form-group"><label>Faculty 2</label><Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty2} onChange={setSelectedFaculty2} placeholder="Select Faculty..." />{renderFacultyLoad(selectedFaculty2)}</div>
+                            </div>
+                        </div>
+
+                        {/* Alerts */}
+                        {conflict && !saving && !successMsg && (<div className="alert-box error animate-fade-in"><AlertTriangle size={18} className="alert-icon" /><div className="alert-content">{conflict.message}</div></div>)}
+                        {successMsg && (<div className="alert-box success animate-fade-in"><Check size={18} className="alert-icon" /><div className="alert-content">{successMsg}</div><button onClick={() => setSuccessMsg('')} className="alert-close"><X size={14} /></button></div>)}
+
+                        {/* Buttons */}
+                        <div className="button-group">
+                            <button className="btn btn-secondary" onClick={() => { setSelectedSubject(''); setSelectedFaculty(''); setSelectedRoom(''); setSelectedFaculty2(''); }}>Clear</button>
+                            <button className="btn btn-primary" onClick={handleAssign} disabled={saving || !!conflict}>
+                                {saving ? <RefreshCw className="spin" size={18} /> : <Check size={18} />} {saving ? 'Creating...' : 'Create Assignment'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Right Column: Table */}
                 <div className="glass-panel table-panel">
                     <div className="table-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 className="table-title">
-                                Assignments <span className="count-badge">{filteredAssignments.length}</span>
-                            </h3>
+                            <h3 className="table-title">Assignments <span className="count-badge">{filteredAssignments.length}</span></h3>
                             <div className="search-wrapper">
                                 <Search size={16} className="search-icon" />
-                                <input
-                                    type="text"
-                                    placeholder="Search..."
-                                    className="glass-input search-input"
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                />
+                                <input type="text" placeholder="Search..." className="glass-input search-input" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                             </div>
                         </div>
-
-                        {/* Table Filters */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-                            <MultiSelectDropdown
-                                options={departments}
-                                selected={filterDepts}
-                                onChange={setFilterDepts}
-                                label="Filter Dept"
-                                icon={BookOpen}
-                            />
-                            <MultiSelectDropdown
-                                options={semesters}
-                                selected={filterSems}
-                                onChange={setFilterSems}
-                                label="Filter Sem"
-                                icon={Layers}
-                            />
-                            <MultiSelectDropdown
-                                options={rawGroups.map(g => g.name)}
-                                selected={filterGroups}
-                                onChange={setFilterGroups}
-                                label="Filter Group"
-                                icon={Users}
-                            />
-                            <MultiSelectDropdown
-                                options={subjects.map(s => s.name)}
-                                selected={filterSubjects}
-                                onChange={setFilterSubjects}
-                                label="Filter Subject"
-                                icon={BookOpen}
-                            />
+                            <MultiSelectDropdown options={departments} selected={filterDepts} onChange={setFilterDepts} label="Filter Dept" icon={BookOpen} />
+                            <MultiSelectDropdown options={semesters} selected={filterSems} onChange={setFilterSems} label="Filter Sem" icon={Layers} />
+                            <MultiSelectDropdown options={rawGroups.map(g => g.name)} selected={filterGroups} onChange={setFilterGroups} label="Filter Group" icon={Users} />
+                            <MultiSelectDropdown options={subjects.map(s => s.name)} selected={filterSubjects} onChange={setFilterSubjects} label="Filter Subject" icon={BookOpen} />
                         </div>
                     </div>
 
                     <div className="table-content">
                         <table className="assignments-table">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Subject</th>
-                                    <th>Faculty</th>
-                                    <th>Room</th>
-                                    <th>Group</th>
-                                    <th className="actions-col"></th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>Time</th><th>Subject</th><th>Faculty</th><th>Room</th><th>Group</th><th className="actions-col"></th></tr></thead>
                             <tbody>
-                                {filteredAssignments.length > 0 ? filteredAssignments.map((assignment, index) => (
+                                {filteredAssignments.length > 0 ? filteredAssignments.map((assignment) => (
                                     <tr key={assignment.id} className="table-row-hover">
-                                        <td>
-                                            <div className="cell-primary">{assignment.day}</div>
-                                            <div className="cell-secondary">
-                                                <Clock size={12} /> {assignment.time}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="cell-primary" title={assignment.subject}>{assignment.subject}</div>
-                                            {(() => {
-                                                const sub = subjects.find(s => s.name === assignment.subject);
-                                                return sub && sub.shortCode ? (
-                                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>{sub.shortCode}</div>
-                                                ) : null;
-                                            })()}
-                                        </td>
-                                        <td>
-                                            <div className="faculty-list">
-                                                <div className="badge badge-blue">
-                                                    <User size={12} />
-                                                    <span>{assignment.faculty}</span>
-                                                </div>
-                                                {assignment.faculty2 && (
-                                                    <div className="badge badge-purple">
-                                                        <User size={12} />
-                                                        <span>{assignment.faculty2}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="badge badge-pink">
-                                                <MapPin size={12} />
-                                                <span>{assignment.room}</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="badge badge-green">
-                                                <Users size={12} />
-                                                <span>{assignment.dept}-{assignment.section}{assignment.group ? `-${assignment.group}` : ''}</span>
-                                            </div>
-                                        </td>
-                                        <td className="actions-col">
-                                            {assignment.id && isAdmin && (
-                                                <button
-                                                    onClick={(e) => handleDelete(e, assignment.id)}
-                                                    className="icon-btn-danger"
-                                                    title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete"}
-                                                    disabled={deletingIds.has(assignment.id)}
-                                                    style={deletingIds.has(assignment.id) ? { opacity: 0.7, cursor: 'wait' } : {}}
-                                                >
-                                                    {deletingIds.has(assignment.id) ? (
-                                                        <RefreshCw size={16} className="spin" />
-                                                    ) : (
-                                                        <Trash2 size={16} />
-                                                    )}
-                                                </button>
-                                            )}
-                                        </td>
+                                        <td><div className="cell-primary">{assignment.day}</div><div className="cell-secondary"><Clock size={12} /> {assignment.time}</div></td>
+                                        <td><div className="cell-primary" title={assignment.subject}>{assignment.subject}</div>{(() => { const sub = subjects.find(s => s.name === assignment.subject); return sub && sub.shortCode ? (<div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>{sub.shortCode}</div>) : null; })()}</td>
+                                        <td><div className="faculty-list"><div className="badge badge-blue"><User size={12} /><span>{assignment.faculty}</span></div>{assignment.faculty2 && (<div className="badge badge-purple"><User size={12} /><span>{assignment.faculty2}</span></div>)}</div></td>
+                                        <td><div className="badge badge-pink"><MapPin size={12} /><span>{assignment.room}</span></div></td>
+                                        <td><div className="badge badge-green"><Users size={12} /><span>{assignment.dept}-{assignment.section}{assignment.group ? `-${assignment.group}` : ''}</span></div></td>
+                                        <td className="actions-col">{assignment.id && canDelete(assignment) && (<button onClick={(e) => handleDelete(e, assignment)} className="icon-btn-danger" title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete"} disabled={deletingIds.has(assignment.id)} style={deletingIds.has(assignment.id) ? { opacity: 0.7, cursor: 'wait' } : {}}>{deletingIds.has(assignment.id) ? (<RefreshCw size={16} className="spin" />) : (<Trash2 size={16} />)}</button>)}</td>
                                     </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan="6" className="empty-state">
-                                            <div className="empty-content">
-                                                <div className="empty-icon">
-                                                    <Search size={24} />
-                                                </div>
-                                                <div>
-                                                    No assignments found for {selectedDept} - {selectedSem}
-                                                    {searchTerm && <span className="search-hint">matching "{searchTerm}"</span>}
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
+                                )) : (<tr><td colSpan="6" className="empty-state"><div className="empty-content"><div className="empty-icon"><Search size={24} /></div><div>No assignments found</div></div></td></tr>)}
                             </tbody>
                         </table>
                     </div>
                 </div>
-            </div >
+            </div>
 
             {/* Manage Data Modal */}
-            {
-                isManageModalOpen && (
-                    <div className="modal-overlay">
-                        <div className="modal-content glass-panel animate-scale-in">
-                            <button
-                                onClick={() => { setIsManageModalOpen(false); fetchMasterData(); }}
-                                className="modal-close-btn"
-                            >
-                                <X size={20} />
-                            </button>
-                            <div className="modal-body">
-                                <MasterData initialTab={manageModalTab} />
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            {isManageModalOpen && (<div className="modal-overlay"><div className="modal-content glass-panel animate-scale-in"><button onClick={() => setIsManageModalOpen(false)} className="modal-close-btn"><X size={20} /></button><div className="modal-body"><MasterData initialTab={manageModalTab} /></div></div></div>)}
 
             {/* CSS Styles */}
             <style>{`

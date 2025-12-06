@@ -25,10 +25,9 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // EmailJS Configuration
-  // EmailJS Configuration
-  const EMAILJS_SERVICE_ID = "service_xoq8zys";
-  const EMAILJS_TEMPLATE_ID = "template_ag70wm8";
-  const EMAILJS_PUBLIC_KEY = "OLfq9wSgarnn9O5z-";
+  const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+  const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+  const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -470,11 +469,22 @@ const Login = () => {
 
         <div style={{
           marginTop: '2rem',
-          fontSize: '0.65rem',
-          color: 'rgba(255,255,255,0.2)',
-          letterSpacing: '0.05em'
+          textAlign: 'center'
         }}>
-          Created by <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>Padmalochan Maharana</span>
+          <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginRight: '6px' }}>
+            Designed by
+          </span>
+          <span style={{
+            fontSize: '0.9rem',
+            fontWeight: '700',
+            background: 'linear-gradient(to right, #38bdf8, #c084fc, #f472b6, #38bdf8)',
+            backgroundSize: '200% auto',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            animation: 'shine 5s linear infinite'
+          }}>
+            Padmalochan Maharana
+          </span>
         </div>
       </div>
 

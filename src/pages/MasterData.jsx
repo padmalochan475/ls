@@ -5,14 +5,62 @@ import { collection, getDocs, getDoc, addDoc, deleteDoc, doc, updateDoc, query, 
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
 import '../styles/design-system.css';
-import { Settings, Users, BookOpen, Clock, MapPin, Layers, Box, Download, Plus, Search, Edit2, Trash2, Grid, List, User, Briefcase, Hash, Calendar, Eye, Check, ChevronDown } from 'lucide-react';
+import { Settings, Users, BookOpen, Clock, MapPin, Layers, Box, Download, Plus, Search, Edit2, Trash2, Grid, List, User, Briefcase, Hash, Calendar, Eye, Check, ChevronDown, RefreshCw } from 'lucide-react';
 
 const MasterData = ({ initialTab }) => {
     const { userProfile } = useAuth();
     const [activeTab, setActiveTab] = useState(initialTab || 'faculty');
 
+    // Security Sync State
+    const [syncStatus, setSyncStatus] = useState('');
+
+    const runSecuritySync = async () => {
+        setSyncStatus('Starting Sync...');
+        try {
+            const usersSnap = await getDocs(collection(db, 'users'));
+            if (usersSnap.empty) {
+                setSyncStatus('No users found to sync.');
+                return;
+            }
+
+            const batch = writeBatch(db);
+            let count = 0;
+
+            usersSnap.forEach(userDoc => {
+                const userData = userDoc.data();
+                if (userData.empId && userData.email) {
+                    const lookupRef = doc(db, 'emp_lookups', userData.empId);
+                    batch.set(lookupRef, {
+                        email: userData.email,
+                        uid: userDoc.id,
+                        syncedAt: new Date().toISOString()
+                    });
+                    count++;
+                }
+            });
+
+            await batch.commit();
+            setSyncStatus(`Success! Synced ${count} users to Secure Lookup.`);
+            // Auto revert tab after 3 seconds
+            setTimeout(() => { setSyncStatus(''); setActiveTab('faculty'); }, 3000);
+
+        } catch (err) {
+            console.error("Sync Failed:", err);
+            setSyncStatus(`Error: ${err.message}`);
+        }
+    };
+
     useEffect(() => {
-        if (initialTab) setActiveTab(initialTab);
+        if (activeTab === 'security') {
+            runSecuritySync();
+        } else if (initialTab) {
+            // Only set if not security
+            // Removed strictly forced set to avoid loop, simple check is enough
+        }
+    }, [activeTab]);
+
+    useEffect(() => {
+        if (initialTab && initialTab !== 'security') setActiveTab(initialTab);
     }, [initialTab]);
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -42,7 +90,6 @@ const MasterData = ({ initialTab }) => {
             });
 
             setNewYearInput('');
-            setNewYearInput('');
             // fetchData(); // Removed: Handled by listener
         } catch (e) {
             console.error("Error adding year:", e);
@@ -67,6 +114,8 @@ const MasterData = ({ initialTab }) => {
         { id: 'timeslots', label: 'Time Slots', icon: <Clock size={18} />, collection: 'timeslots' },
         { id: 'semesters', label: 'Semesters', icon: <Hash size={18} />, collection: 'semesters' },
         { id: 'settings', label: 'Settings', icon: <Settings size={18} />, collection: 'settings' },
+        // Security Sync (Hidden: Run once during migration)
+        // { id: 'security', label: 'Sync Security', icon: <RefreshCw size={18} />, collection: 'users', isAction: true },
     ];
 
     const activeCollection = tabs.find(t => t.id === activeTab)?.collection;
@@ -209,20 +258,82 @@ const MasterData = ({ initialTab }) => {
                 // Item Deletion
                 if (!activeCollection) return;
 
-                // Dependency Check for Faculty within Item Delete
-                if (activeTab === 'faculty') {
-                    const facultyItem = data.find(d => d.id === id);
-                    if (facultyItem) {
-                        const q1 = query(collection(db, 'schedule'), where('faculty', '==', facultyItem.name));
-                        const q2 = query(collection(db, 'schedule'), where('faculty2', '==', facultyItem.name));
-                        const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+                // Dependency Checks - Prevent deletion of data in use
+                const item = data.find(d => d.id === id);
 
-                        if (!snap1.empty || !snap2.empty) {
-                            alert(`Cannot delete ${facultyItem.name}. They have active assignments. Please remove their assignments first.`);
-                            return;
-                        }
+                if (!item) {
+                    alert("System Error: Could not find item details to verify safety. Please refresh the page and try again.");
+                    return;
+                }
+
+                const checkUsage = async (field, value, itemName) => {
+                    const q = query(collection(db, 'schedule'), where(field, '==', value));
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        const uses = snap.docs.slice(0, 3).map(d => `${d.data().day} ${d.data().time.substring(0, 5)} (${d.data().subject})`).join('\n- ');
+                        const more = snap.size > 3 ? `\n...and ${snap.size - 3} more.` : '';
+                        return `Cannot delete "${itemName}". It is currently assigned to ${snap.size} class(es):\n- ${uses}${more}\n\nPlease remove these assignments first.`;
+                    }
+                    return null;
+                };
+
+                if (activeTab === 'faculty' && item) {
+                    const q1 = query(collection(db, 'schedule'), where('faculty', '==', item.name));
+                    const q2 = query(collection(db, 'schedule'), where('faculty2', '==', item.name));
+                    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+                    if (!snap1.empty || !snap2.empty) {
+                        const allDocs = [...snap1.docs, ...snap2.docs];
+                        const count = allDocs.length;
+                        const uses = allDocs.slice(0, 3).map(d => `${d.data().day} ${d.data().time.substring(0, 5)} (${d.data().subject})`).join('\n- ');
+                        const more = count > 3 ? `\n...and ${count - 3} more.` : '';
+                        alert(`Cannot delete Faculty "${item.name}". They are assigned to ${count} class(es):\n- ${uses}${more}`);
+                        return;
                     }
                 }
+
+                if (activeTab === 'rooms' && item) {
+                    const error = await checkUsage('room', item.name, item.name);
+                    if (error) { alert(error); return; }
+                }
+
+                if (activeTab === 'subjects' && item) {
+                    const error = await checkUsage('subject', item.name, item.name);
+                    if (error) { alert(error); return; }
+                }
+
+                if (activeTab === 'departments' && item) {
+                    const error = await checkUsage('dept', item.code || item.name, item.name);
+                    if (error) { alert(error); return; }
+                }
+
+                if (activeTab === 'semesters' && item) {
+                    const error = await checkUsage('sem', item.name, item.name);
+                    if (error) { alert(error); return; }
+                }
+
+                if (activeTab === 'groups' && item) {
+                    // Groups from MasterData are saved as 'section' in Schedule
+                    const error = await checkUsage('section', item.name, item.name);
+                    if (error) { alert(error); return; }
+                }
+
+                if (activeTab === 'days' && item) {
+                    const error = await checkUsage('day', item.name, item.name);
+                    if (error) { alert(error); return; }
+                }
+
+                if (activeTab === 'timeslots' && item) {
+                    // Reconstruct time string to match Schedule format
+                    // Format: "10:00 AM - 11:00 AM"
+                    const start = new Date(`2000-01-01T${item.startTime}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                    const end = new Date(`2000-01-01T${item.endTime}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                    const timeStr = `${start} - ${end}`;
+
+                    const error = await checkUsage('time', timeStr, item.label || timeStr);
+                    if (error) { alert(error); return; }
+                }
+
                 await deleteDoc(doc(db, activeCollection, id));
                 // fetchData();
             }
@@ -243,14 +354,18 @@ const MasterData = ({ initialTab }) => {
         if (selectedUser) {
             setFormData({
                 ...formData,
-                name: selectedUser.name || '',
-                empId: selectedUser.empId || '',
-                email: selectedUser.email || '',
-                // Keep existing fields if any
+                uid: selectedUser.id, // Store linkage
+                name: selectedUser.name || formData.name || '',
+                email: selectedUser.email || formData.email || '',
+                empId: selectedUser.empId || formData.empId || '',
+                photoURL: selectedUser.photoURL || formData.photoURL || '',
+                // Preserve other fields
                 department: formData.department || '',
-                designation: formData.designation || '',
-                photoURL: selectedUser.photoURL || ''
+                designation: formData.designation || ''
             });
+        } else {
+            // Handle unselection
+            setFormData(prev => ({ ...prev, uid: null }));
         }
     };
 
@@ -278,12 +393,15 @@ const MasterData = ({ initialTab }) => {
                     });
                 }
             } else if (collectionName === 'faculty') {
-                if (oldData.name !== newData.name) {
+                if (oldData.name !== newData.name || oldData.empId !== newData.empId) {
                     // Update faculty 1
                     const q1 = query(collection(db, 'schedule'), where('faculty', '==', oldData.name));
                     const snap1 = await getDocs(q1);
                     snap1.forEach(doc => {
-                        batch.update(doc.ref, { faculty: newData.name });
+                        batch.update(doc.ref, {
+                            faculty: newData.name,
+                            facultyEmpId: newData.empId || null
+                        });
                         updateCount++;
                     });
 
@@ -291,9 +409,33 @@ const MasterData = ({ initialTab }) => {
                     const q2 = query(collection(db, 'schedule'), where('faculty2', '==', oldData.name));
                     const snap2 = await getDocs(q2);
                     snap2.forEach(doc => {
-                        batch.update(doc.ref, { faculty2: newData.name });
+                        batch.update(doc.ref, {
+                            faculty2: newData.name,
+                            faculty2EmpId: newData.empId || null
+                        });
                         updateCount++;
                     });
+                }
+
+                // AUTOMATIC SECURITY SYNC: Handle emp_lookups updates immediately
+                const lookupRef = newData.empId ? doc(db, 'emp_lookups', newData.empId) : null;
+
+                if (newData.uid && newData.email && newData.empId) {
+                    // Update or Create Lookup
+                    batch.set(lookupRef, {
+                        uid: newData.uid,
+                        email: newData.email,
+                        syncedAt: new Date().toISOString(),
+                        source: 'auto-sync'
+                    });
+
+                    // If EmpID changed, remove the old one
+                    if (oldData.empId && oldData.empId !== newData.empId) {
+                        batch.delete(doc(db, 'emp_lookups', oldData.empId));
+                    }
+                } else if (oldData.uid && (!newData.uid || !newData.empId) && oldData.empId) {
+                    // Unlinking User or removing EmpID: Delete secure lookup
+                    batch.delete(doc(db, 'emp_lookups', oldData.empId));
                 }
             } else if (collectionName === 'subjects') {
                 if (oldData.name !== newData.name) {
@@ -313,11 +455,70 @@ const MasterData = ({ initialTab }) => {
                         updateCount++;
                     });
                 }
+            } else if (collectionName === 'departments') {
+                if ((oldData.code || oldData.name) !== (newData.code || newData.name)) {
+                    // Check both code and name as fallback, though mainly we use name or code depending on saving
+                    // Assignments usually save 'dept' as the name/code selected.
+                    // Let's assume we match against what was stored.
+                    // The safe bet is: if we change the Value that is stored.
+                    // In Assignments.jsx, we save 'selectedDept'. It comes from MasterData.
+                    // If MasterData dept has 'name' and 'code', usually 'name' is used?
+                    // Let's check: MasterData saves {name, code, hod}.
+                    // Assignments saves 'dept'.
+
+                    const oldVal = oldData.code || oldData.name;
+                    const newVal = newData.code || newData.name;
+
+                    // We try to match 'dept' field
+                    const q = query(collection(db, 'schedule'), where('dept', '==', oldVal));
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        snap.forEach(doc => {
+                            batch.update(doc.ref, { dept: newVal });
+                            updateCount++;
+                        });
+                    } else {
+                        // Fallback: maybe it stored keys differently? Check just name
+                        const q2 = query(collection(db, 'schedule'), where('dept', '==', oldData.name));
+                        const snap2 = await getDocs(q2);
+                        snap2.forEach(doc => {
+                            batch.update(doc.ref, { dept: newData.name });
+                            updateCount++;
+                        });
+                    }
+                }
+            } else if (collectionName === 'semesters') {
+                if (oldData.name !== newData.name) {
+                    const q = query(collection(db, 'schedule'), where('sem', '==', oldData.name));
+                    const snap = await getDocs(q);
+                    snap.forEach(doc => {
+                        batch.update(doc.ref, { sem: newData.name });
+                        updateCount++;
+                    });
+                }
+            } else if (collectionName === 'groups') {
+                if (oldData.name !== newData.name) {
+                    // Update 'section' field in schedule
+                    const q = query(collection(db, 'schedule'), where('section', '==', oldData.name));
+                    const snap = await getDocs(q);
+                    snap.forEach(doc => {
+                        batch.update(doc.ref, { section: newData.name });
+                        updateCount++;
+                    });
+                }
+            } else if (collectionName === 'days') {
+                if (oldData.name !== newData.name) {
+                    const q = query(collection(db, 'schedule'), where('day', '==', oldData.name));
+                    const snap = await getDocs(q);
+                    snap.forEach(doc => {
+                        batch.update(doc.ref, { day: newData.name });
+                        updateCount++;
+                    });
+                }
             }
 
             if (updateCount > 0) {
                 await batch.commit();
-                console.log(`Updated ${updateCount} related schedule entries.`);
             }
         } catch (err) {
             console.error("Error in cascade update:", err);
@@ -341,6 +542,20 @@ const MasterData = ({ initialTab }) => {
                 await updateDoc(doc(db, activeCollection, editingId), formData);
             } else {
                 await addDoc(collection(db, activeCollection), formData);
+
+                // AUTOMATIC SECURITY SYNC: Handle New Faculty
+                if (activeCollection === 'faculty' && formData.uid && formData.empId && formData.email) {
+                    try {
+                        await setDoc(doc(db, 'emp_lookups', formData.empId), {
+                            uid: formData.uid,
+                            email: formData.email,
+                            syncedAt: new Date().toISOString(),
+                            source: 'auto-sync-create'
+                        });
+                    } catch (syncErr) {
+                        console.error("Auto-sync failed:", syncErr);
+                    }
+                }
             }
             setIsModalOpen(false);
             setFormData({});
@@ -534,16 +749,17 @@ const MasterData = ({ initialTab }) => {
                 return (
                     <>
                         <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginBottom: '0.5rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.85rem', color: '#93c5fd', marginBottom: '0.5rem' }}>Auto-fill from Registered User</label>
+                            <label style={{ display: 'block', fontSize: '0.85rem', color: '#93c5fd', marginBottom: '0.5rem' }}>Link Registered User (Syncs Data)</label>
                             <select
                                 className="glass-input"
+                                value={formData.uid || ''}
                                 onChange={(e) => handleUserSelect(e.target.value)}
                                 style={{ background: 'rgba(0, 0, 0, 0.3)', color: 'white' }}
                             >
-                                <option value="" style={{ background: '#1e293b', color: 'white' }}>Select a User...</option>
+                                <option value="" style={{ background: '#1e293b', color: 'white' }}>Select User to Link...</option>
                                 {usersList.map(u => (
                                     <option key={u.id} value={u.id} style={{ background: '#1e293b', color: 'white' }}>
-                                        {u.name} ({u.empId})
+                                        {u.name} {u.empId ? `(${u.empId})` : ''}
                                     </option>
                                 ))}
                             </select>
@@ -1029,6 +1245,28 @@ const MasterData = ({ initialTab }) => {
                             </div>
                         </div>
                     </div>
+                ) : activeTab === 'security' ? (
+                    <div className="glass-panel animate-fade-in" style={{ padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
+                            <RefreshCw size={64} className={syncStatus.includes('Starting') ? 'spin-animation' : ''} color="#60a5fa" />
+                            {syncStatus.includes('Starting') && (
+                                <div style={{
+                                    position: 'absolute', inset: -10, borderRadius: '50%',
+                                    border: '2px solid rgba(96, 165, 250, 0.3)',
+                                    borderTopColor: '#60a5fa',
+                                    animation: 'rotate 1s linear infinite'
+                                }} />
+                            )}
+                        </div>
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1rem 0' }}>
+                            {syncStatus || 'Initializing Security Sync...'}
+                        </h3>
+                        <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', lineHeight: '1.6' }}>
+                            {syncStatus.includes('Success')
+                                ? 'Your user database is now synchronized with the secure lookup table. You can safely lock the main users collection.'
+                                : 'This process securely copies Employee IDs to a restricted lookup table, enabling secure login without exposing your user list.'}
+                        </p>
+                    </div>
                 ) : (
                     <>
                         {/* Search */}
@@ -1142,7 +1380,7 @@ const MasterData = ({ initialTab }) => {
             {deleteConfirm.isOpen && createPortal(
                 <ConfirmModal
                     isOpen={deleteConfirm.isOpen}
-                    onClose={() => setDeleteConfirm({ isOpen: false, id: null, type: 'item' })}
+                    onCancel={() => setDeleteConfirm({ isOpen: false, id: null, type: 'item' })}
                     onConfirm={executeDelete}
                     title={deleteConfirm.type === 'year' ? "Delete Academic Year" : "Delete Item"}
                     message={deleteConfirm.type === 'year'
