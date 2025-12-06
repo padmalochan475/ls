@@ -545,11 +545,33 @@ const Scheduler = () => {
 
             // 2. Faculty Conflict
             // Check if New Faculty 1 is busy
-            if (newBooking.faculty && (item.faculty === newBooking.faculty || item.faculty2 === newBooking.faculty)) {
+            const checkFacultyBusy = (facName, facEmpId) => {
+                // Strict EmpID Check (Prioritized)
+                if (facEmpId) {
+                    if (item.facultyEmpId) {
+                        return item.facultyEmpId === facEmpId || item.faculty2EmpId === facEmpId;
+                    }
+                    if (item.faculty2EmpId) {
+                        return item.faculty2EmpId === facEmpId;
+                    }
+                }
+                // Fallback Name Check
+                return item.faculty === facName || item.faculty2 === facName;
+            };
+
+            // Get EmpIDs for new booking (need to look them up from state if not passed directly, but checkConflict receives full object or we need to look it up)
+            // The `newBooking` passed to checkConflict usually comes from `formData` which has names. 
+            // We need to look up EmpIDs from the `faculty` state array.
+
+            const getEmpId = (name) => faculty.find(f => f.name === name)?.empId;
+            const newF1EmpId = getEmpId(newBooking.faculty);
+            const newF2EmpId = getEmpId(newBooking.faculty2);
+
+            if (newBooking.faculty && checkFacultyBusy(newBooking.faculty, newF1EmpId)) {
                 return `Conflict! Faculty "${newBooking.faculty}" is already teaching "${item.subject}" in ${item.room}.`;
             }
-            // Check if New Faculty 2 is busy
-            if (newBooking.faculty2 && (item.faculty === newBooking.faculty2 || item.faculty2 === newBooking.faculty2)) {
+
+            if (newBooking.faculty2 && checkFacultyBusy(newBooking.faculty2, newF2EmpId)) {
                 return `Conflict! Faculty "${newBooking.faculty2}" is already teaching "${item.subject}" in ${item.room}.`;
             }
 

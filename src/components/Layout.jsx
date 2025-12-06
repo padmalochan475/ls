@@ -11,9 +11,12 @@ import {
     Menu,
     X,
     LogOut,
-    FlaskConical
+    FlaskConical,
+    Download
 } from 'lucide-react';
 import '../styles/design-system.css';
+
+// Layout Component wrapping the application
 
 const Layout = ({ children }) => {
     const location = useLocation();
@@ -34,6 +37,28 @@ const Layout = ({ children }) => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // PWA Install Prompt
+    const [installPrompt, setInstallPrompt] = useState(null);
+
+    useEffect(() => {
+        const handler = (e) => {
+            e.preventDefault();
+            setInstallPrompt(e);
+        };
+        window.addEventListener('beforeinstallprompt', handler);
+        return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    const handleInstallClick = async () => {
+        if (!installPrompt) return;
+        installPrompt.prompt();
+        const { outcome } = await installPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setInstallPrompt(null);
+        }
+    };
+
 
     const isAdmin = userProfile && userProfile.role === 'admin';
 
@@ -197,6 +222,31 @@ const Layout = ({ children }) => {
                             <span style={{ marginRight: (isSidebarOpen || isMobile) ? 'var(--space-md)' : 0, display: 'flex' }}><Shield size={20} /></span>
                             {(isSidebarOpen || isMobile) && <span style={{ fontWeight: 500 }}>Admin Panel</span>}
                         </Link>
+                    )}
+                    {/* Install App Button (Visible only if installable) */}
+                    {installPrompt && (
+                        <button
+                            onClick={handleInstallClick}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: 'var(--space-sm) var(--space-md)',
+                                borderRadius: 'var(--radius-md)',
+                                textDecoration: 'none',
+                                color: '#4ade80', // Success Green
+                                background: 'rgba(74, 222, 128, 0.1)',
+                                border: '1px solid rgba(74, 222, 128, 0.2)',
+                                transition: 'all 0.2s ease',
+                                justifyContent: (isSidebarOpen || isMobile) ? 'flex-start' : 'center',
+                                marginTop: 'var(--space-sm)',
+                                cursor: 'pointer',
+                                width: '100%',
+                                flexShrink: 0
+                            }}
+                        >
+                            <span style={{ marginRight: (isSidebarOpen || isMobile) ? 'var(--space-md)' : 0, display: 'flex' }}><Download size={20} /></span>
+                            {(isSidebarOpen || isMobile) && <span style={{ fontWeight: 600 }}>Install App</span>}
+                        </button>
                     )}
                 </nav>
 

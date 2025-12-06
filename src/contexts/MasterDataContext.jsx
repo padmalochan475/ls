@@ -39,8 +39,10 @@ export const MasterDataProvider = ({ children }) => {
         const unsubscribes = [];
 
         // Helper to create listener
-        const subscribe = (colName, setter, sortFn) => {
+        const subscribe = (colName, setter, sortFn, onLoaded) => {
             const q = query(collection(db, colName));
+            let initialLoadDone = false;
+
             const unsub = onSnapshot(q, (snapshot) => {
                 const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (sortFn) {
@@ -50,24 +52,42 @@ export const MasterDataProvider = ({ children }) => {
                     items.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
                 }
                 setter(items);
+
+                if (!initialLoadDone && onLoaded) {
+                    initialLoadDone = true;
+                    onLoaded();
+                }
             }, (error) => {
                 console.error(`Error fetching ${colName}:`, error);
+                // Even on error, we should count it as "done" so the app doesn't hang
+                if (!initialLoadDone && onLoaded) {
+                    initialLoadDone = true;
+                    onLoaded();
+                }
             });
             unsubscribes.push(unsub);
         };
 
         setLoading(true);
 
-        subscribe('departments', setDepartments);
-        subscribe('semesters', setSemesters, (a, b) => (a.number || 0) - (b.number || 0)); // Sort by semester number
-        subscribe('subjects', setSubjects);
-        subscribe('faculty', setFaculty);
-        subscribe('rooms', setRooms);
-        subscribe('days', setDays, (a, b) => (a.order || 0) - (b.order || 0));
-        subscribe('timeslots', setTimeSlots, (a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
-        subscribe('groups', setGroups);
+        const totalCollections = 8;
+        let loadedCount = 0;
 
-        setLoading(false);
+        const checkLoading = () => {
+            loadedCount++;
+            if (loadedCount === totalCollections) {
+                setLoading(false);
+            }
+        };
+
+        subscribe('departments', setDepartments, null, checkLoading);
+        subscribe('semesters', setSemesters, (a, b) => (a.number || 0) - (b.number || 0), checkLoading);
+        subscribe('subjects', setSubjects, null, checkLoading);
+        subscribe('faculty', setFaculty, null, checkLoading);
+        subscribe('rooms', setRooms, null, checkLoading);
+        subscribe('days', setDays, (a, b) => (a.order || 0) - (b.order || 0), checkLoading);
+        subscribe('timeslots', setTimeSlots, (a, b) => (a.startTime || '').localeCompare(b.startTime || ''), checkLoading);
+        subscribe('groups', setGroups, null, checkLoading);
 
         return () => {
             unsubscribes.forEach(unsub => unsub());

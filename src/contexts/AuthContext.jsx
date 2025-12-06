@@ -157,6 +157,7 @@ export const AuthProvider = ({ children }) => {
         let unsubscribeProfile = () => { };
 
         if (currentUser) {
+            setLoading(true);
             const docRef = doc(db, 'users', currentUser.uid);
             unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {

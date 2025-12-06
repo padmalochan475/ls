@@ -1115,7 +1115,6 @@ const MasterData = ({ initialTab }) => {
                                     onChange={async (e) => {
                                         try {
                                             await updateDoc(doc(db, 'settings', 'config'), { activeAcademicYear: e.target.value });
-                                            fetchData();
                                         } catch (err) {
                                             console.error(err);
                                             alert('Failed to update active year');
