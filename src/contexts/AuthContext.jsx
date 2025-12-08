@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
         const isFirstUser = usersSnapshot.empty;
 
         // Create user profile in Firestore
-        await setDoc(doc(db, 'users', user.uid), {
+        const userProfileData = {
             empId,
             name,
             email: recoveryEmail, // Store real email for recovery
@@ -72,7 +72,13 @@ export const AuthProvider = ({ children }) => {
             role: isFirstUser ? 'admin' : 'user', // First user is Admin
             status: isFirstUser ? 'approved' : 'pending', // First user is Approved
             createdAt: new Date().toISOString()
-        });
+        };
+
+        await setDoc(doc(db, 'users', user.uid), userProfileData);
+
+        // Create Secure Lookup Entry (EmpID -> Email)
+        // This allows unauthenticated users (Login/Forgot Password) to lookup email securely
+        await setDoc(doc(db, 'emp_lookups', empId), { email: recoveryEmail });
 
         // Create Secure Lookup Entry (for Login)
         if (empId) {

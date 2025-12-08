@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
 import emailjs from '@emailjs/browser';
@@ -137,26 +137,26 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Step 1: Verify Emp ID and get Email
-      const q = query(collection(db, 'users'), where('empId', '==', resetEmpId));
-      const querySnapshot = await getDocs(q);
+      // Step 1: Verify Emp ID and get Email (SECURE LOOKUP)
+      // Use emp_lookups because unauthenticated users cannot query the full 'users' collection.
+      const lookupDoc = await getDoc(doc(db, 'emp_lookups', resetEmpId));
 
-      if (querySnapshot.empty) {
-        setError('Employee ID not found.');
+      if (!lookupDoc.exists()) {
+        setError('Employee ID not found. Please contact Admin.');
         setIsLoading(false);
         return;
       }
 
-      const userData = querySnapshot.docs[0].data();
-      if (!userData.email) {
-        setError('No recovery email found for this user. Contact Admin.');
+      const email = lookupDoc.data().email;
+      if (!email) {
+        setError('No recovery email linked. Contact Admin.');
         setIsLoading(false);
         return;
       }
 
       // Step 2: Send Firebase Password Reset Email
-      await resetPassword(userData.email);
-      setStatusMessage(`Password reset link sent to ${userData.email}. Please check your inbox.`);
+      await resetPassword(email);
+      setStatusMessage(`Password reset link sent to ${email}. Please check your inbox.`);
 
       // Clear form after success
       setResetEmpId('');
