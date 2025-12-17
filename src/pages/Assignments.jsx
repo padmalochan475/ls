@@ -1018,7 +1018,7 @@ const Assignments = () => {
                                 <div className="form-group"><label>Dept</label><Select options={departments} value={selectedDept} onChange={setSelectedDept} placeholder="Dept" /></div>
                                 <div className="form-group"><label>Sem</label><Select options={semesters} value={selectedSem} onChange={setSelectedSem} placeholder="Sem" /></div>
                                 <div className="form-group"><label>Group</label><Select options={rawGroups.map(g => ({ value: g.name, label: g.name }))} value={selectedMainGroup} onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }} placeholder="Group" /></div>
-                                <div className="form-group"><label>Sub-Grp</label><Select options={availableSubGroups} value={selectedSubGroup} onChange={setSelectedSubGroup} placeholder={selectedMainGroup && availableSubGroups.length === 0 ? "No Sub-Groups (Whole Class)" : "All"} disabled={!selectedMainGroup || availableSubGroups.length === 0} /></div>
+                                <div className="form-group"><label>Sub-Grp</label><Select options={availableSubGroups} value={selectedSubGroup} onChange={setSelectedSubGroup} placeholder="All" disabled={!selectedMainGroup || availableSubGroups.length === 0} /></div>
                             </div>
 
                             {/* Row 3: Faculty */}
@@ -1334,13 +1334,20 @@ const Assignments = () => {
                      padding: 1rem 1.5rem;
                      background: rgba(15, 23, 42, 0.3);
                      border-bottom: 1px solid rgba(255,255,255,0.05);
-                     display: grid;
-                     gap: 10px;
-                     /* Responsive grid for filters */
-                     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                     display: flex; /* Changed from grid to flex for better control */
+                     gap: 1.5rem;   /* Increased gap for positive spacing */
+                     align-items: center;
+                     flex-wrap: nowrap; /* Keep on one line if possible */
+                     overflow-x: auto; /* Allow scroll on very small screens */
+                }
+                
+                .filters-bar > div {
+                    flex: 1; /* Make each filter take equal available space */
+                    min-width: 150px; /* But don't shrink too much */
                 }
 
                 .table-content {
+
                     overflow-x: auto;
                     width: 100%;
                 }
