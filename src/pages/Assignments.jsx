@@ -1281,9 +1281,52 @@ const Assignments = () => {
                 }
 
                 .table-header-row {
-                    padding: 1.5rem 1.5rem 0.5rem 1.5rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 1.5rem;
                     border-bottom: 1px solid rgba(255,255,255,0.05);
                     background: rgba(30, 41, 59, 0.4);
+                    flex-wrap: wrap; /* Allow wrapping on small screens */
+                    gap: 1rem;
+                }
+
+                .search-wrapper {
+                   position: relative;
+                   display: flex;
+                   align-items: center;
+                   width: 300px;
+                   max-width: 100%;
+                }
+
+                .search-input {
+                   width: 100%;
+                   padding: 10px 10px 10px 38px;
+                   background: rgba(0,0,0,0.2) !important;
+                   border: 1px solid rgba(255,255,255,0.05) !important;
+                   border-radius: 99px !important;
+                   font-size: 0.9rem;
+                }
+                .search-input:focus {
+                   background: rgba(0,0,0,0.4) !important;
+                   border-color: rgba(255,255,255,0.1) !important;
+                   box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+                }
+
+                .search-icon {
+                    position: absolute;
+                    left: 12px;
+                    color: #94a3b8;
+                    pointer-events: none;
+                }
+
+                .count-badge {
+                    background: rgba(255,255,255,0.1);
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 0.8rem;
+                    color: #94a3b8;
+                    margin-left: 8px;
                 }
 
                 .filters-bar {
