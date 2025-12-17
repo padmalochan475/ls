@@ -1221,7 +1221,7 @@ const Assignments = () => {
                     margin-left: 2px;
                 }
 
-                /* Unified Action Bar */
+                /* Unified Action Bar Alignment */
                 .action-bar-unified {
                     display: flex;
                     justify-content: space-between;
@@ -1229,7 +1229,7 @@ const Assignments = () => {
                     margin-top: 1.5rem;
                     padding-top: 1rem;
                     border-top: 1px solid rgba(255,255,255,0.05);
-                    gap: 1rem;
+                    gap: 1.5rem; /* Increased gap for better separation */
                 }
 
                 .feedback-zone {
@@ -1237,7 +1237,18 @@ const Assignments = () => {
                     display: flex;
                     align-items: center;
                     min-height: 40px; 
+                    /* Ensure it takes space even if empty to align buttons */
                 }
+
+                .assignments-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2rem;
+                    width: 100%;
+                    max-width: 1200px; /* Increased max-width for widescreen */
+                    margin: 0 auto;
+                }
+
 
                 .mini-alert {
                     display: flex;
@@ -1456,8 +1467,7 @@ const Assignments = () => {
                     color: #e2e8f0;
                 }
 
-                /* Tab Switcher */
-                .tab-switcher {
+                /* Tab Switcher Removed */
                     display: flex;
                     background: rgba(255,255,255,0.05);
                     padding: 4px;
@@ -1965,6 +1975,45 @@ const Assignments = () => {
                     .assignments-table th, .assignments-table td {
                         padding: 0.75rem 0.5rem;
                     }
+                }
+                /* Global Responsiveness Fixes */
+                @media (max-width: 1024px) {
+                    .assignments-container {
+                        padding: 1rem;
+                    }
+                    .filters-bar {
+                        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                    }
+                }
+
+                @media (max-width: 768px) {
+                     .form-grid-compact > div {
+                        flex-direction: column;
+                        gap: 10px;
+                     }
+                     .action-bar-unified {
+                        flex-direction: column;
+                        align-items: stretch;
+                        gap: 1rem;
+                     }
+                     .button-group-compact {
+                        justify-content: stretch;
+                     }
+                     .button-group-compact button {
+                        flex: 1;
+                        justify-content: center;
+                     }
+                     .feedback-zone {
+                        width: 100%;
+                     }
+                     .panel-header {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 10px;
+                     }
+                     .status-pill {
+                        align-self: flex-start;
+                     }
                 }
             `}</style>
         </div >
