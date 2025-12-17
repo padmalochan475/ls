@@ -568,14 +568,12 @@ const Assignments = () => {
     const [saving, setSaving] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
 
+
+
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [manageModalTab, setManageModalTab] = useState('faculty');
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState('create'); // 'create' or 'history'
 
-    useEffect(() => {
-        if (!isAdmin) setActiveTab('history');
-    }, [isAdmin]);
 
 
     const openManageModal = (tab = 'faculty') => {
@@ -972,28 +970,12 @@ const Assignments = () => {
                 isDangerous={true}
                 confirmText="Delete Permanently"
             />
-            {/* Header with Tabs */}
+            {/* Header */}
             <div className="assignments-header">
                 <div>
                     <h2 className="page-title">Assignments <span className="academic-year-badge">({activeAcademicYear})</span></h2>
+                    <p className="page-subtitle">Manage class schedules and faculty assignments</p>
                 </div>
-
-                {isAdmin && (
-                    <div className="tab-switcher">
-                        <button
-                            className={`tab-btn ${activeTab === 'create' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('create')}
-                        >
-                            <Keyboard size={16} /> Create
-                        </button>
-                        <button
-                            className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('history')}
-                        >
-                            <List size={16} /> History
-                        </button>
-                    </div>
-                )}
 
                 {isAdmin && (
                     <button
@@ -1005,17 +987,22 @@ const Assignments = () => {
                 )}
             </div>
 
-            {/* Main Content (Tabs) */}
+            {/* Main Content (Stacked) */}
             <div className="assignments-content">
 
-                {/* Left Column: Form (Create Tab) */}
-                {isAdmin && activeTab === 'create' && (
-                    <div className="glass-panel form-panel animate-fade-in">
+                {/* Section: Create Assignment (Admin Only) */}
+                {isAdmin && (
+                    <div className="glass-panel form-panel animate-slide-up">
+                        <div className="panel-header">
+                            <div className="panel-icon-wrapper"><Keyboard size={20} color="#60a5fa" /></div>
+                            <h3 className="panel-title">Create New Assignment</h3>
+                        </div>
+
                         {/* Section 1: Schedule */}
                         <div className="form-section">
-                            <h3 className="section-title" style={{ color: '#60a5fa' }}>
-                                <Clock size={16} /> Schedule
-                            </h3>
+                            <h4 className="section-title" style={{ color: '#60a5fa' }}>
+                                <Clock size={16} /> Time & Schedule
+                            </h4>
                             <div className="form-grid-2">
                                 <div className="form-group">
                                     <label>Day</label>
@@ -1086,47 +1073,47 @@ const Assignments = () => {
                             </button>
                         </div>
                     </div>
-
                 )}
 
-                {/* Right Column: Table (History Tab) */}
-                {(activeTab === 'history' || !isAdmin) && (
-                    <div className="glass-panel table-panel animate-fade-in">
-                        <div className="table-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 className="table-title">Assignments <span className="count-badge">{filteredAssignments.length}</span></h3>
-                                <div className="search-wrapper">
-                                    <Search size={16} className="search-icon" />
-                                    <input type="text" placeholder="Search..." className="glass-input search-input" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                                </div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-                                <MultiSelectDropdown options={departments} selected={filterDepts} onChange={setFilterDepts} label="Filter Dept" icon={BookOpen} />
-                                <MultiSelectDropdown options={semesters} selected={filterSems} onChange={setFilterSems} label="Filter Sem" icon={Layers} />
-                                <MultiSelectDropdown options={rawGroups.map(g => g.name)} selected={filterGroups} onChange={setFilterGroups} label="Filter Group" icon={Users} />
-                                <MultiSelectDropdown options={subjects.map(s => s.name)} selected={filterSubjects} onChange={setFilterSubjects} label="Filter Subject" icon={BookOpen} />
-                            </div>
+                {/* Section: Assignment History */}
+                <div className="glass-panel table-panel animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                    <div className="table-header-row">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div className="panel-icon-wrapper secondary"><List size={20} color="#a78bfa" /></div>
+                            <h3 className="panel-title">Assignment History <span className="count-badge">{filteredAssignments.length}</span></h3>
                         </div>
-
-                        <div className="table-content">
-                            <table className="assignments-table">
-                                <thead><tr><th>Time</th><th>Subject</th><th>Faculty</th><th>Room</th><th>Group</th><th className="actions-col"></th></tr></thead>
-                                <tbody>
-                                    {filteredAssignments.length > 0 ? filteredAssignments.map((assignment) => (
-                                        <tr key={assignment.id} className="table-row-hover">
-                                            <td><div className="cell-primary">{assignment.day}</div><div className="cell-secondary"><Clock size={12} /> {assignment.time}</div></td>
-                                            <td><div className="cell-primary" title={assignment.subject}>{assignment.subject}</div>{(() => { const sub = subjects.find(s => s.name === assignment.subject); return sub && sub.shortCode ? (<div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>{sub.shortCode}</div>) : null; })()}</td>
-                                            <td><div className="faculty-list"><div className="badge badge-blue"><User size={12} /><span>{assignment.faculty}</span></div>{assignment.faculty2 && (<div className="badge badge-purple"><User size={12} /><span>{assignment.faculty2}</span></div>)}</div></td>
-                                            <td><div className="badge badge-pink"><MapPin size={12} /><span>{assignment.room}</span></div></td>
-                                            <td><div className="badge badge-green"><Users size={12} /><span>{assignment.dept}-{assignment.section}{assignment.group ? `-${assignment.group}` : ''}</span></div></td>
-                                            <td className="actions-col">{assignment.id && canDelete(assignment) && (<button onClick={(e) => handleDelete(e, assignment)} className="icon-btn-danger" title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete"} disabled={deletingIds.has(assignment.id)} style={deletingIds.has(assignment.id) ? { opacity: 0.7, cursor: 'wait' } : {}}>{deletingIds.has(assignment.id) ? (<RefreshCw size={16} className="spin" />) : (<Trash2 size={16} />)}</button>)}</td>
-                                        </tr>
-                                    )) : (<tr><td colSpan="6" className="empty-state"><div className="empty-content"><div className="empty-icon"><Search size={24} /></div><div>No assignments found</div></div></td></tr>)}
-                                </tbody>
-                            </table>
+                        <div className="search-wrapper">
+                            <Search size={16} className="search-icon" />
+                            <input type="text" placeholder="Search assignments..." className="glass-input search-input" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                         </div>
                     </div>
-                )}
+
+                    <div className="filters-bar">
+                        <MultiSelectDropdown options={departments} selected={filterDepts} onChange={setFilterDepts} label="Dept" icon={BookOpen} />
+                        <MultiSelectDropdown options={semesters} selected={filterSems} onChange={setFilterSems} label="Sem" icon={Layers} />
+                        <MultiSelectDropdown options={rawGroups.map(g => g.name)} selected={filterGroups} onChange={setFilterGroups} label="Group" icon={Users} />
+                        <MultiSelectDropdown options={subjects.map(s => s.name)} selected={filterSubjects} onChange={setFilterSubjects} label="Subject" icon={BookOpen} />
+                    </div>
+
+                    <div className="table-content">
+                        <table className="assignments-table">
+                            <thead><tr><th>Time</th><th>Subject</th><th>Faculty</th><th>Room</th><th>Group</th><th className="actions-col"></th></tr></thead>
+                            <tbody>
+                                {filteredAssignments.length > 0 ? filteredAssignments.map((assignment) => (
+                                    <tr key={assignment.id} className="table-row-hover">
+                                        <td><div className="cell-primary">{assignment.day}</div><div className="cell-secondary"><Clock size={12} /> {assignment.time}</div></td>
+                                        <td><div className="cell-primary" title={assignment.subject}>{assignment.subject}</div>{(() => { const sub = subjects.find(s => s.name === assignment.subject); return sub && sub.shortCode ? (<div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>{sub.shortCode}</div>) : null; })()}</td>
+                                        <td><div className="faculty-list"><div className="badge badge-blue"><User size={12} /><span>{assignment.faculty}</span></div>{assignment.faculty2 && (<div className="badge badge-purple"><User size={12} /><span>{assignment.faculty2}</span></div>)}</div></td>
+                                        <td><div className="badge badge-pink"><MapPin size={12} /><span>{assignment.room}</span></div></td>
+                                        <td><div className="badge badge-green"><Users size={12} /><span>{assignment.dept}-{assignment.section}{assignment.group ? `-${assignment.group}` : ''}</span></div></td>
+                                        <td className="actions-col">{assignment.id && canDelete(assignment) && (<button onClick={(e) => handleDelete(e, assignment)} className="icon-btn-danger" title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete"} disabled={deletingIds.has(assignment.id)} style={deletingIds.has(assignment.id) ? { opacity: 0.7, cursor: 'wait' } : {}}>{deletingIds.has(assignment.id) ? (<RefreshCw size={16} className="spin" />) : (<Trash2 size={16} />)}</button>)}</td>
+                                    </tr>
+                                )) : (<tr><td colSpan="6" className="empty-state"><div className="empty-content"><div className="empty-icon"><Search size={24} /></div><div>No assignments found</div></div></td></tr>)}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
 
             {/* Manage Data Modal */}
@@ -1137,11 +1124,95 @@ const Assignments = () => {
                 .assignments-container {
                     display: flex;
                     flex-direction: column;
-                    height: calc(100vh - 80px);
-                    gap: 1rem;
-                    overflow: hidden;
-                    padding: 0.5rem;
+                    min-height: 100vh;
+                    gap: 1.5rem;
+                    padding: 1rem 2rem 3rem 2rem;
                     color: #fff;
+                    overflow-y: auto; /* Allow full page scroll */
+                    height: auto;
+                }
+
+                .page-subtitle {
+                    color: #94a3b8;
+                    font-size: 0.9rem;
+                    margin-top: 4px;
+                }
+
+                .assignments-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2rem;
+                    width: 100%;
+                    max-width: 1000px;
+                    margin: 0 auto;
+                }
+
+                /* Panel Styling */
+                .glass-panel {
+                    background: rgba(30, 41, 59, 0.7);
+                    backdrop-filter: blur(20px);
+                    border: 1px solid rgba(255,255,255,0.08);
+                    border-radius: 20px;
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+                    padding: 1.5rem;
+                    overflow: visible; /* Prevent clipping */
+                }
+
+                .form-panel {
+                    border-top: 4px solid #60a5fa;
+                }
+
+                .table-panel {
+                    border-top: 4px solid #a78bfa;
+                }
+
+                .panel-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    margin-bottom: 2rem;
+                    padding-bottom: 1rem;
+                    border-bottom: 1px solid rgba(255,255,255,0.05);
+                }
+
+                .panel-icon-wrapper {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 12px;
+                    background: rgba(96, 165, 250, 0.1);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .panel-icon-wrapper.secondary {
+                    background: rgba(167, 139, 250, 0.1);
+                }
+
+                .panel-title {
+                    font-size: 1.25rem;
+                    font-weight: 700;
+                    color: white;
+                    margin: 0;
+                }
+
+                .table-header-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                    margin-bottom: 1.5rem;
+                }
+
+                .filters-bar {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                    gap: 12px;
+                    margin-bottom: 1.5rem;
+                    background: rgba(0,0,0,0.2);
+                    padding: 12px;
+                    border-radius: 12px;
                 }
 
                 .assignments-header {
