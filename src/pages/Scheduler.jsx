@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
-import { collection, getDocs, addDoc, query, where, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, query, where, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
+import { analyzeSchedule } from '../utils/conflictDetection';
 import '../styles/design-system.css';
 import ConfirmModal from '../components/ConfirmModal';
-import { ChevronDown, Check, LayoutGrid, List, Zap, Printer, Filter, Users, BookOpen, FlaskConical, Layers, X, RefreshCw } from 'lucide-react';
+import { ChevronDown, Check, LayoutGrid, List, Zap, Filter, Users, BookOpen, FlaskConical, Layers, X, RefreshCw } from 'lucide-react';
 
 const MultiSelectDropdown = ({ options, selected, onChange, label, icon: Icon }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -499,106 +500,6 @@ const Scheduler = () => {
     const filteredSchedule = getFilteredSchedule();
 
     // Enhanced Conflict Detection Logic
-    const checkConflict = (newBooking, ignoreId = null) => {
-        if (!schedule || !Array.isArray(schedule)) return null;
-
-        // Filter out the current booking if we are editing
-        const otherBookings = ignoreId
-            ? schedule.filter(item => item.id !== ignoreId)
-            : schedule;
-
-        const checkTimeOverlap = (t1, t2) => {
-            if (t1 === t2) return true;
-            try {
-                // Normalize and parse times
-                const parse = (t) => {
-                    const parts = t.replace(/\s+/g, ' ').split(' - ');
-                    if (parts.length !== 2) throw new Error("Invalid format");
-                    const base = '2000/01/01 ';
-                    let sTime = new Date(base + parts[0]).getTime();
-                    let eTime = new Date(base + parts[1]).getTime();
-                    if (eTime < sTime) {
-                        eTime += 24 * 60 * 60 * 1000;
-                    }
-                    return { start: sTime, end: eTime };
-                };
-                const a = parse(t1);
-                const b = parse(t2);
-                return a.start < b.end && a.end > b.start;
-            } catch (e) {
-                return t1 === t2;
-            }
-        };
-
-        // Filter for conflicting day/time
-        const sameSlotBookings = otherBookings.filter(item =>
-            item.day === newBooking.day && checkTimeOverlap(item.time, newBooking.time)
-        );
-
-        if (sameSlotBookings.length === 0) return null;
-
-        for (const item of sameSlotBookings) {
-            // 1. Room Conflict
-            if (item.room === newBooking.room) {
-                return `Conflict! Room "${newBooking.room}" is already booked for "${item.subject}" (${item.dept}-${item.section}).`;
-            }
-
-            // 2. Faculty Conflict
-            // Check if New Faculty 1 is busy
-            const checkFacultyBusy = (facName, facEmpId) => {
-                // Strict EmpID Check (Prioritized)
-                if (facEmpId) {
-                    if (item.facultyEmpId) {
-                        return item.facultyEmpId === facEmpId || item.faculty2EmpId === facEmpId;
-                    }
-                    if (item.faculty2EmpId) {
-                        return item.faculty2EmpId === facEmpId;
-                    }
-                }
-                // Fallback Name Check
-                return item.faculty === facName || item.faculty2 === facName;
-            };
-
-            // Get EmpIDs for new booking (need to look them up from state if not passed directly, but checkConflict receives full object or we need to look it up)
-            // The `newBooking` passed to checkConflict usually comes from `formData` which has names. 
-            // We need to look up EmpIDs from the `faculty` state array.
-
-            const getEmpId = (name) => faculty.find(f => f.name === name)?.empId;
-            const newF1EmpId = getEmpId(newBooking.faculty);
-            const newF2EmpId = getEmpId(newBooking.faculty2);
-
-            if (newBooking.faculty && checkFacultyBusy(newBooking.faculty, newF1EmpId)) {
-                return `Conflict! Faculty "${newBooking.faculty}" is already teaching "${item.subject}" in ${item.room}.`;
-            }
-
-            if (newBooking.faculty2 && checkFacultyBusy(newBooking.faculty2, newF2EmpId)) {
-                return `Conflict! Faculty "${newBooking.faculty2}" is already teaching "${item.subject}" in ${item.room}.`;
-            }
-
-            // 3. Student Group Conflict
-            // Must be same Department and Semester to conflict (usually)
-            if (item.dept === newBooking.dept && item.sem === newBooking.sem) {
-                // Check Section/Group overlap
-                if (item.section === newBooking.section || item.section === 'All' || newBooking.section === 'All') {
-                    // If either is for the whole section (no group or "All"), they conflict
-                    const itemIsWholeSection = !item.group || item.group === 'All';
-                    const newIsWholeSection = !newBooking.group || newBooking.group === 'All';
-
-                    if (itemIsWholeSection || newIsWholeSection) {
-                        return `Conflict! Student Group "${newBooking.dept} ${newBooking.sem} ${newBooking.section}" is already booked for "${item.subject}".`;
-                    }
-
-                    // If both have specific groups, check if they match
-                    if (item.group === newBooking.group) {
-                        return `Conflict! Student Group "${newBooking.dept} ${newBooking.sem} ${newBooking.section}-${newBooking.group}" is already booked for "${item.subject}".`;
-                    }
-                }
-            }
-        }
-
-        return null;
-    };
-
     const handleSave = async (e, overrideData = null) => {
         if (e) e.preventDefault();
         setError('');
@@ -627,25 +528,35 @@ const Scheduler = () => {
             return;
         }
 
+        // Lookup Faculty EmpIDs for robust linking
+        const faculty1Obj = faculty.find(f => f.name === dataToSave.faculty);
+        const faculty2Obj = dataToSave.faculty2 ? faculty.find(f => f.name === dataToSave.faculty2) : null;
+
+        const finalData = {
+            ...dataToSave,
+            facultyEmpId: faculty1Obj ? faculty1Obj.empId : null,
+            faculty2EmpId: faculty2Obj ? faculty2Obj.empId : null,
+            academicYear: activeAcademicYear
+        };
+
         try {
-            // Check for conflicts
-            const conflictError = checkConflict(dataToSave, editingId);
-            if (conflictError) {
-                setError(conflictError);
-                if (overrideData) alert(conflictError);
+            // AI Analysis (Conflict Detection & Optimization)
+            const analysis = analyzeSchedule(finalData, schedule, {
+                ignoreId: editingId,
+                roomsCount: rooms.length
+            });
+
+            if (analysis.status === 'error') {
+                setError(analysis.message);
+                if (overrideData) alert(analysis.message);
                 return; // Block saving
             }
 
-            // Lookup Faculty EmpIDs for robust linking
-            const faculty1Obj = faculty.find(f => f.name === dataToSave.faculty);
-            const faculty2Obj = dataToSave.faculty2 ? faculty.find(f => f.name === dataToSave.faculty2) : null;
-
-            const finalData = {
-                ...dataToSave,
-                facultyEmpId: faculty1Obj ? faculty1Obj.empId : null,
-                faculty2EmpId: faculty2Obj ? faculty2Obj.empId : null,
-                academicYear: activeAcademicYear
-            };
+            // Show Warnings (Soft Conflicts)
+            if (analysis.status === 'warning') {
+                const confirmed = window.confirm(`Warning: ${analysis.message}\n\nDo you want to proceed anyway?`);
+                if (!confirmed) return;
+            }
 
             if (editingId) {
                 await updateDoc(doc(db, 'schedule', editingId), finalData);
@@ -761,9 +672,15 @@ const Scheduler = () => {
         return s && s.shortCode ? s.shortCode : name;
     };
 
-    const handlePrint = () => {
-        window.print();
-    };
+
+
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)' }}>
+                <RefreshCw className="spin" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', height: '100%' }}>

@@ -401,6 +401,40 @@ const Dashboard = () => {
                 ))}
             </div>
 
+            {/* AI Daily Insights */}
+            {todaySchedule.length > 0 && dashboardView === 'personal' && (
+                <div className="glass-panel" style={{
+                    padding: '1.5rem',
+                    background: 'linear-gradient(to right, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.05))',
+                    border: '1px solid rgba(139, 92, 246, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem'
+                }}>
+                    <div style={{
+                        padding: '0.75rem',
+                        background: 'rgba(139, 92, 246, 0.2)',
+                        borderRadius: '50%',
+                        color: '#a78bfa'
+                    }}>
+                        <Zap size={24} />
+                    </div>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#e2e8f0' }}>Daily Insight</h3>
+                        <p style={{ margin: '0.25rem 0 0 0', color: 'var(--color-text-muted)', fontSize: '0.95rem' }}>
+                            {(() => {
+                                const count = todaySchedule.length;
+                                const uniqueRooms = new Set(todaySchedule.map(i => i.room)).size;
+                                const isHeavy = count > 3;
+
+                                if (isHeavy) return `You have a packed day with ${count} classes across ${uniqueRooms} different rooms. Stay hydrated!`;
+                                return `You have a balanced schedule with ${count} classes. Good day for research or grading.`;
+                            })()}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
 
                 {/* Up Next / Live Status Card (Faculty View Only) */}
@@ -420,17 +454,19 @@ const Dashboard = () => {
                             const now = new Date();
                             // Simple time parser for comparison
                             const parseTime = (t) => {
-                                if (!t) return new Date();
-                                // Handle "10:00 AM - 11:00 AM" or "10:00 - 11:00"
-                                const [rangeStart] = t.split(' - ');
-                                // Remove AM/PM if present to get raw HH:MM
+                                if (!t || typeof t !== 'string') return new Date();
+                                const parts = t.replace(/\s+/g, ' ').split(' - ');
+                                if (parts.length < 2) return new Date();
+
+                                const [rangeStart] = parts;
+                                if (!rangeStart) return new Date();
+
                                 const timeOnly = rangeStart.replace(/(AM|PM)/i, '').trim();
                                 const [hStr, mStr] = timeOnly.split(':');
 
-                                let h = parseInt(hStr);
-                                const m = parseInt(mStr);
+                                let h = parseInt(hStr || '0');
+                                const m = parseInt(mStr || '0');
 
-                                // Adjust for PM if needed (12 PM is 12, 1 PM is 13)
                                 const isPM = rangeStart.toUpperCase().includes('PM');
                                 const isAM = rangeStart.toUpperCase().includes('AM');
 
@@ -438,7 +474,7 @@ const Dashboard = () => {
                                 if (isAM && h === 12) h = 0;
 
                                 const d = new Date();
-                                d.setHours(h, m, 0);
+                                d.setHours(h, m, 0, 0);
                                 return d;
                             };
 
@@ -811,7 +847,7 @@ const Dashboard = () => {
                                             if (modifier === 'PM' && h < 12) h += 12;
                                             if (modifier === 'AM' && h === 12) h = 0;
                                             return h + (m / 60);
-                                        } catch (e) {
+                                        } catch {
                                             return 8;
                                         }
                                     };
@@ -829,7 +865,7 @@ const Dashboard = () => {
                                             };
 
                                             return getHours(endStr) - getHours(startStr);
-                                        } catch (e) {
+                                        } catch {
                                             return 1;
                                         }
                                     };

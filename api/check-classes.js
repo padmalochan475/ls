@@ -95,9 +95,10 @@ export default async function handler(request, response) {
             const uniqueTokens = [...new Set(tokens)];
 
             const message = {
-                notification: {
+                data: {
                     title: `Upcoming Class: ${cls.subject}`,
-                    body: `Class starts in 15 mins! Venue: ${cls.room}`
+                    body: `Class starts in 15 mins! Venue: ${cls.room}`,
+                    url: '/schedule' // For click handling
                 },
                 tokens: uniqueTokens
             };

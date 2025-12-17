@@ -3,7 +3,7 @@ import { db, messaging } from '../lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { getToken, onMessage } from 'firebase/messaging';
 import { useAuth } from './AuthContext';
-import { Bell } from 'lucide-react';
+
 import toast from 'react-hot-toast';
 
 const NotificationContext = createContext();
@@ -23,9 +23,12 @@ export const NotificationProvider = ({ children }) => {
     useEffect(() => {
         const initMessaging = async () => {
             if ('Notification' in window) {
-                setPermission(Notification.permission);
+                // Update local state if it differs from browser state
+                if (Notification.permission !== permission) {
+                    setPermission(Notification.permission);
+                }
 
-                if (Notification.permission === 'granted' && currentUser) {
+                if (Notification.permission === 'granted' && currentUser && messaging) {
                     try {
                         const token = await getToken(messaging, {
                             vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY
@@ -47,18 +50,25 @@ export const NotificationProvider = ({ children }) => {
         if (currentUser) {
             initMessaging();
         }
-    }, [currentUser]);
+    }, [currentUser, permission]);
 
     // Handle Foreground Messages
     useEffect(() => {
+        if (!messaging) return;
+
         onMessage(messaging, (payload) => {
             console.log('Message received. ', payload);
-            toast((t) => (
-                <div onClick={() => toast.dismiss(t.id)}>
-                    <p className="font-bold">{payload.notification.title}</p>
-                    <p className="text-sm">{payload.notification.body}</p>
-                </div>
-            ), { duration: 5000, icon: '🔔' });
+            const title = payload.notification?.title || payload.data?.title;
+            const body = payload.notification?.body || payload.data?.body;
+
+            if (title) {
+                toast((t) => (
+                    <div onClick={() => toast.dismiss(t.id)}>
+                        <p className="font-bold">{title}</p>
+                        <p className="text-sm">{body}</p>
+                    </div>
+                ), { duration: 5000, icon: '🔔' });
+            }
         });
     }, []);
 

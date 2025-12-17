@@ -160,7 +160,8 @@ export const analyzeSchedule = (booking, schedule, metadata = {}) => {
 
     // 2.1 Utilization Check
     const activeSlots = dailySchedule.filter(s => s.time === booking.time);
-    const utilization = Math.round(((activeSlots.length + 1) / roomsCount) * 100);
+    const effectiveRoomsCount = roomsCount > 0 ? roomsCount : 1;
+    const utilization = Math.round(((activeSlots.length + 1) / effectiveRoomsCount) * 100);
 
     if (utilization > 90) {
         warnings.push(`High traffic! ${utilization}% of rooms will be booked.`);

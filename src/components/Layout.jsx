@@ -12,8 +12,11 @@ import {
     X,
     LogOut,
     FlaskConical,
-    Download
+    Download,
+    Bell,
+    BellOff
 } from 'lucide-react';
+import { useNotifications } from '../contexts/NotificationContext';
 import '../styles/design-system.css';
 
 // Layout Component wrapping the application
@@ -24,6 +27,7 @@ const Layout = ({ children }) => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { userProfile, logout, activeAcademicYear, setSelectedAcademicYear, academicYears } = useAuth();
+    const { permission, requestPermission } = useNotifications();
 
     // Handle Window Resize
     useEffect(() => {
@@ -246,6 +250,32 @@ const Layout = ({ children }) => {
                         >
                             <span style={{ marginRight: (isSidebarOpen || isMobile) ? 'var(--space-md)' : 0, display: 'flex' }}><Download size={20} /></span>
                             {(isSidebarOpen || isMobile) && <span style={{ fontWeight: 600 }}>Install App</span>}
+                        </button>
+                    )}
+
+                    {/* Enable Notifications Button */}
+                    {permission === 'default' && (
+                        <button
+                            onClick={requestPermission}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: 'var(--space-sm) var(--space-md)',
+                                borderRadius: 'var(--radius-md)',
+                                textDecoration: 'none',
+                                color: '#f59e0b', // Amber/Warning color
+                                background: 'rgba(245, 158, 11, 0.1)',
+                                border: '1px solid rgba(245, 158, 11, 0.2)',
+                                transition: 'all 0.2s ease',
+                                justifyContent: (isSidebarOpen || isMobile) ? 'flex-start' : 'center',
+                                marginTop: 'var(--space-sm)',
+                                cursor: 'pointer',
+                                width: '100%',
+                                flexShrink: 0
+                            }}
+                        >
+                            <span style={{ marginRight: (isSidebarOpen || isMobile) ? 'var(--space-md)' : 0, display: 'flex' }}><Bell size={20} /></span>
+                            {(isSidebarOpen || isMobile) && <span style={{ fontWeight: 600 }}>Enable Alerts</span>}
                         </button>
                     )}
                 </nav>

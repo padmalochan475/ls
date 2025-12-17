@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import MasterData from './MasterData';
 import ConfirmModal from '../components/ConfirmModal';
+import { analyzeSchedule } from '../utils/conflictDetection';
 
 const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = false, style }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -562,7 +563,7 @@ const Assignments = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
-    const [lastSavedCount, setLastSavedCount] = useState(0);
+
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [manageModalTab, setManageModalTab] = useState('faculty');
     const [searchTerm, setSearchTerm] = useState('');
@@ -573,15 +574,7 @@ const Assignments = () => {
         setIsManageModalOpen(true);
     };
 
-    // Derived Group String
-    const getEffectiveGroup = useCallback(() => {
-        if (!selectedMainGroup) return '';
-        if (selectedMainGroup === 'All') return 'All';
-        if (selectedSubGroup && selectedSubGroup !== 'All') {
-            return `${selectedMainGroup}-${selectedSubGroup}`;
-        }
-        return selectedMainGroup;
-    }, [selectedMainGroup, selectedSubGroup]);
+
 
 
 
@@ -680,124 +673,52 @@ const Assignments = () => {
             const durationHours = (endTime - startTime) / (1000 * 60 * 60);
 
             return { start: startTime, end: endTime, duration: durationHours };
-        } catch (e) {
+        } catch {
             return null;
         }
     }, []);
 
-    // Conflict Logic
+    // Conflict Logic using AI Analyzer
     const checkConflict = useCallback(() => {
         if (!selectedDay || !selectedTime) return null;
 
-        const currentSlot = parseTimeSlot(selectedTime);
-        if (!currentSlot) return null;
+        // Resolve Entities for Analysis
+        const fac1 = faculty.find(f => f.id === selectedFaculty);
+        const fac2 = selectedFaculty2 ? faculty.find(f => f.id === selectedFaculty2) : null;
 
-        const checkTimeOverlap = (t1) => {
-            if (t1 === selectedTime) return true;
-            const otherSlot = parseTimeSlot(t1);
-            if (!otherSlot) return t1 === selectedTime; // Fallback
-            return currentSlot.start < otherSlot.end && currentSlot.end > otherSlot.start;
+        const candidate = {
+            day: selectedDay,
+            time: selectedTime,
+            dept: selectedDept,
+            sem: selectedSem,
+            section: selectedMainGroup,
+            group: selectedSubGroup,
+            subject: selectedSubject,
+            room: selectedRoom,
+            faculty: fac1 ? fac1.name : '',
+            facultyEmpId: fac1 ? fac1.empId : null,
+            faculty2: fac2 ? fac2.name : '',
+            faculty2EmpId: fac2 ? fac2.empId : null
         };
 
-        const effectiveGroup = getEffectiveGroup();
-
-        // 1. Student Conflict
-        const studentBusy = fullSchedule.find(s => {
-            if (s.day !== selectedDay) return false;
-            // Dept Check
-            if (s.dept !== selectedDept || s.sem !== selectedSem) return false;
-
-            // Time Check
-            if (!checkTimeOverlap(s.time)) return false;
-
-            // Section/Group Check
-            if (s.section !== selectedMainGroup && s.section !== 'All' && selectedMainGroup !== 'All') return false;
-
-            // Sub-Group Check
-            if (!s.group || s.group === 'All') return true;
-            if (!selectedSubGroup || selectedSubGroup === 'All') return true;
-            if (s.group === selectedSubGroup) return true;
-
-            return false;
+        const analysis = analyzeSchedule(candidate, fullSchedule, {
+            roomsCount: rooms.length
         });
-        if (studentBusy) return {
-            type: 'student',
-            message: `⚠️ Conflict: ${studentBusy.dept} ${selectedMainGroup}${selectedSubGroup ? `-${selectedSubGroup}` : ''} already has ${studentBusy.subject} in Room ${studentBusy.room}.`
-        };
 
-        // 2. Faculty Conflict
-        const checkFacultyBusy = (facId) => {
-            if (!facId) return null;
-            const facObj = faculty.find(f => f.id === facId);
-            if (!facObj) return null;
-
-            const { name, empId } = facObj;
-
-            return fullSchedule.find(s => {
-                if (s.day !== selectedDay) return false;
-                if (!checkTimeOverlap(s.time)) return false;
-
-                // 1. Strict EmpID Check (Prioritized)
-                // If both the candidate and the schedule entry have EmpIDs, rely on them.
-                if (empId) {
-                    if (s.facultyEmpId) {
-                        if (s.facultyEmpId === empId) return true; // Conflict
-                        if (s.faculty2EmpId === empId) return true; // Conflict
-                        // If IDs present but mismatch, it's NOT a conflict (even if names match)
-                        return false;
-                    }
-                    // If schedule has no facultyEmpId (old data), check faculty2
-                    if (s.faculty2EmpId && s.faculty2EmpId === empId) return true;
-                }
-
-                // 2. Fallback Name Check (If EmpIDs missing or old data)
-                if (s.faculty === name || s.faculty2 === name) return true;
-
-                return false;
-            });
-        };
-
-        const f1Busy = checkFacultyBusy(selectedFaculty);
-        if (f1Busy) {
-            const f1Name = faculty.find(f => f.id === selectedFaculty)?.name || selectedFaculty;
-            return {
-                type: 'faculty',
-                message: `⚠️ Conflict: ${f1Name} is teaching ${f1Busy.subject} (${f1Busy.dept}-${f1Busy.sem}) during this time.`
-            };
+        if (analysis.status === 'error') {
+            return { type: 'error', message: analysis.message };
         }
 
-        const f2Busy = checkFacultyBusy(selectedFaculty2);
-        if (f2Busy) {
-            const f2Name = faculty.find(f => f.id === selectedFaculty2)?.name || selectedFaculty2;
-            return {
-                type: 'faculty',
-                message: `⚠️ Conflict: ${f2Name} is teaching ${f2Busy.subject} (${f2Busy.dept}-${f2Busy.sem}) during this time.`
-            };
-        }
-
-        // 3. Room Conflict
-        if (selectedRoom) {
-            const roomBusy = fullSchedule.find(s => s.day === selectedDay && checkTimeOverlap(s.time) && s.room === selectedRoom);
-            if (roomBusy) return {
-                type: 'room',
-                message: `⚠️ Conflict: Room ${selectedRoom} is booked for ${roomBusy.subject} (${roomBusy.dept}-${roomBusy.sem}) during this time.`
-            };
-        }
-
-        // 4. Self-Conflict
-        if (selectedFaculty && selectedFaculty2) {
-            if (selectedFaculty === selectedFaculty2) {
-                return { type: 'faculty', message: `⚠️ Invalid: Cannot select the same faculty twice.` };
-            }
-            const f1Obj = faculty.find(f => f.id === selectedFaculty);
-            const f2Obj = faculty.find(f => f.id === selectedFaculty2);
-            if (f1Obj && f2Obj && f1Obj.empId && f2Obj.empId && f1Obj.empId === f2Obj.empId) {
-                return { type: 'faculty', message: `⚠️ Invalid: Selected faculty members have the same Employee ID (${f1Obj.empId}).` };
-            }
+        // We can expose warnings if needed, but for 'conflict' blocking, we focus on errors.
+        // Warnings (like soft limits) could be handled separately or allowed.
+        if (analysis.status === 'warning') {
+            // Optional: You could return specific warning types here if UI supports it.
+            // For now, we only block on hard conflicts.
+            // return { type: 'warning', message: analysis.message };
         }
 
         return null;
-    }, [fullSchedule, selectedDay, selectedTime, selectedDept, selectedSem, selectedMainGroup, selectedSubGroup, selectedFaculty, selectedFaculty2, selectedRoom, faculty, getEffectiveGroup, parseTimeSlot]);
+    }, [fullSchedule, selectedDay, selectedTime, selectedDept, selectedSem, selectedMainGroup, selectedSubGroup, selectedFaculty, selectedFaculty2, selectedRoom, selectedSubject, faculty, rooms]);
 
     const conflict = checkConflict();
 
@@ -883,7 +804,7 @@ const Assignments = () => {
         try {
             const facultyObj = faculty.find(f => f.id === selectedFaculty);
             const faculty2Obj = selectedFaculty2 ? faculty.find(f => f.id === selectedFaculty2) : null;
-            const effectiveGroup = getEffectiveGroup();
+
 
             await addDoc(collection(db, 'schedule'), {
                 academicYear: activeAcademicYear,
@@ -905,7 +826,7 @@ const Assignments = () => {
             });
 
             setSuccessMsg('Assignment Created!');
-            setLastSavedCount(prev => prev + 1);
+
 
             // Clear fields to prevent immediate self-conflict and prepare for next entry
             setSelectedTime('');
@@ -1013,7 +934,7 @@ const Assignments = () => {
                 const timeA = new Date('2000/01/01 ' + a.time.split(' - ')[0]).getTime();
                 const timeB = new Date('2000/01/01 ' + b.time.split(' - ')[0]).getTime();
                 return timeA - timeB;
-            } catch (e) {
+            } catch {
                 return 0;
             }
         });
@@ -1027,6 +948,11 @@ const Assignments = () => {
 
     return (
         <div className="assignments-container animate-fade-in">
+            {loading && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.8)', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+                    <RefreshCw className="spin" size={32} color="#60a5fa" />
+                </div>
+            )}
             {/* Confirm Modal */}
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
@@ -1107,6 +1033,23 @@ const Assignments = () => {
                         </div>
 
                         {/* Alerts */}
+                        {isAnalyzing && (
+                            <div className="alert-box animate-pulse" style={{ background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                                <Brain size={18} className="alert-icon" color="#818cf8" />
+                                <div className="alert-content" style={{ color: '#c7d2fe' }}>Analyzing schedule...</div>
+                            </div>
+                        )}
+                        {aiInsight && !conflict && !saving && !isAnalyzing && (
+                            <div className="alert-box animate-fade-in" style={{ borderColor: aiInsight.color, background: `${aiInsight.color}15` }}>
+                                <Brain size={18} className="alert-icon" style={{ color: aiInsight.color }} />
+                                <div className="alert-content">
+                                    <div style={{ fontWeight: 600, color: aiInsight.color, marginBottom: '2px', fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                        AI INSIGHT: {aiInsight.status.toUpperCase()}
+                                    </div>
+                                    <div style={{ color: '#e2e8f0', fontSize: '0.85rem' }}>{aiInsight.message}</div>
+                                </div>
+                            </div>
+                        )}
                         {conflict && !saving && !successMsg && (<div className="alert-box error animate-fade-in"><AlertTriangle size={18} className="alert-icon" /><div className="alert-content">{conflict.message}</div></div>)}
                         {successMsg && (<div className="alert-box success animate-fade-in"><Check size={18} className="alert-icon" /><div className="alert-content">{successMsg}</div><button onClick={() => setSuccessMsg('')} className="alert-close"><X size={14} /></button></div>)}
 
@@ -1543,10 +1486,10 @@ const Assignments = () => {
                     text-align: right;
                     position: sticky;
                     right: 0;
-                    background: #0f172a; /* Solid background to prevent overlap */
-                    z-index: 5;
-                    box-shadow: -4px 0 12px -4px rgba(0,0,0,0.5); /* Shadow for separation */
-                    width: 48px; /* Fixed width */
+                    background: #0f172a;
+                    z-index: 50 !important;
+                    box-shadow: -4px 0 12px -4px rgba(0,0,0,0.5);
+                    width: 48px;
                 }
                 
                 .table-row-hover .actions-col {

@@ -22,14 +22,42 @@ console.log("[SW] Service Worker Loaded");
 messaging.onBackgroundMessage((payload) => {
     console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-    // Customize notification presence
-    const notificationTitle = payload.notification.title;
+    // Parse data payload (backend sends data-only to ensure SW handling)
+    const notificationTitle = payload.notification?.title || payload.data?.title;
+    const notificationBody = payload.notification?.body || payload.data?.body;
     const notificationOptions = {
-        body: payload.notification.body,
-        icon: '/logo.svg', // Ensure this exists in public/
+        body: notificationBody,
+        icon: '/logo.svg',
         badge: '/logo.svg',
-        data: payload.data
+        data: payload.data // Pass data (including url) to the notification
     };
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
+    if (notificationTitle) {
+        self.registration.showNotification(notificationTitle, notificationOptions);
+    }
+});
+
+// 3. Handle Notification Clicks
+self.addEventListener('notificationclick', function (event) {
+    console.log('[firebase-messaging-sw.js] Notification click received.');
+    event.notification.close();
+
+    const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+    // Open the app and navigate
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (windowClients) {
+            // Check if there is already a window open with this URL
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url.includes(targetUrl) && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // If not, open a new window
+            if (clients.openWindow) {
+                return clients.openWindow(targetUrl);
+            }
+        })
+    );
 });

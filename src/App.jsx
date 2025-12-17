@@ -1,6 +1,8 @@
 import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MasterDataProvider } from './contexts/MasterDataContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -17,7 +19,7 @@ import OfflineAlert from './components/OfflineAlert';
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { userProfile, loading, logout } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
+
 
   if (loading) return <div style={{ color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
 
@@ -57,71 +59,80 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <MasterDataProvider>
-          <Router>
-            <OfflineAlert />
-            <Routes>
-              <Route path="/login" element={<Login />} />
+          <NotificationProvider>
+            <Toaster position="top-right" toastOptions={{
+              style: {
+                background: '#1e293b',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.1)'
+              }
+            }} />
+            <Router>
+              <OfflineAlert />
+              <Routes>
+                <Route path="/login" element={<Login />} />
 
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Dashboard />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+                <Route path="/" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Dashboard />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/schedule" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Scheduler />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+                <Route path="/schedule" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Scheduler />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/assignments" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Assignments />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+                <Route path="/assignments" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Assignments />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/master-data" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Layout>
-                    <MasterData />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+                <Route path="/master-data" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Layout>
+                      <MasterData />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
 
 
-              <Route path="/analytics" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Analytics />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+                <Route path="/analytics" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Analytics />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/admin" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Layout>
-                    <AdminPanel />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+                <Route path="/admin" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Layout>
+                      <AdminPanel />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Profile />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Profile />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
 
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Router>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Router>
+          </NotificationProvider>
         </MasterDataProvider>
       </AuthProvider>
     </ErrorBoundary>

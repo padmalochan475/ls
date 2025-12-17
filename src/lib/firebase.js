@@ -21,7 +21,12 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
-const messaging = getMessaging(app);
+let messaging;
+try {
+    messaging = getMessaging(app);
+} catch (err) {
+    console.warn("Firebase Messaging failed to initialize", err);
+}
 const googleProvider = new GoogleAuthProvider();
 
 export { db, auth, storage, messaging, googleProvider };
