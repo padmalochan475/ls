@@ -990,87 +990,73 @@ const Assignments = () => {
             {/* Main Content (Stacked) */}
             <div className="assignments-content">
 
-                {/* Section: Create Assignment (Admin Only) */}
+                {/* Section: Create Assignment (Admin Only) - "Command Center" Layout */}
                 {isAdmin && (
                     <div className="glass-panel form-panel animate-slide-up">
-                        <div className="panel-header">
-                            <div className="panel-icon-wrapper"><Keyboard size={20} color="#60a5fa" /></div>
-                            <h3 className="panel-title">Create New Assignment</h3>
-                        </div>
-
-                        {/* Section 1: Schedule */}
-                        <div className="form-section">
-                            <h4 className="section-title" style={{ color: '#60a5fa' }}>
-                                <Clock size={16} /> Time & Schedule
-                            </h4>
-                            <div className="form-grid-2">
-                                <div className="form-group">
-                                    <label>Day</label>
-                                    <Select options={days} value={selectedDay} onChange={setSelectedDay} placeholder="Select Day..." />
-                                </div>
-                                <div className="form-group">
-                                    <label>Time</label>
-                                    <Select options={timeSlots} value={selectedTime} onChange={setSelectedTime} placeholder="Select Time..." />
-                                </div>
+                        <div className="panel-header compact-header">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div className="panel-icon-wrapper"><Keyboard size={18} color="#60a5fa" /></div>
+                                <h3 className="panel-title">Create Assignment</h3>
+                            </div>
+                            {/* Status Indicator */}
+                            <div className={`status-pill ${saving ? 'saving' : conflict ? 'conflict' : 'ready'}`}>
+                                {saving ? 'Saving...' : conflict ? 'Conflict Detected' : 'Ready to Create'}
                             </div>
                         </div>
 
-                        {/* Section 2: Class Info */}
-                        <div className="form-section">
-                            <h3 className="section-title" style={{ color: '#34d399' }}><Layers size={16} /> Class Info</h3>
-                            <div className="form-grid-2">
-                                <div className="form-group"><label>Dept</label><Select options={departments} value={selectedDept} onChange={setSelectedDept} placeholder="Select..." /></div>
-                                <div className="form-group"><label>Sem</label><Select options={semesters} value={selectedSem} onChange={setSelectedSem} placeholder="Select..." /></div>
-                                <div className="form-group"><label>Group</label><Select options={rawGroups.map(g => ({ value: g.name, label: g.name }))} value={selectedMainGroup} onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }} placeholder="Select Group..." /></div>
-                                <div className="form-group"><label>Sub Group</label><Select options={availableSubGroups} value={selectedSubGroup} onChange={setSelectedSubGroup} placeholder={selectedMainGroup && availableSubGroups.length === 0 ? "No Sub-Groups (Whole Class)" : "Select Sub Group..."} disabled={!selectedMainGroup || availableSubGroups.length === 0} /></div>
+                        <div className="form-grid-compact">
+                            {/* Row 1: Time & Location */}
+                            <div className="form-group-row">
+                                <div className="form-group"><label>Day</label><Select options={days} value={selectedDay} onChange={setSelectedDay} placeholder="Day" /></div>
+                                <div className="form-group"><label>Time</label><Select options={timeSlots} value={selectedTime} onChange={setSelectedTime} placeholder="Time" /></div>
+                                <div className="form-group"><label>Room</label><Select options={rooms} value={selectedRoom} onChange={setSelectedRoom} placeholder="Room" /></div>
+                                <div className="form-group" style={{ flex: 1.5 }}><label>Subject</label><Select options={subjects.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))} value={selectedSubject} onChange={setSelectedSubject} placeholder="Subject" /></div>
+                            </div>
+
+                            {/* Row 2: Class Target */}
+                            <div className="form-group-row">
+                                <div className="form-group"><label>Dept</label><Select options={departments} value={selectedDept} onChange={setSelectedDept} placeholder="Dept" /></div>
+                                <div className="form-group"><label>Sem</label><Select options={semesters} value={selectedSem} onChange={setSelectedSem} placeholder="Sem" /></div>
+                                <div className="form-group"><label>Group</label><Select options={rawGroups.map(g => ({ value: g.name, label: g.name }))} value={selectedMainGroup} onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }} placeholder="Group" /></div>
+                                <div className="form-group"><label>Sub-Grp</label><Select options={availableSubGroups} value={selectedSubGroup} onChange={setSelectedSubGroup} placeholder={selectedMainGroup && availableSubGroups.length === 0 ? "No Sub-Groups (Whole Class)" : "All"} disabled={!selectedMainGroup || availableSubGroups.length === 0} /></div>
+                            </div>
+
+                            {/* Row 3: Faculty */}
+                            <div className="form-group-row">
+                                <div className="form-group" style={{ flex: 1 }}><label>Faculty 1</label><Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty} onChange={setSelectedFaculty} placeholder="Select Faculty..." />{renderFacultyLoad(selectedFaculty)}</div>
+                                <div className="form-group" style={{ flex: 1 }}><label>Faculty 2</label><Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty2} onChange={setSelectedFaculty2} placeholder="Optional..." />{renderFacultyLoad(selectedFaculty2)}</div>
                             </div>
                         </div>
 
-                        {/* Section 3: Details */}
-                        <div className="form-section">
-                            <h3 className="section-title" style={{ color: '#f472b6' }}><BookOpen size={16} /> Details</h3>
-                            <div className="form-grid-2">
-                                <div className="form-group full-width"><label>Subject</label><Select options={subjects.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))} value={selectedSubject} onChange={setSelectedSubject} placeholder="Select Subject..." /></div>
-                                <div className="form-group full-width"><label>Room</label><Select options={rooms} value={selectedRoom} onChange={setSelectedRoom} placeholder="Select Room..." /></div>
-                            </div>
-                        </div>
-
-                        {/* Section 4: Faculty */}
-                        <div className="form-section">
-                            <h3 className="section-title" style={{ color: '#fbbf24' }}><Users size={16} /> Faculty</h3>
-                            <div className="form-grid-1">
-                                <div className="form-group"><label>Faculty 1</label><Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty} onChange={setSelectedFaculty} placeholder="Select Faculty..." />{renderFacultyLoad(selectedFaculty)}</div>
-                                <div className="form-group"><label>Faculty 2</label><Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty2} onChange={setSelectedFaculty2} placeholder="Select Faculty..." />{renderFacultyLoad(selectedFaculty2)}</div>
-                            </div>
-                        </div>
-
-                        {/* Alerts */}
-                        {isAnalyzing && (
-                            <div className="alert-box animate-pulse" style={{ background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-                                <Brain size={18} className="alert-icon" color="#818cf8" />
-                                <div className="alert-content" style={{ color: '#c7d2fe' }}>Analyzing schedule...</div>
-                            </div>
-                        )}
-                        {aiInsight && !conflict && !saving && !isAnalyzing && (
-                            <div className="alert-box animate-fade-in" style={{ borderColor: aiInsight.color, background: `${aiInsight.color}15` }}>
-                                <Brain size={18} className="alert-icon" style={{ color: aiInsight.color }} />
-                                <div className="alert-content">
-                                    <div style={{ fontWeight: 600, color: aiInsight.color, marginBottom: '2px', fontSize: '0.75rem', letterSpacing: '0.5px' }}>
-                                        AI INSIGHT: {aiInsight.status.toUpperCase()}
+                        {/* Action Bar: Insights + Buttons */}
+                        <div className="action-bar-unified">
+                            {/* Left: AI / Error Feedback */}
+                            <div className="feedback-zone">
+                                {isAnalyzing && (
+                                    <div className="mini-alert analyzing"><RefreshCw size={14} className="spin" /> Checking...</div>
+                                )}
+                                {conflict && !saving && (
+                                    <div className="mini-alert error"><AlertTriangle size={14} /> {conflict.message}</div>
+                                )}
+                                {aiInsight && !conflict && !saving && !isAnalyzing && (
+                                    <div className="mini-alert insight" style={{ borderColor: aiInsight.color, color: aiInsight.color, background: `${aiInsight.color}10` }}>
+                                        <Brain size={14} /> <span>{aiInsight.message}</span>
                                     </div>
-                                    <div style={{ color: '#e2e8f0', fontSize: '0.85rem' }}>{aiInsight.message}</div>
-                                </div>
+                                )}
+                                {successMsg && (
+                                    <div className="mini-alert success"><Check size={14} /> {successMsg} <button onClick={() => setSuccessMsg('')} style={{ background: 'none', border: 'none', marginLeft: 'auto' }}><X size={12} /></button></div>
+                                )}
                             </div>
-                        )}
-                        {conflict && !saving && !successMsg && (<div className="alert-box error animate-fade-in"><AlertTriangle size={18} className="alert-icon" /><div className="alert-content">{conflict.message}</div></div>)}
-                        {successMsg && (<div className="alert-box success animate-fade-in"><Check size={18} className="alert-icon" /><div className="alert-content">{successMsg}</div><button onClick={() => setSuccessMsg('')} className="alert-close"><X size={14} /></button></div>)}
 
-                        {/* Buttons */}
-                        <div className="button-group">
-                            <button className="btn btn-secondary" onClick={() => { setSelectedSubject(''); setSelectedFaculty(''); setSelectedRoom(''); setSelectedFaculty2(''); }}>Clear</button>
-                            <button className="btn btn-primary" onClick={handleAssign} disabled={saving || !!conflict}>
-                                {saving ? <RefreshCw className="spin" size={18} /> : <Check size={18} />} {saving ? 'Creating...' : 'Create Assignment'}
-                            </button>
+                            {/* Right: Buttons */}
+                            <div className="button-group-compact">
+                                <button className="btn-icon-text secondary" onClick={() => { setSelectedSubject(''); setSelectedFaculty(''); setSelectedRoom(''); setSelectedFaculty2(''); }}>
+                                    <X size={16} /> Clear
+                                </button>
+                                <button className="btn-icon-text primary" onClick={handleAssign} disabled={saving || !!conflict}>
+                                    {saving ? <RefreshCw className="spin" size={16} /> : <Check size={16} />} Create
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1189,12 +1175,128 @@ const Assignments = () => {
                     background: rgba(167, 139, 250, 0.1);
                 }
 
-                .panel-title {
-                    font-size: 1.25rem;
-                    font-weight: 700;
-                    color: white;
-                    margin: 0;
+                .panel-header.compact-header {
+                   margin-bottom: 1rem;
+                   padding-bottom: 0.75rem;
+                   justify-content: space-between;
                 }
+
+                .status-pill {
+                   font-size: 0.75rem;
+                   font-weight: 600;
+                   padding: 4px 10px;
+                   border-radius: 99px;
+                   background: rgba(255,255,255,0.05);
+                   color: #94a3b8;
+                   border: 1px solid rgba(255,255,255,0.05);
+                }
+                .status-pill.saving { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border-color: rgba(59, 130, 246, 0.2); }
+                .status-pill.conflict { background: rgba(239, 68, 68, 0.1); color: #f87171; border-color: rgba(239, 68, 68, 0.2); }
+                .status-pill.ready { background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
+
+                /* Compact Form Grid */
+                .form-grid-compact {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+
+                .form-group-row {
+                    display: flex;
+                    gap: 12px;
+                    width: 100%;
+                }
+
+                .form-group {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+                }
+
+                .form-group label {
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                    color: #94a3b8;
+                    margin-left: 2px;
+                }
+
+                /* Unified Action Bar */
+                .action-bar-unified {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: 1.5rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid rgba(255,255,255,0.05);
+                    gap: 1rem;
+                }
+
+                .feedback-zone {
+                    flex: 1;
+                    display: flex;
+                    align-items: center;
+                    min-height: 40px; 
+                }
+
+                .mini-alert {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                    width: 100%;
+                    animation: fadeIn 0.3s ease;
+                }
+                
+                .mini-alert.analyzing { background: rgba(255,255,255,0.05); color: #94a3b8; }
+                .mini-alert.error { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2); }
+                .mini-alert.insight { border: 1px solid; }
+                .mini-alert.success { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.2); }
+
+                .button-group-compact {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    flex-shrink: 0;
+                }
+
+                .btn-icon-text {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    border: none;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .btn-icon-text.primary {
+                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                    color: white;
+                    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+                }
+                .btn-icon-text.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(37, 99, 235, 0.4); }
+                .btn-icon-text.primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+                .btn-icon-text.secondary {
+                    background: rgba(255,255,255,0.05);
+                    color: #94a3b8;
+                }
+                .btn-icon-text.secondary:hover { background: rgba(255,255,255,0.1); color: white; }
+
+                @media (max-width: 768px) {
+                    .form-group-row { flex-direction: column; gap: 10px; }
+                    .action-bar-unified { flex-direction: column; align-items: stretch; }
+                    .button-group-compact { justify-content: flex-end; }
+                }
+
+                .panel-title {
 
                 .table-header-row {
                     display: flex;
