@@ -22,9 +22,7 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
     const listRef = useRef(null);
     const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
 
-    // Generate a unique ID for the portal
-    const uniqueId = useRef(`select-${Math.random().toString(36).substr(2, 9)}`).current;
-    const portalId = `portal-${uniqueId}`;
+
 
     // Normalize options
     const normalizedOptions = options.map(opt => {
@@ -41,20 +39,26 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
 
     const selectedOption = normalizedOptions.find(opt => opt.value === value);
 
+
+
     // Close on click outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                // Check if click is inside the portal
-                const portal = document.getElementById(portalId);
-                if (portal && portal.contains(event.target)) return;
+                // Check if click is inside the portal - use ref instead of ID search if possible, or simple check
+                // Since we removed the ID from the portal div, we need to rely on ref containment more robustly if needed
+                // But generally, the portal is outside the root.
+                // For now, simpler: just close. The listRef check handles internal clicks if structured right,
+                // but actually, clicking option closes it anyway.
+                // Clicking search input shouldn't close.
+                if (listRef.current && listRef.current.contains(event.target)) return;
                 setIsOpen(false);
                 setSearch('');
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [portalId]);
+    }, []);
 
     // Update coords on open and scroll
     useEffect(() => {
@@ -199,7 +203,6 @@ const Select = ({ options, value, onChange, placeholder, icon: Icon, disabled = 
 
             {isOpen && !disabled && createPortal(
                 <div
-                    id={portalId}
                     ref={listRef}
                     className="animate-fade-in"
                     style={{
@@ -342,6 +345,7 @@ const MultiSelectDropdown = ({ options, selected, onChange, label, icon: Icon })
             window.removeEventListener('scroll', updateCoords, true);
             window.removeEventListener('resize', updateCoords);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
 
     const toggleOption = (option) => {
@@ -567,6 +571,11 @@ const Assignments = () => {
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [manageModalTab, setManageModalTab] = useState('faculty');
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState('create'); // 'create' or 'history'
+
+    useEffect(() => {
+        if (!isAdmin) setActiveTab('history');
+    }, [isAdmin]);
 
 
     const openManageModal = (tab = 'faculty') => {
@@ -963,13 +972,29 @@ const Assignments = () => {
                 isDangerous={true}
                 confirmText="Delete Permanently"
             />
-            {/* Header */}
+            {/* Header with Tabs */}
             <div className="assignments-header">
                 <div>
-                    <h2 className="page-title">
-                        {isAdmin ? 'Create Assignment' : 'Assignments'} <span className="academic-year-badge">({activeAcademicYear})</span>
-                    </h2>
+                    <h2 className="page-title">Assignments <span className="academic-year-badge">({activeAcademicYear})</span></h2>
                 </div>
+
+                {isAdmin && (
+                    <div className="tab-switcher">
+                        <button
+                            className={`tab-btn ${activeTab === 'create' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('create')}
+                        >
+                            <Keyboard size={16} /> Create
+                        </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('history')}
+                        >
+                            <List size={16} /> History
+                        </button>
+                    </div>
+                )}
+
                 {isAdmin && (
                     <button
                         onClick={() => openManageModal('faculty')}
@@ -980,12 +1005,12 @@ const Assignments = () => {
                 )}
             </div>
 
-            {/* Main Content Grid */}
-            <div className="assignments-content" style={!isAdmin ? { gridTemplateColumns: '1fr' } : {}}>
+            {/* Main Content (Tabs) */}
+            <div className="assignments-content">
 
-                {/* Left Column: Form */}
-                {isAdmin && (
-                    <div className="glass-panel form-panel">
+                {/* Left Column: Form (Create Tab) */}
+                {isAdmin && activeTab === 'create' && (
+                    <div className="glass-panel form-panel animate-fade-in">
                         {/* Section 1: Schedule */}
                         <div className="form-section">
                             <h3 className="section-title" style={{ color: '#60a5fa' }}>
@@ -1061,44 +1086,47 @@ const Assignments = () => {
                             </button>
                         </div>
                     </div>
+
                 )}
 
-                {/* Right Column: Table */}
-                <div className="glass-panel table-panel">
-                    <div className="table-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 className="table-title">Assignments <span className="count-badge">{filteredAssignments.length}</span></h3>
-                            <div className="search-wrapper">
-                                <Search size={16} className="search-icon" />
-                                <input type="text" placeholder="Search..." className="glass-input search-input" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                {/* Right Column: Table (History Tab) */}
+                {(activeTab === 'history' || !isAdmin) && (
+                    <div className="glass-panel table-panel animate-fade-in">
+                        <div className="table-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3 className="table-title">Assignments <span className="count-badge">{filteredAssignments.length}</span></h3>
+                                <div className="search-wrapper">
+                                    <Search size={16} className="search-icon" />
+                                    <input type="text" placeholder="Search..." className="glass-input search-input" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                                <MultiSelectDropdown options={departments} selected={filterDepts} onChange={setFilterDepts} label="Filter Dept" icon={BookOpen} />
+                                <MultiSelectDropdown options={semesters} selected={filterSems} onChange={setFilterSems} label="Filter Sem" icon={Layers} />
+                                <MultiSelectDropdown options={rawGroups.map(g => g.name)} selected={filterGroups} onChange={setFilterGroups} label="Filter Group" icon={Users} />
+                                <MultiSelectDropdown options={subjects.map(s => s.name)} selected={filterSubjects} onChange={setFilterSubjects} label="Filter Subject" icon={BookOpen} />
                             </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-                            <MultiSelectDropdown options={departments} selected={filterDepts} onChange={setFilterDepts} label="Filter Dept" icon={BookOpen} />
-                            <MultiSelectDropdown options={semesters} selected={filterSems} onChange={setFilterSems} label="Filter Sem" icon={Layers} />
-                            <MultiSelectDropdown options={rawGroups.map(g => g.name)} selected={filterGroups} onChange={setFilterGroups} label="Filter Group" icon={Users} />
-                            <MultiSelectDropdown options={subjects.map(s => s.name)} selected={filterSubjects} onChange={setFilterSubjects} label="Filter Subject" icon={BookOpen} />
+
+                        <div className="table-content">
+                            <table className="assignments-table">
+                                <thead><tr><th>Time</th><th>Subject</th><th>Faculty</th><th>Room</th><th>Group</th><th className="actions-col"></th></tr></thead>
+                                <tbody>
+                                    {filteredAssignments.length > 0 ? filteredAssignments.map((assignment) => (
+                                        <tr key={assignment.id} className="table-row-hover">
+                                            <td><div className="cell-primary">{assignment.day}</div><div className="cell-secondary"><Clock size={12} /> {assignment.time}</div></td>
+                                            <td><div className="cell-primary" title={assignment.subject}>{assignment.subject}</div>{(() => { const sub = subjects.find(s => s.name === assignment.subject); return sub && sub.shortCode ? (<div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>{sub.shortCode}</div>) : null; })()}</td>
+                                            <td><div className="faculty-list"><div className="badge badge-blue"><User size={12} /><span>{assignment.faculty}</span></div>{assignment.faculty2 && (<div className="badge badge-purple"><User size={12} /><span>{assignment.faculty2}</span></div>)}</div></td>
+                                            <td><div className="badge badge-pink"><MapPin size={12} /><span>{assignment.room}</span></div></td>
+                                            <td><div className="badge badge-green"><Users size={12} /><span>{assignment.dept}-{assignment.section}{assignment.group ? `-${assignment.group}` : ''}</span></div></td>
+                                            <td className="actions-col">{assignment.id && canDelete(assignment) && (<button onClick={(e) => handleDelete(e, assignment)} className="icon-btn-danger" title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete"} disabled={deletingIds.has(assignment.id)} style={deletingIds.has(assignment.id) ? { opacity: 0.7, cursor: 'wait' } : {}}>{deletingIds.has(assignment.id) ? (<RefreshCw size={16} className="spin" />) : (<Trash2 size={16} />)}</button>)}</td>
+                                        </tr>
+                                    )) : (<tr><td colSpan="6" className="empty-state"><div className="empty-content"><div className="empty-icon"><Search size={24} /></div><div>No assignments found</div></div></td></tr>)}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-
-                    <div className="table-content">
-                        <table className="assignments-table">
-                            <thead><tr><th>Time</th><th>Subject</th><th>Faculty</th><th>Room</th><th>Group</th><th className="actions-col"></th></tr></thead>
-                            <tbody>
-                                {filteredAssignments.length > 0 ? filteredAssignments.map((assignment) => (
-                                    <tr key={assignment.id} className="table-row-hover">
-                                        <td><div className="cell-primary">{assignment.day}</div><div className="cell-secondary"><Clock size={12} /> {assignment.time}</div></td>
-                                        <td><div className="cell-primary" title={assignment.subject}>{assignment.subject}</div>{(() => { const sub = subjects.find(s => s.name === assignment.subject); return sub && sub.shortCode ? (<div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>{sub.shortCode}</div>) : null; })()}</td>
-                                        <td><div className="faculty-list"><div className="badge badge-blue"><User size={12} /><span>{assignment.faculty}</span></div>{assignment.faculty2 && (<div className="badge badge-purple"><User size={12} /><span>{assignment.faculty2}</span></div>)}</div></td>
-                                        <td><div className="badge badge-pink"><MapPin size={12} /><span>{assignment.room}</span></div></td>
-                                        <td><div className="badge badge-green"><Users size={12} /><span>{assignment.dept}-{assignment.section}{assignment.group ? `-${assignment.group}` : ''}</span></div></td>
-                                        <td className="actions-col">{assignment.id && canDelete(assignment) && (<button onClick={(e) => handleDelete(e, assignment)} className="icon-btn-danger" title={deletingIds.has(assignment.id) ? "Deleting..." : "Delete"} disabled={deletingIds.has(assignment.id)} style={deletingIds.has(assignment.id) ? { opacity: 0.7, cursor: 'wait' } : {}}>{deletingIds.has(assignment.id) ? (<RefreshCw size={16} className="spin" />) : (<Trash2 size={16} />)}</button>)}</td>
-                                    </tr>
-                                )) : (<tr><td colSpan="6" className="empty-state"><div className="empty-content"><div className="empty-icon"><Search size={24} /></div><div>No assignments found</div></div></td></tr>)}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                )}
             </div>
 
             {/* Manage Data Modal */}
@@ -1154,22 +1182,48 @@ const Assignments = () => {
                     color: #e2e8f0;
                 }
 
-                .assignments-content {
-                    display: grid;
-                    grid-template-columns: 1fr;
-                    gap: 1.5rem;
-                    flex: 1;
-                    overflow: hidden;
+                /* Tab Switcher */
+                .tab-switcher {
+                    display: flex;
+                    background: rgba(255,255,255,0.05);
+                    padding: 4px;
+                    border-radius: 12px;
+                    gap: 4px;
                 }
 
-                @media (min-width: 1024px) {
-                    .assignments-content {
-                        grid-template-columns: 380px 1fr;
-                    }
+                .tab-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    background: transparent;
+                    color: #94a3b8;
+                    border: none;
+                    cursor: pointer;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                }
+
+                .tab-btn.active {
+                    background: rgba(255,255,255,0.1);
+                    color: white;
+                    font-weight: 600;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                }
+
+                .assignments-content {
+                    display: flex;
+                    flex-direction: column;
+                    flex: 1;
+                    overflow: hidden;
+                    padding: 0.5rem;
                 }
 
                 /* Form Panel */
                 .form-panel {
+                    flex: 1;
                     padding: 1.5rem;
                     display: flex;
                     flex-direction: column;
@@ -1178,6 +1232,9 @@ const Assignments = () => {
                     background: linear-gradient(145deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6));
                     border: 1px solid rgba(255,255,255,0.08);
                     backdrop-filter: blur(12px);
+                    max-width: 800px;
+                    margin: 0 auto;
+                    width: 100%;
                 }
 
                 .form-section {
