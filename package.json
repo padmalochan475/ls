@@ -10,10 +10,12 @@
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "deploy:firebase": "firebase deploy --only hosting"
+    "deploy:firebase": "firebase deploy --only hosting",
+    "push": "git add . && git commit -m \"Update from local\" && git push"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "@vercel/analytics": "^1.6.1",
     "firebase": "^12.7.0",
     "firebase-admin": "^13.6.0",
     "lucide-react": "^0.555.0",
