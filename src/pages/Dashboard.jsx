@@ -620,8 +620,12 @@ const Dashboard = () => {
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type="date"
-                                        value={currentDate.toISOString().split('T')[0]}
-                                        onChange={(e) => setCurrentDate(new Date(e.target.value))}
+                                        value={currentDate && !isNaN(currentDate.getTime()) ? currentDate.toISOString().split('T')[0] : ''}
+                                        onChange={(e) => {
+                                            if (!e.target.value) return;
+                                            const d = new Date(e.target.value);
+                                            if (!isNaN(d.getTime())) setCurrentDate(d);
+                                        }}
                                         style={{
                                             background: 'rgba(255, 255, 255, 0.05)',
                                             border: '1px solid rgba(255, 255, 255, 0.1)',

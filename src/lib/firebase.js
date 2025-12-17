@@ -14,12 +14,15 @@ import firebaseConfig from '../firebaseConfig';
 //   appId: import.meta.env.VITE_FIREBASE_APP_ID
 // };
 
+import { getMessaging } from "firebase/messaging";
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
+const messaging = getMessaging(app);
 const googleProvider = new GoogleAuthProvider();
 
-export { db, auth, storage, googleProvider };
+export { db, auth, storage, messaging, googleProvider };
 export default app;
