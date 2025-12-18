@@ -998,7 +998,7 @@ const Assignments = () => {
                             </div>
                             {/* Status Pill */}
                             <div className={`status-pill ${saving ? 'saving' : conflict ? 'conflict' : 'ready'}`}>
-                                <div className={`status-dot ${saving ? 'pulse' : ''}`} style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', marginRight: 6 }}></div>
+                                <div className={`status-dot ${saving ? 'pulse' : ''}`}></div>
                                 {saving ? 'Saving...' : conflict ? 'Conflict Detected' : 'Ready to Create'}
                             </div>
                         </div>
@@ -1066,7 +1066,8 @@ const Assignments = () => {
                 )}
 
                 {/* Section: Assignment History */}
-                <div className="glass-panel table-panel animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                {/* Section: Assignment History */}
+                <div className="glass-panel table-panel animate-slide-up premium-table-panel" style={{ animationDelay: '0.1s' }}>
                     <div className="table-header-row">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div className="panel-icon-wrapper secondary"><List size={20} color="#a78bfa" /></div>
@@ -1165,38 +1166,38 @@ const Assignments = () => {
                     border-bottom: 1px solid rgba(255,255,255,0.05);
                 }
 
-                .panel-icon-wrapper {
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 12px;
-                    background: rgba(96, 165, 250, 0.1);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-
-                .panel-icon-wrapper.secondary {
-                    background: rgba(167, 139, 250, 0.1);
-                }
-
                 .panel-header.compact-header {
-                   margin-bottom: 1rem;
-                   padding-bottom: 0.75rem;
+                   margin-bottom: 1.5rem;
+                   padding-bottom: 1rem;
                    justify-content: space-between;
+                   align-items: center; /* Enforce center alignment */
                 }
 
                 .status-pill {
-                   font-size: 0.75rem;
-                   font-weight: 600;
-                   padding: 4px 10px;
+                   font-size: 0.8rem;
+                   font-weight: 500;
+                   padding: 6px 14px;
                    border-radius: 99px;
-                   background: rgba(255,255,255,0.05);
+                   background: rgba(255,255,255,0.03);
                    color: #94a3b8;
-                   border: 1px solid rgba(255,255,255,0.05);
+                   border: 1px solid rgba(255,255,255,0.08);
+                   display: flex;
+                   align-items: center;
+                   gap: 8px;
+                   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                   transition: all 0.3s ease;
                 }
                 .status-pill.saving { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border-color: rgba(59, 130, 246, 0.2); }
                 .status-pill.conflict { background: rgba(239, 68, 68, 0.1); color: #f87171; border-color: rgba(239, 68, 68, 0.2); }
                 .status-pill.ready { background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
+                
+                .status-dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: currentColor;
+                    box-shadow: 0 0 8px currentColor;
+                }
 
                 /* Compact Form Grid */
                 .form-grid-compact {
@@ -1249,7 +1250,7 @@ const Assignments = () => {
                     flex-direction: column;
                     gap: 2rem;
                     width: 100%;
-                    max-width: 1200px; /* Increased max-width for widescreen */
+                    max-width: 1400px; /* Extended Size */
                     margin: 0 auto;
                 }
 
@@ -1410,6 +1411,14 @@ const Assignments = () => {
                     background: linear-gradient(160deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
                     border: 1px solid rgba(255,255,255,0.08);
                     box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5) !important;
+                }
+
+                .premium-table-panel {
+                     background: linear-gradient(160deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
+                     border: 1px solid rgba(255,255,255,0.08);
+                     box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5) !important;
+                     padding: 0 !important; /* Reset padding for full-width table */
+                     overflow: hidden;
                 }
 
                 .form-grid-premium {
