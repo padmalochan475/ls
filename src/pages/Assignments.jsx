@@ -1408,10 +1408,11 @@ const Assignments = () => {
 
                 /* --- PREMIUM FORM STYLES --- */
                 .premium-form-panel {
-                    padding: 3.5rem !important; /* Ultra Spacious */
+                    padding: 2rem !important; /* Balanced Spacing */
                     background: linear-gradient(160deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
                     border: 1px solid rgba(255,255,255,0.08);
                     box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5) !important;
+                    width: 100%;
                 }
 
                 .premium-table-panel {
