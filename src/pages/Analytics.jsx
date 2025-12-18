@@ -945,6 +945,9 @@ const Analytics = () => {
                     display: flex;
                     flex-direction: column;
                     gap: 2rem;
+                    width: 100%;
+                    max-width: 95vw;
+                    margin: 0 auto;
                 }
                 .stats-grid {
                     display: grid;

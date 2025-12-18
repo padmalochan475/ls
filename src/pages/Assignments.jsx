@@ -1220,10 +1220,11 @@ const Assignments = () => {
                 }
 
                 .form-group label {
-                    font-size: 0.75rem;
-                    font-weight: 500;
-                    color: #94a3b8;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    color: #cbd5e1; /* Lighter for visibility */
                     margin-left: 2px;
+                    margin-bottom: 0.25rem;
                 }
 
                 /* Unified Action Bar Alignment */
@@ -1250,7 +1251,7 @@ const Assignments = () => {
                     flex-direction: column;
                     gap: 2rem;
                     width: 100%;
-                    max-width: 1400px; /* Extended Size */
+                    max-width: 95vw; /* Extended Size to nearly full screen width */
                     margin: 0 auto;
                 }
 
@@ -1407,7 +1408,7 @@ const Assignments = () => {
 
                 /* --- PREMIUM FORM STYLES --- */
                 .premium-form-panel {
-                    padding: 2.5rem !important; /* Spacious */
+                    padding: 3.5rem !important; /* Ultra Spacious */
                     background: linear-gradient(160deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
                     border: 1px solid rgba(255,255,255,0.08);
                     box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5) !important;
@@ -1436,14 +1437,16 @@ const Assignments = () => {
 
                 /* Premium Status Console */
                 .status-console-box {
-                    background: rgba(4, 7, 13, 0.5);
+                    background: rgba(4, 7, 13, 0.6);
                     border-radius: 16px;
-                    padding: 1.25rem 1.5rem;
-                    border: 1px solid rgba(255,255,255,0.03);
+                    padding: 1.5rem 2rem;
+                    border: 1px solid rgba(255,255,255,0.05);
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     box-shadow: inset 0 2px 10px rgba(0,0,0,0.4);
+                    min-height: 80px;
+                    gap: 2rem;
                 }
 
                 .console-screen {
