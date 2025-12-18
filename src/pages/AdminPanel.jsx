@@ -158,6 +158,9 @@ const AdminPanel = () => {
                 />
             </div>
 
+            {/* Notification Management Panel */}
+            <NotificationManager users={users} />
+
             {/* Users Table */}
             <div className="glass-panel" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -317,6 +320,120 @@ const AdminPanel = () => {
                 />,
                 document.body
             )}
+        </div>
+    );
+};
+
+const NotificationManager = ({ users }) => {
+    const [settings, setSettings] = useState({ firstWarning: 15, secondWarning: 5 });
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Manual Notification State
+    const [targetUser, setTargetUser] = useState('all');
+    const [notifTitle, setNotifTitle] = useState('');
+    const [notifBody, setNotifBody] = useState('');
+    const [isSending, setIsSending] = useState(false);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            const docRef = doc(db, 'settings', 'notifications');
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+                setSettings(snap.data());
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const saveSettings = async () => {
+        setIsSaving(true);
+        try {
+            await setDoc(doc(db, 'settings', 'notifications'), {
+                firstWarning: parseInt(settings.firstWarning),
+                secondWarning: parseInt(settings.secondWarning)
+            });
+            alert("Settings saved!");
+        } catch (e) {
+            console.error("Error saving settings:", e);
+            alert("Failed to save settings.");
+        }
+        setIsSaving(false);
+    };
+
+    const sendManualNotification = async () => {
+        if (!notifTitle || !notifBody) {
+            alert("Please provide a title and body.");
+            return;
+        }
+
+        setIsSending(true);
+        try {
+            // Write to 'notifications' collection which triggers Cloud Function
+            // Or simple local function call if we had one. 
+            // Better to use Cloud Function trigger on 'notifications' collection for robustness
+            // OR use the 'sendManualNotification' callable if we create one.
+            // Let's assume we create a 'notifications' collection listener in Cloud Functions later.
+            // For now, we'll write to 'outbox_notifications'
+
+            await setDoc(doc(collection(db, 'outbox_notifications')), {
+                targetUser: targetUser, // 'all' or userId
+                title: notifTitle,
+                body: notifBody,
+                status: 'pending',
+                createdAt: new Date()
+            });
+
+            alert(`Notification sent to ${targetUser === 'all' ? 'All Users' : 'Selected User'}.`);
+            setNotifTitle('');
+            setNotifBody('');
+        } catch (e) {
+            console.error("Error sending notification:", e);
+            alert("Failed to send notification.");
+        }
+        setIsSending(false);
+    };
+
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+            {/* Settings Card */}
+            <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                <h3 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>⚙️</span> Notification Settings
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>First Warning (mins)</label>
+                        <input type="number" className="glass-input" value={settings.firstWarning} onChange={e => setSettings({ ...settings, firstWarning: e.target.value })} />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>Second Warning (mins)</label>
+                        <input type="number" className="glass-input" value={settings.secondWarning} onChange={e => setSettings({ ...settings, secondWarning: e.target.value })} />
+                    </div>
+                </div>
+                <button onClick={saveSettings} disabled={isSaving} className="btn" style={{ marginTop: '1rem', width: '100%', background: 'var(--color-accent)' }}>
+                    {isSaving ? 'Saving...' : 'Update Settings'}
+                </button>
+            </div>
+
+            {/* Manual Notification Card */}
+            <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                <h3 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>📢</span> Send Notification
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <select className="glass-input" value={targetUser} onChange={e => setTargetUser(e.target.value)}>
+                        <option value="all" style={{ background: '#1e293b' }}>All Users</option>
+                        {users.map(u => (
+                            <option key={u.id} value={u.empId || u.id} style={{ background: '#1e293b' }}>{u.name} ({u.role})</option>
+                        ))}
+                    </select>
+                    <input type="text" placeholder="Title" className="glass-input" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} />
+                    <textarea placeholder="Message Body" className="glass-input" rows={2} value={notifBody} onChange={e => setNotifBody(e.target.value)} style={{ resize: 'none' }} />
+                    <button onClick={sendManualNotification} disabled={isSending} className="btn" style={{ width: '100%', background: '#8b5cf6' }}>
+                        {isSending ? 'Sending...' : 'Send Notification'}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

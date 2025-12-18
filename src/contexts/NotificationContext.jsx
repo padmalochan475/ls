@@ -119,6 +119,22 @@ export const NotificationProvider = ({ children }) => {
     useEffect(() => {
         if (permission !== 'granted' || todayClasses.length === 0) return;
 
+        // Fetch settings - default to 15/5 if not set
+        let firstWarning = 15;
+        let secondWarning = 5;
+
+        // Simple real-time listener for settings (optional, or just fetch once)
+        // For efficiency, we can just fetch inside this effect or use a separate effect.
+        // Let's assume we want real-time updates.
+        const settingsRef = doc(db, 'settings', 'notifications');
+        const unsubSettings = onSnapshot(settingsRef, (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                if (data.firstWarning) firstWarning = data.firstWarning;
+                if (data.secondWarning) secondWarning = data.secondWarning;
+            }
+        });
+
         const checkTime = () => {
             const now = new Date();
             const nowTime = now.getTime();
@@ -140,29 +156,29 @@ export const NotificationProvider = ({ children }) => {
                 const diff = classTimeMs - nowTime;
                 const minutesLeft = diff / 1000 / 60;
 
-                const id15 = `${cls.id}-15min-${new Date().toDateString()}`;
-                const id05 = `${cls.id}-05min-${new Date().toDateString()}`;
+                const idFirst = `${cls.id}-first-${new Date().toDateString()}`;
+                const idSecond = `${cls.id}-second-${new Date().toDateString()}`;
                 const details = `${cls.dept || ''} ${cls.section || ''} ${cls.group && cls.group !== 'All' ? `(${cls.group})` : ''}`.trim();
 
-                // 1. 15 Minute Warning
-                if (minutesLeft > 5 && minutesLeft <= 15 && !notifiedClassesRef.current.has(id15)) {
+                // Dynamic First Warning
+                if (minutesLeft > secondWarning && minutesLeft <= firstWarning && !notifiedClassesRef.current.has(idFirst)) {
                     new Notification(`Upcoming Class: ${cls.subject}`, {
-                        body: `15 Minutes left! ${details} in Room ${cls.room}.`,
+                        body: `${Math.ceil(minutesLeft)} Minutes left! ${details} in Room ${cls.room}.`,
                         icon: '/logo.svg',
-                        tag: id15
+                        tag: idFirst
                     });
-                    notifiedClassesRef.current.add(id15);
+                    notifiedClassesRef.current.add(idFirst);
                 }
 
-                // 2. 5 Minute Warning
-                if (minutesLeft > 0 && minutesLeft <= 5 && !notifiedClassesRef.current.has(id05)) {
+                // Dynamic Second Warning
+                if (minutesLeft > 0 && minutesLeft <= secondWarning && !notifiedClassesRef.current.has(idSecond)) {
                     new Notification(`Hurry Up! Class Starting: ${cls.subject}`, {
                         body: `Starts in ${Math.ceil(minutesLeft)} mins! ${details} in ${cls.room}.`,
                         icon: '/logo.svg',
-                        tag: id05,
+                        tag: idSecond,
                         requireInteraction: true
                     });
-                    notifiedClassesRef.current.add(id05);
+                    notifiedClassesRef.current.add(idSecond);
                 }
             });
         };
@@ -170,7 +186,10 @@ export const NotificationProvider = ({ children }) => {
         const interval = setInterval(checkTime, 60 * 1000);
         checkTime();
 
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            unsubSettings();
+        };
     }, [todayClasses, permission]);
 
     const value = {

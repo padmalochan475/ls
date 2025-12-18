@@ -1112,6 +1112,15 @@ const Assignments = () => {
 
             {/* CSS Styles */}
             <style>{`
+                .assignments-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 2rem;
+                    padding-bottom: 1rem;
+                    border-bottom: 1px solid rgba(255,255,255,0.05);
+                }
+
                 .assignments-container {
                     display: flex;
                     flex-direction: column;

@@ -60,8 +60,15 @@ service cloud.firestore {
 
     // 6. Config/Settings
     match /settings/{docId} {
-        allow read: if true;
+        allow read: if isAuth(); // Changed from true to isAuth() for better security, but needs to match client
         allow write: if isAdmin();
+    }
+    
+    // 7. Manual Notifications Outbox
+    match /outbox_notifications/{docId} {
+        allow create: if isAdmin();
+        allow read: if isAdmin();
+        allow update: if isAdmin(); // For status updates if done by client-side admin logic (though optimized for CF)
     }
   }
 }
