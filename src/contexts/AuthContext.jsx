@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
     const [systemAcademicYear, setSystemAcademicYear] = useState('2024-2025'); // Global System Default
-    const [selectedAcademicYear, setSelectedAcademicYear] = useState(null); // User's View Choice (Defaults to System)
+    const [selectedAcademicYear, setSelectedAcademicYear] = useState(() => localStorage.getItem('selectedAcademicYear') || null); // User's View Choice (Defaults to System)
     const [academicYears, setAcademicYears] = useState(['2024-2025']); // List of all years
     const [maxFacultyLoad, setMaxFacultyLoad] = useState(18); // Default Max Load
     const [yearConfigs, setYearConfigs] = useState({});
@@ -101,7 +101,11 @@ export const AuthProvider = ({ children }) => {
     };
 
     const handleSetSelectedYear = (year) => {
-
+        if (year) {
+            localStorage.setItem('selectedAcademicYear', year);
+        } else {
+            localStorage.removeItem('selectedAcademicYear');
+        }
         setSelectedAcademicYear(year);
     };
 
