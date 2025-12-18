@@ -719,9 +719,7 @@ const Assignments = () => {
         // We can expose warnings if needed, but for 'conflict' blocking, we focus on errors.
         // Warnings (like soft limits) could be handled separately or allowed.
         if (analysis.status === 'warning') {
-            // Optional: You could return specific warning types here if UI supports it.
-            // For now, we only block on hard conflicts.
-            // return { type: 'warning', message: analysis.message };
+            return { type: 'warning', message: analysis.message };
         }
 
         return null;

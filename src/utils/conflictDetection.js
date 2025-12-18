@@ -163,9 +163,9 @@ export const analyzeSchedule = (booking, schedule, metadata = {}) => {
     const effectiveRoomsCount = roomsCount > 0 ? roomsCount : 1;
     const utilization = Math.round(((activeSlots.length + 1) / effectiveRoomsCount) * 100);
 
-    if (utilization > 90) {
-        warnings.push(`High traffic! ${utilization}% of rooms will be booked.`);
-    }
+    // if (utilization > 90) {
+    //     warnings.push(`High traffic! ${utilization}% of rooms will be booked.`);
+    // }
 
     // 2.2 Subject Repetition for Group
     if (booking.subject && booking.section) {
