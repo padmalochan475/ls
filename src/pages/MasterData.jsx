@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
-import { collection, getDocs, getDoc, addDoc, deleteDoc, doc, updateDoc, query, where, writeBatch, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, getDoc, addDoc, setDoc, deleteDoc, doc, updateDoc, query, where, writeBatch, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
 import '../styles/design-system.css';
@@ -593,11 +593,11 @@ const MasterData = ({ initialTab }) => {
                                     style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                                 />
                             ) : (
-                                item.name.charAt(0)
+                                (item.name && typeof item.name === 'string') ? item.name.charAt(0) : '?'
                             )}
                         </div>
                         <div>
-                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{item.name}</div>
+                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{item.name || 'Unnamed Faculty'}</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{item.designation} • {item.department}</div>
                             <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
                                 ID: {item.empId} {item.shortCode && `• Code: ${item.shortCode}`}
@@ -615,7 +615,7 @@ const MasterData = ({ initialTab }) => {
                             <Layers size={24} />
                         </div>
                         <div>
-                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{item.name}</div>
+                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{item.name || 'Unnamed Department'}</div>
                             <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontFamily: 'monospace', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', marginTop: '4px' }}>
                                 {item.code}
                             </div>
@@ -626,7 +626,7 @@ const MasterData = ({ initialTab }) => {
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{item.name}</div>
+                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{item.name || 'Unnamed Subject'}</div>
                             <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: item.type === 'lab' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(59, 130, 246, 0.2)', color: item.type === 'lab' ? '#fbbf24' : '#60a5fa' }}>
                                 {item.type === 'lab' ? 'LAB' : 'THEORY'}
                             </span>
@@ -651,9 +651,9 @@ const MasterData = ({ initialTab }) => {
                             <MapPin size={24} />
                         </div>
                         <div>
-                            <div style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{item.name}</div>
+                            <div style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{item.name || 'Unnamed Room'}</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                                {item.type ? (item.type.charAt(0).toUpperCase() + item.type.slice(1)) : 'Unknown Type'} • Capacity: {item.capacity}
+                                {(item.type && typeof item.type === 'string') ? (item.type.charAt(0).toUpperCase() + item.type.slice(1)) : 'Unknown Type'} • Capacity: {item.capacity}
                             </div>
                         </div>
                     </div>
