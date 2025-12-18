@@ -1023,12 +1023,12 @@ const Assignments = () => {
                             {/* Row 3: Faculty */}
                             <div className="form-group-row">
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Lead Faculty</label>
+                                    <label>Faculty 1</label>
                                     <Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty} onChange={setSelectedFaculty} placeholder="Select Faculty..." />
                                     {renderFacultyLoad(selectedFaculty)}
                                 </div>
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Assistant Faculty (Optional)</label>
+                                    <label>Faculty 2</label>
                                     <Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty2} onChange={setSelectedFaculty2} placeholder="Select Assistant..." />
                                     {renderFacultyLoad(selectedFaculty2)}
                                 </div>
