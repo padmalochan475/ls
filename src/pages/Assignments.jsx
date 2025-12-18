@@ -990,71 +990,77 @@ const Assignments = () => {
             {/* Main Content (Stacked) */}
             <div className="assignments-content">
 
-                {/* Section: Create Assignment (Admin Only) - "Command Center" Layout */}
+                {/* Section: Create Assignment (Admin Only) - Premium Layout */}
                 {isAdmin && (
-                    <div className="glass-panel form-panel animate-slide-up">
+                    <div className="glass-panel form-panel animate-slide-up premium-form-panel">
                         <div className="panel-header compact-header">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div className="panel-icon-wrapper"><Keyboard size={18} color="#60a5fa" /></div>
-                                <h3 className="panel-title">Create Assignment</h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div className="panel-icon-wrapper"><Keyboard size={20} color="#60a5fa" /></div>
+                                <h3 className="panel-title" style={{ fontSize: '1.25rem' }}>Create Assignment</h3>
                             </div>
-                            {/* Status Indicator */}
+                            {/* Status Pill */}
                             <div className={`status-pill ${saving ? 'saving' : conflict ? 'conflict' : 'ready'}`}>
+                                <div className={`status-dot ${saving ? 'pulse' : ''}`} style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', marginRight: 6 }}></div>
                                 {saving ? 'Saving...' : conflict ? 'Conflict Detected' : 'Ready to Create'}
                             </div>
                         </div>
 
-                        <div className="form-grid-compact">
+                        <div className="form-grid-premium">
                             {/* Row 1: Time & Location */}
                             <div className="form-group-row">
-                                <div className="form-group"><label>Day</label><Select options={days} value={selectedDay} onChange={setSelectedDay} placeholder="Day" /></div>
-                                <div className="form-group"><label>Time</label><Select options={timeSlots} value={selectedTime} onChange={setSelectedTime} placeholder="Time" /></div>
-                                <div className="form-group"><label>Room</label><Select options={rooms} value={selectedRoom} onChange={setSelectedRoom} placeholder="Room" /></div>
-                                <div className="form-group" style={{ flex: 1.5 }}><label>Subject</label><Select options={subjects.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))} value={selectedSubject} onChange={setSelectedSubject} placeholder="Subject" /></div>
+                                <div className="form-group"><label>Day</label><Select options={days} value={selectedDay} onChange={setSelectedDay} placeholder="Select Day" /></div>
+                                <div className="form-group"><label>Time</label><Select options={timeSlots} value={selectedTime} onChange={setSelectedTime} placeholder="Select Time" /></div>
+                                <div className="form-group"><label>Room</label><Select options={rooms} value={selectedRoom} onChange={setSelectedRoom} placeholder="Select Room" /></div>
+                                <div className="form-group" style={{ flex: 1.5 }}><label>Subject</label><Select options={subjects.map(s => ({ value: s.name, label: `${s.name} ${s.shortCode ? `[${s.shortCode}]` : ''}` }))} value={selectedSubject} onChange={setSelectedSubject} placeholder="Search Subject..." /></div>
                             </div>
 
                             {/* Row 2: Class Target */}
                             <div className="form-group-row">
-                                <div className="form-group"><label>Dept</label><Select options={departments} value={selectedDept} onChange={setSelectedDept} placeholder="Dept" /></div>
-                                <div className="form-group"><label>Sem</label><Select options={semesters} value={selectedSem} onChange={setSelectedSem} placeholder="Sem" /></div>
-                                <div className="form-group"><label>Group</label><Select options={rawGroups.map(g => ({ value: g.name, label: g.name }))} value={selectedMainGroup} onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }} placeholder="Group" /></div>
-                                <div className="form-group"><label>Sub-Grp</label><Select options={availableSubGroups} value={selectedSubGroup} onChange={setSelectedSubGroup} placeholder="All" disabled={!selectedMainGroup || availableSubGroups.length === 0} /></div>
+                                <div className="form-group"><label>Department</label><Select options={departments} value={selectedDept} onChange={setSelectedDept} placeholder="Dept" /></div>
+                                <div className="form-group"><label>Semester</label><Select options={semesters} value={selectedSem} onChange={setSelectedSem} placeholder="Sem" /></div>
+                                <div className="form-group"><label>Group</label><Select options={rawGroups.map(g => ({ value: g.name, label: g.name }))} value={selectedMainGroup} onChange={val => { setSelectedMainGroup(val); setSelectedSubGroup(''); }} placeholder="Main Group" /></div>
+                                <div className="form-group"><label>Sub-Group</label><Select options={availableSubGroups} value={selectedSubGroup} onChange={setSelectedSubGroup} placeholder="All Sub-groups" disabled={!selectedMainGroup || availableSubGroups.length === 0} /></div>
                             </div>
 
                             {/* Row 3: Faculty */}
                             <div className="form-group-row">
-                                <div className="form-group" style={{ flex: 1 }}><label>Faculty 1</label><Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty} onChange={setSelectedFaculty} placeholder="Select Faculty..." />{renderFacultyLoad(selectedFaculty)}</div>
-                                <div className="form-group" style={{ flex: 1 }}><label>Faculty 2</label><Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty2} onChange={setSelectedFaculty2} placeholder="Optional..." />{renderFacultyLoad(selectedFaculty2)}</div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Lead Faculty</label>
+                                    <Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty} onChange={setSelectedFaculty} placeholder="Select Faculty..." />
+                                    {renderFacultyLoad(selectedFaculty)}
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Assistant Faculty (Optional)</label>
+                                    <Select options={faculty.map(f => ({ value: f.id, label: `${f.name} ${f.shortCode ? `[${f.shortCode}]` : ''}` }))} value={selectedFaculty2} onChange={setSelectedFaculty2} placeholder="Select Assistant..." />
+                                    {renderFacultyLoad(selectedFaculty2)}
+                                </div>
                             </div>
                         </div>
 
-                        {/* Action Bar: Insights + Buttons */}
-                        <div className="action-bar-unified">
-                            {/* Left: AI / Error Feedback */}
-                            <div className="feedback-zone">
-                                {isAnalyzing && (
-                                    <div className="mini-alert analyzing"><RefreshCw size={14} className="spin" /> Checking...</div>
-                                )}
-                                {conflict && !saving && (
-                                    <div className="mini-alert error"><AlertTriangle size={14} /> {conflict.message}</div>
-                                )}
-                                {aiInsight && !conflict && !saving && !isAnalyzing && (
-                                    <div className="mini-alert insight" style={{ borderColor: aiInsight.color, color: aiInsight.color, background: `${aiInsight.color}10` }}>
-                                        <Brain size={14} /> <span>{aiInsight.message}</span>
-                                    </div>
-                                )}
-                                {successMsg && (
-                                    <div className="mini-alert success"><Check size={14} /> {successMsg} <button onClick={() => setSuccessMsg('')} style={{ background: 'none', border: 'none', marginLeft: 'auto' }}><X size={12} /></button></div>
+                        {/* Status Console Box */}
+                        <div className="status-console-box">
+                            {/* Console Screen */}
+                            <div className={`console-screen ${conflict ? 'state-error' : successMsg ? 'state-success' : 'state-idle'}`}>
+                                {isAnalyzing ? (
+                                    <div className="console-line"><RefreshCw size={16} className="spin" /> <span>System analyzing schedule conflicts...</span></div>
+                                ) : conflict ? (
+                                    <div className="console-line"><AlertTriangle size={16} /> <span>Conflict: {conflict.message}</span></div>
+                                ) : successMsg ? (
+                                    <div className="console-line"><Check size={16} /> <span>Success: {successMsg}</span></div>
+                                ) : aiInsight ? (
+                                    <div className="console-line"><Brain size={16} /> <span>AI Insight: {aiInsight.message}</span></div>
+                                ) : (
+                                    <div className="console-line idle"><span>Waiting for input... System ready.</span></div>
                                 )}
                             </div>
 
-                            {/* Right: Buttons */}
-                            <div className="button-group-compact">
-                                <button className="btn-icon-text secondary" onClick={() => { setSelectedSubject(''); setSelectedFaculty(''); setSelectedRoom(''); setSelectedFaculty2(''); }}>
-                                    <X size={16} /> Clear
+                            {/* Control Buttons */}
+                            <div className="console-controls">
+                                <button className="premium-btn clear" onClick={() => { setSelectedSubject(''); setSelectedFaculty(''); setSelectedRoom(''); setSelectedFaculty2(''); setSuccessMsg(''); }}>
+                                    <X size={18} /> Clear
                                 </button>
-                                <button className="btn-icon-text primary" onClick={handleAssign} disabled={saving || !!conflict}>
-                                    {saving ? <RefreshCw className="spin" size={16} /> : <Check size={16} />} Create
+                                <button className="premium-btn create" onClick={handleAssign} disabled={saving || !!conflict}>
+                                    {saving ? <RefreshCw className="spin" size={18} /> : <Check size={18} />} Create Assignment
                                 </button>
                             </div>
                         </div>
@@ -1399,6 +1405,126 @@ const Assignments = () => {
                     border-bottom-right-radius: 8px;
                     border-right: 1px solid rgba(255,255,255,0.02);
                 }
+
+                /* --- PREMIUM FORM STYLES --- */
+                .premium-form-panel {
+                    padding: 2.5rem !important; /* Spacious */
+                    background: linear-gradient(160deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
+                    border: 1px solid rgba(255,255,255,0.08);
+                    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5) !important;
+                }
+
+                .form-grid-premium {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem; /* Increased vertical gap */
+                    margin-bottom: 2.5rem;
+                }
+
+                .form-group-row {
+                    display: flex;
+                    gap: 1.5rem; /* Increased horizontal gap */
+                    width: 100%;
+                }
+
+                /* Premium Status Console */
+                .status-console-box {
+                    background: rgba(4, 7, 13, 0.5);
+                    border-radius: 16px;
+                    padding: 1.25rem 1.5rem;
+                    border: 1px solid rgba(255,255,255,0.03);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    box-shadow: inset 0 2px 10px rgba(0,0,0,0.4);
+                }
+
+                .console-screen {
+                    flex: 1;
+                    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                    font-size: 0.95rem;
+                    display: flex;
+                    align-items: center;
+                    padding-right: 1rem;
+                }
+
+                .console-line {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+
+                .console-screen.idle { color: #475569; }
+                .console-screen.state-error { color: #f87171; }
+                .console-screen.state-success { color: #4ade80; }
+                .console-screen.state-idle span { opacity: 0.6; }
+
+                /* Premium Buttons */
+                .console-controls {
+                    display: flex;
+                    gap: 1rem;
+                }
+
+                .premium-btn {
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 0.9rem;
+                    letter-spacing: 0.02em;
+                }
+
+                .premium-btn.clear {
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    color: #94a3b8;
+                }
+                .premium-btn.clear:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    color: #fff;
+                    transform: translateY(-1px);
+                }
+
+                .premium-btn.create {
+                    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                    border: none;
+                    color: #0f172a;
+                    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+                }
+                .premium-btn.create:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2);
+                }
+                .premium-btn.create:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                    background: #334155;
+                    color: #64748b;
+                    box-shadow: none;
+                }
+
+                @keyframes slideInRight {
+                    from { opacity: 0; transform: translateX(-10px); }
+                    to { opacity: 1; transform: translateX(0); }
+                }
+
+                /* Hide scrollbar for clean look */
+                .assignments-container::-webkit-scrollbar {
+                  width: 8px;
+                }
+                .assignments-container::-webkit-scrollbar-track {
+                  background: rgba(0,0,0,0.1);
+                }
+                .assignments-container::-webkit-scrollbar-thumb {
+                  background: rgba(255,255,255,0.1);
+                  border-radius: 4px;
+                }
+
 
                 .cell-primary {
                     font-weight: 600;
