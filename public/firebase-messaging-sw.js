@@ -9,7 +9,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-comp
 // Note: If you encounter errors, you may need to hardcode the 'messagingSenderId' here.
 const firebaseConfig = {
     // It is safe to expose this in client-side code
-    messagingSenderId: "160195982823"
+    messagingSenderId: "250431971958"
 };
 
 firebase.initializeApp(firebaseConfig);
