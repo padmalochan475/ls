@@ -7,7 +7,7 @@ import { useMasterData } from '../contexts/MasterDataContext';
 import { analyzeSchedule } from '../utils/conflictDetection';
 import '../styles/design-system.css';
 import ConfirmModal from '../components/ConfirmModal';
-import { ChevronDown, Check, LayoutGrid, List, Zap, Filter, Users, BookOpen, FlaskConical, Layers, X, RefreshCw } from 'lucide-react';
+import { ChevronDown, Check, LayoutGrid, List, Zap, Filter, Users, BookOpen, FlaskConical, Layers, X, RefreshCw, Printer } from 'lucide-react';
 
 const MultiSelectDropdown = ({ options, selected, onChange, label, icon: Icon }) => {
     const [isOpen, setIsOpen] = useState(false);
