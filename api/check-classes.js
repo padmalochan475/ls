@@ -545,6 +545,7 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
             const targetName = target.name ? target.name.toString().trim().toLowerCase() : null;
 
             // 1. SEARCH BY ID (STRICT PRIMARY)
+            let foundById = false;
             if (targetId) {
                 const userMatch = allUsers.find(u => 
                     u.empId && u.empId.toString().trim().toLowerCase() === targetId
@@ -555,7 +556,6 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                 );
 
                 if (userMatch || facMatch) {
-                    // MERGE: Prefer User profile data, fallback to Faculty Master
                     discoveredUsers.push({
                         uid: userMatch?.uid || facMatch?.uid || facMatch?.id,
                         oneSignalId: userMatch?.oneSignalId || null,
@@ -565,13 +565,12 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                         whatsappEnabled: (userMatch?.whatsappEnabled !== false) && (facMatch?.whatsappEnabled !== false),
                         isExactMatch: true
                     });
-                    return; 
+                    foundById = true;
                 }
-                return;
             }
 
-            // 2. SEARCH BY NAME (LEGACY FALLBACK) - Only if target.id is truly blank.
-            if (targetName) {
+            // 2. SEARCH BY NAME (LEGACY FALLBACK) - Only if ID search came up empty.
+            if (!foundById && targetName) {
                 let nameMatch = allUsers.find(u => {
                     const uName = u.name ? u.name.toString().trim().toLowerCase() : null;
                     return uName && (uName === targetName || uName.includes(targetName) || targetName.includes(uName));
