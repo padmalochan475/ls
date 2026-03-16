@@ -1,9 +1,9 @@
-
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { sendWhatsAppNotification } from './whatsappUtils';
 
 /**
- * Sends notifications (In-App + Push) to users.
+ * Sends notifications (In-App + Push + WhatsApp) to users.
  * 
  * @param {Object} params
  * @param {string[]} [params.userIds] - Array of Firebase Auth UIDs to target.
@@ -27,10 +27,8 @@ export const sendNotification = async ({
 
         // 1. Resolve EmpIDs to UIDs
         if (empIds.length > 0) {
-            // Process sequentially to be safe with Firestore limits/logic
             for (const empId of empIds) {
                 if (!empId) continue;
-                // Query by empId to get the UID (doc.id)
                 const q = query(collection(db, 'users'), where('empId', '==', empId));
                 const snap = await getDocs(q);
                 snap.forEach(doc => {
@@ -39,7 +37,6 @@ export const sendNotification = async ({
             }
         }
 
-        // Deduplicate UIDs
         targetUids = [...new Set(targetUids)];
 
         if (targetUids.length === 0) {
@@ -47,8 +44,7 @@ export const sendNotification = async ({
             return { success: false, message: 'No valid users found' };
         }
 
-        // 2. Add to In-App Notification History (Firestore) - RELIABLE
-        // We write strict "serverTimestamp()" for consistency
+        // 2. Add to In-App Notification History (Firestore)
         const historyPromises = targetUids.map(uid =>
             addDoc(collection(db, 'users', uid, 'notifications'), {
                 title,
@@ -59,22 +55,67 @@ export const sendNotification = async ({
                 ...data
             })
         );
-
-        // Wait for Firestore writes to ensure data consistency
         await Promise.all(historyPromises);
 
-        // 3. Send Push Notification via Serverless API (Conditional)
+        // 3. WHATSAPP INTEGRATION (Dynamic Template Engine)
+        const getWhatsAppTemplate = (profile) => {
+            const userName = profile.name || 'Faculty';
+            
+            switch (type) {
+                case 'substitution_request':
+                    return `🔄 *Substitution Request* 🔄\n\nHello *${userName}*,\nYou have received a new substitution request.\n\n📝 *Details*:\n${body}\n\n👉 _Log in to the portal to Accept or Reject._`;
+                
+                case 'substitution_approved':
+                    return `✅ *Substitution Approved* ✅\n\nGood news *${userName}*,\nYour substitution has been *Approved*.\n\n📅 *Updated Schedule*:\n${body}\n\n_System Admin_`;
+
+                case 'substitution_rejected':
+                    return `❌ *Substitution Request Status* ❌\n\nHello *${userName}*,\nA substitution request has been *Rejected* or cancelled.\n\nℹ️ *Info*:\n${body}`;
+
+                case 'account_approved':
+                    return `👋 *Welcome to LAMS, ${userName}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_`;
+
+                case 'substitution_accepted':
+                    return `🎉 *Substitution Request Confirmed* 🎉\n\nHello *${userName}*,\nYour request has been *Accepted* by the target faculty member.\n\n📅 *Schedule Updated*:\n${body}\n\n_System Admin_`;
+
+                case 'substitution_cancelled':
+                    return `⚠️ *Substitution Cancelled* ⚠️\n\nHello *${userName}*,\nA previously requested substitution has been *Cancelled*.\n\nℹ️ *Info*:\n${body}`;
+
+                case 'manual':
+                case 'manual_alert':
+                case 'alert':
+                    return `📢 *Admin Announcement* 📢\n\n*${title}*\n${body}\n\n_System Broadcast_`;
+
+                default:
+                    return `🔔 *LAMS Notification* 🔔\n\n*${title}*\n${body}\n\n_Check the portal for details._`;
+            }
+        };
+
+        const whatsappPromises = targetUids.map(async (uid) => {
+            try {
+                const userSnap = await getDoc(doc(db, 'users', uid));
+                if (userSnap.exists()) {
+                    const profile = userSnap.data();
+                    if (profile.mobile && profile.whatsappEnabled !== false) {
+                        const waMessage = getWhatsAppTemplate(profile);
+                        return sendWhatsAppNotification(profile.mobile, waMessage);
+                    }
+                }
+            } catch (err) {
+                console.warn(`WhatsApp skip for ${uid}:`, err.message);
+            }
+            return null;
+        });
+        // We don't await all WhatsApp calls to block the flow, but we initiate them
+        Promise.all(whatsappPromises).catch(err => console.error("WhatsApp Bulk Error:", err));
+
+        // 4. Send Push Notification via Serverless API
         let pushStatus = "skipped";
 
-        // 🛡️ DEV MODE BYPASS: Prevent "develop issues" by skipping external API calls locally
         if (import.meta.env.DEV) {
             console.log(`[DEV] Mocking Push Notification: "${title}" to ${targetUids.length} users.`);
-            console.log("To test real push, use a tailored 'npm run build && npm run preview' or deploy.");
             pushStatus = "dev_mock_success";
         } else {
-            // PRODUCTION: Attempt sending, but treat as non-fatal enhancement
             try {
-                // Uses 'external_id' targeting strategy (Firebase UID mapping)
                 const apiRes = await fetch('/api/send-notification', {
                     method: 'POST',
                     headers: {
@@ -86,18 +127,13 @@ export const sendNotification = async ({
                         targetType: 'external_id',
                         title,
                         body,
-                        data: {
-                            ...data,
-                            type // Ensure type is passed in data payload for client handlers
-                        }
+                        data: { ...data, type }
                     })
                 });
 
                 if (apiRes.ok) pushStatus = "sent";
                 else console.warn("Push API Warning:", await apiRes.text());
-
             } catch (err) {
-                // Network error or blocked
                 console.error("Push Notification API Error (Non-Fatal):", err);
                 pushStatus = "failed";
             }

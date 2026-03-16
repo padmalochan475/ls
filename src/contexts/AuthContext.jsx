@@ -163,6 +163,7 @@ export const AuthProvider = ({ children }) => {
             status: isFirstUser ? 'approved' : 'pending',
             dept: linkedDept,
             isFaculty: isFaculty,
+            whatsappEnabled: true,
             createdAt: new Date().toISOString()
         };
         await setDoc(doc(db, 'users', user.uid), userProfileData);

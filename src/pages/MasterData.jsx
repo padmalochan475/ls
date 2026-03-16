@@ -209,6 +209,78 @@ const MasterData = ({ initialTab }) => {
     useEffect(() => {
         if (initialTab && initialTab !== 'security') setActiveTab(initialTab);
     }, [initialTab]);
+    const hasAutoSyncedRef = useRef(false);
+
+    const handleSyncFacultyPhones = async (isManual = false) => {
+        if (!checkWritePermission()) return;
+        if (hasAutoSyncedRef.current && !isManual) return;
+        
+        hasAutoSyncedRef.current = true;
+        
+        try {
+            const [usersSnap, facultySnap] = await Promise.all([
+                getDocs(collection(db, 'users')),
+                getDocs(collection(db, 'faculty'))
+            ]);
+
+            const usersMap = new Map();
+            usersSnap.forEach(u => {
+                const ud = u.data();
+                usersMap.set(u.id, ud);
+                if (ud.empId) {
+                    const cleanId = ud.empId.toString().trim().toLowerCase();
+                    if (!usersMap.has(cleanId)) usersMap.set(cleanId, ud);
+                }
+            });
+
+            const batch = writeBatch(db);
+            let updateCount = 0;
+
+            facultySnap.forEach(f => {
+                const fd = f.data();
+                const userMatch = (fd.uid && usersMap.get(fd.uid)) || 
+                                 (fd.empId && usersMap.get(fd.empId.toString().trim().toLowerCase()));
+
+                if (userMatch) {
+                    const updates = {};
+                    
+                    // Sync Phone if missing
+                    if (!fd.phone || !fd.phone.trim() || fd.phone === '--') {
+                        updates.phone = userMatch.mobile;
+                    }
+                    
+                    // Sync DOB if missing
+                    if (!fd.dob && userMatch.dob) {
+                        updates.dob = userMatch.dob;
+                    }
+
+                    // Sync Joining Date if missing
+                    if (!fd.joiningDate && userMatch.joiningDate) {
+                        updates.joiningDate = userMatch.joiningDate;
+                    }
+
+                    if (Object.keys(updates).length > 0) {
+                        batch.update(f.ref, updates);
+                        updateCount++;
+                    }
+                }
+            });
+
+            if (updateCount > 0) {
+                await batch.commit();
+                toast.success(`Background Sync: Updated ${updateCount} missing faculty phone numbers.`, { duration: 4000 });
+            }
+        } catch (err) {
+            console.warn("Silent Sync Background Error:", err);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'faculty' && userProfile?.role === 'admin') {
+            handleSyncFacultyPhones();
+        }
+    }, [activeTab]);
+
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -268,18 +340,18 @@ const MasterData = ({ initialTab }) => {
 
     // Define Tabs and their corresponding Firestore collections
     const tabs = [
-        { id: 'faculty', label: 'Faculty', icon: <Users size={18} />, collection: 'faculty' },
-        { id: 'departments', label: 'Departments', icon: <Layers size={18} />, collection: 'departments' },
-        { id: 'subjects', label: 'Subjects', icon: <BookOpen size={18} />, collection: 'subjects' },
-        { id: 'rooms', label: 'Rooms', icon: <MapPin size={18} />, collection: 'rooms' },
-        { id: 'groups', label: 'Groups', icon: <Box size={18} />, collection: 'groups' },
-        { id: 'days', label: 'Days', icon: <Calendar size={18} />, collection: 'days' },
-        { id: 'timeslots', label: 'Time Slots', icon: <Clock size={18} />, collection: 'timeslots' },
-        { id: 'semesters', label: 'Semesters', icon: <Hash size={18} />, collection: 'semesters' },
-        { id: 'holidays', label: 'Holidays', icon: <CalendarOff size={18} />, collection: 'settings' },
-        { id: 'settings', label: 'Settings', icon: <Settings size={18} />, collection: 'settings' },
+        { id: 'faculty', label: 'Faculty', singular: 'Faculty', icon: <Users size={18} />, collection: 'faculty' },
+        { id: 'departments', label: 'Departments', singular: 'Department', icon: <Layers size={18} />, collection: 'departments' },
+        { id: 'subjects', label: 'Subjects', singular: 'Subject', icon: <BookOpen size={18} />, collection: 'subjects' },
+        { id: 'rooms', label: 'Rooms', singular: 'Room', icon: <MapPin size={18} />, collection: 'rooms' },
+        { id: 'groups', label: 'Groups', singular: 'Group', icon: <Box size={18} />, collection: 'groups' },
+        { id: 'days', label: 'Days', singular: 'Day', icon: <Calendar size={18} />, collection: 'days' },
+        { id: 'timeslots', label: 'Time Slots', singular: 'Time Slot', icon: <Clock size={18} />, collection: 'timeslots' },
+        { id: 'semesters', label: 'Semesters', singular: 'Semester', icon: <Hash size={18} />, collection: 'semesters' },
+        { id: 'holidays', label: 'Holidays', singular: 'Holiday', icon: <CalendarOff size={18} />, collection: 'settings' },
+        { id: 'settings', label: 'Settings', singular: 'Setting', icon: <Settings size={18} />, collection: 'settings' },
         // Security Sync (Hidden: Run once during migration)
-        { id: 'security', label: 'Sync Security', icon: <RefreshCw size={18} />, collection: 'users', isAction: true },
+        { id: 'security', label: 'Sync Security', singular: 'Sync Action', icon: <RefreshCw size={18} />, collection: 'users', isAction: true },
     ];
 
     const activeCollection = tabs.find(t => t.id === activeTab)?.collection;
@@ -1137,7 +1209,9 @@ const MasterData = ({ initialTab }) => {
                             await updateDoc(userRef, {
                                 empId: formData.empId || null,
                                 isFaculty: true,
-                                dept: formData.department || formData.dept || null
+                                dept: formData.department || formData.dept || null,
+                                mobile: formData.phone || null,
+                                whatsappEnabled: formData.whatsappEnabled !== false
                             });
                         }
                     } catch (uErr) {
@@ -1150,6 +1224,9 @@ const MasterData = ({ initialTab }) => {
                 let dataToSave = { ...formData };
                 if (activeTab === 'holidays') {
                     dataToSave.type = 'holiday';
+                }
+                if (activeCollection === 'faculty' && dataToSave.whatsappEnabled === undefined) {
+                    dataToSave.whatsappEnabled = true;
                 }
                 await addDoc(collection(db, activeCollection), dataToSave);
 
@@ -1165,7 +1242,9 @@ const MasterData = ({ initialTab }) => {
                             batch.update(userRef, {
                                 isFaculty: true,
                                 empId: formData.empId || null,
-                                dept: formData.department || formData.dept || null
+                                dept: formData.department || formData.dept || null,
+                                mobile: formData.phone || null,
+                                whatsappEnabled: formData.whatsappEnabled !== false
                             });
                         }
 
@@ -1227,20 +1306,35 @@ const MasterData = ({ initialTab }) => {
                 return (
                     <>
                         <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginBottom: '0.5rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.85rem', color: '#93c5fd', marginBottom: '0.5rem' }}>Link Registered User (Syncs Data)</label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                <label style={{ fontSize: '0.85rem', color: '#93c5fd', fontWeight: 600 }}>Link Registered User (Syncs Data)</label>
+                                {formData.uid ? (
+                                    <span style={{ fontSize: '0.75rem', color: '#4ade80', background: 'rgba(74, 222, 128, 0.1)', padding: '2px 8px', borderRadius: '4px' }}>✓ Linked</span>
+                                ) : (
+                                    <span style={{ fontSize: '0.75rem', color: '#fb7185', background: 'rgba(251, 113, 133, 0.1)', padding: '2px 8px', borderRadius: '4px' }}>Not Linked</span>
+                                )}
+                            </div>
                             <select
                                 className="glass-input"
                                 value={formData.uid || ''}
                                 onChange={(e) => handleUserSelect(e.target.value)}
                                 style={{ background: 'rgba(0, 0, 0, 0.3)', color: 'white' }}
+                                disabled={loading && usersList.length === 0}
                             >
-                                <option value="" style={{ background: '#1e293b', color: 'white' }}>Select User to Link...</option>
+                                <option value="" style={{ background: '#1e293b', color: 'white' }}>
+                                    {usersList.length === 0 ? 'Loading Users...' : 'Select User to Link...'}
+                                </option>
                                 {usersList.map(u => (
                                     <option key={u.id} value={u.id} style={{ background: '#1e293b', color: 'white' }}>
                                         {u.name} ({u.empId || u.email || 'No ID'})
                                     </option>
                                 ))}
                             </select>
+                            {!formData.uid && usersList.length > 0 && formData.name && (
+                                <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                    💡 Looking for: <b>{formData.name}</b>
+                                </div>
+                            )}
                         </div>
 
                         <input className="glass-input" placeholder="Full Name" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
@@ -1254,16 +1348,28 @@ const MasterData = ({ initialTab }) => {
                             {deptOptions.map(d => <option key={d} value={d} style={{ background: '#1e293b', color: 'white' }}>{d}</option>)}
                         </select>
                         <input className="glass-input" placeholder="Designation" value={formData.designation || ''} onChange={e => setFormData({ ...formData, designation: e.target.value })} />
-                        <input className="glass-input" placeholder="Phone Number (10 digits)" type="tel" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'white', marginTop: '0.5rem' }}>
-                            <input
-                                type="checkbox"
-                                checked={formData.whatsappEnabled !== false}
-                                onChange={e => setFormData({ ...formData, whatsappEnabled: e.target.checked })}
-                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                            />
-                            <label>Enable WhatsApp Notifications</label>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', color: '#93c5fd', marginBottom: '0.25rem' }}>Date of Birth</label>
+                                <input className="glass-input" type="date" value={formData.dob || ''} onChange={e => setFormData({ ...formData, dob: e.target.value })} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', color: '#93c5fd', marginBottom: '0.25rem' }}>Joining Date</label>
+                                <input className="glass-input" type="date" value={formData.joiningDate || ''} onChange={e => setFormData({ ...formData, joiningDate: e.target.value })} />
+                            </div>
                         </div>
+                        <input className="glass-input" placeholder="Phone Number (10 digits)" type="tel" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: 'white', marginTop: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                             <label style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', flex: 1 }}>WhatsApp Notifications</label>
+                             <label className="switch">
+                                 <input
+                                     type="checkbox"
+                                     checked={formData.whatsappEnabled !== false}
+                                     onChange={e => setFormData({ ...formData, whatsappEnabled: e.target.checked })}
+                                 />
+                                 <span className="slider"></span>
+                             </label>
+                         </div>
                     </>
                 );
             case 'departments':
@@ -1516,20 +1622,22 @@ const MasterData = ({ initialTab }) => {
                 </div>
 
                 {isAdmin && activeTab !== 'settings' && (
-                    <button
-                        onClick={() => openModal()}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            background: 'linear-gradient(135deg, var(--color-accent) 0%, #2563eb 100%)',
-                            border: 'none', borderRadius: '12px', color: 'white',
-                            display: 'flex', alignItems: 'center', gap: '0.5rem',
-                            cursor: 'pointer', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-                            fontWeight: 600, transition: 'all 0.2s'
-                        }}
-                    >
-                        <Plus size={20} />
-                        Add New
-                    </button>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            onClick={() => openModal()}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                background: 'linear-gradient(135deg, var(--color-accent) 0%, #2563eb 100%)',
+                                border: 'none', borderRadius: '12px', color: 'white',
+                                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                cursor: 'pointer', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                                fontWeight: 600, transition: 'all 0.2s'
+                            }}
+                        >
+                            <Plus size={20} />
+                            Add New
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -1948,7 +2056,7 @@ const MasterData = ({ initialTab }) => {
                         display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
                     }}>
                         <div className="glass-panel" style={{ width: '90%', maxWidth: '450px', padding: '2.5rem', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
-                            <h3 style={{ marginBottom: '2rem', fontSize: '1.5rem', fontWeight: 700 }}>{editingId ? 'Edit' : 'Add'} {tabs.find(t => t.id === activeTab)?.label.slice(0, -1)}</h3>
+                            <h3 style={{ marginBottom: '2rem', fontSize: '1.5rem', fontWeight: 700 }}>{editingId ? 'Edit' : 'Add'} {tabs.find(t => t.id === activeTab)?.singular || 'Item'}</h3>
                             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                                 {renderFormFields()}
                                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>

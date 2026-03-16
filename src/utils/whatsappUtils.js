@@ -1,7 +1,7 @@
 // src/utils/whatsappUtils.js
 
 const WHATSAPP_API_URL = 'https://lams-whatsapp-bot.onrender.com/api/sendText';
-const API_KEY = process.env.VITE_WHATSAPP_API_KEY || 'lams_local_dev_key_123';
+const API_KEY = import.meta.env.VITE_WHATSAPP_API_KEY || 'lams_local_dev_key_123';
 
 /**
  * Sends a WhatsApp notification to a specific phone number.

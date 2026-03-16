@@ -616,6 +616,25 @@ const Substitutions = () => {
                 targetResponse: null, // Will be set to 'accepted' or 'declined' when faculty responds
                 createdAt: serverTimestamp()
             });
+
+            // 📢 NOTIFY TARGET FACULTY
+            try {
+                const cGroupStr = `${originalClass.dept || '?'}-${originalClass.grp || originalClass.section || '?'}${originalClass.group && originalClass.group !== 'All' ? `-${originalClass.group}` : ''}`;
+                await sendNotification({
+                    empIds: [targetFacultyId],
+                    title: "New Substitution Request",
+                    body: `${userProfile.name} requested you to cover ${originalClass.subject || 'class'} on ${selectedDate} at ${originalClass.time || 'N/A'} for (${cGroupStr}).`,
+                    type: 'substitution_request',
+                    data: {
+                        type: 'substitution_request',
+                        date: selectedDate,
+                        subject: originalClass.subject
+                    }
+                });
+            } catch (notifErr) {
+                console.warn("Notification failed (non-critical):", notifErr);
+            }
+
             toast.success("Request sent!");
             setView('list'); setActiveTab('sent');
             setStep(1); setSelectedDate(''); setSelectedClassId(''); setTargetFacultyId(''); setReason('');

@@ -64,5 +64,11 @@
             "source": "/((?!api/|OneSignalSDK.sw.js|OneSignalSDKWorker.js|manifest.json|logo.svg|vite.svg).*)",
             "destination": "/index.html"
         }
+    ],
+    "crons": [
+        {
+            "path": "/api/check-classes",
+            "schedule": "*/5 * * * *"
+        }
     ]
 }

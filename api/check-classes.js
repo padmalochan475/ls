@@ -73,6 +73,28 @@ async function sendOneSignal(target, title, body, data, targetType = 'external_i
     }
 }
 
+const WHATSAPP_API_URL = 'https://lams-whatsapp-bot.onrender.com/api/sendText';
+const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || process.env.VITE_WHATSAPP_API_KEY || 'lams_local_dev_key_123';
+
+async function sendWhatsApp(phoneNumber, message) {
+    if (!phoneNumber || !message) return false;
+    try {
+        await axios.post(WHATSAPP_API_URL, {
+            number: phoneNumber,
+            text: message
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': WHATSAPP_API_KEY
+            }
+        });
+        return true;
+    } catch (e) {
+        console.error("WhatsApp Error:", e.response?.data || e.message);
+        return false;
+    }
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export default async function handler(req, res) {
     if (req.method !== 'GET' && req.method !== 'POST') {
@@ -80,7 +102,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log("Starting check-classes (OneSignal)...");
+        console.log("Starting check-classes (OneSignal + WhatsApp)...");
 
         // 1. Get Settings
         const configSnap = await db.collection('settings').doc('config').get();
@@ -116,12 +138,30 @@ export default async function handler(req, res) {
                 const alreadySentHoliday = await db.collection('sent_notifications').doc(notifIdHoliday).get();
 
                 if (!alreadySentHoliday.exists && nowIST >= holidayAlertTime) {
+                    const title = '🎉 Holiday Alert';
+                    const body = `Today is ${h.name}. No classes today. Enjoy!`;
+                    
                     const success = await sendOneSignal(
                         'ALL',
-                        '🎉 Holiday Alert',
-                        `Today is ${h.name}. No classes today. Enjoy!`,
+                        title,
+                        body,
                         { type: 'holiday', date: todayDateStr }
                     );
+
+                    // WhatsApp Holiday Broadcast
+                    try {
+                        const usersSnap = await db.collection('users').get();
+                        const waTargets = usersSnap.docs
+                            .map(d => d.data())
+                            .filter(u => u.mobile && u.whatsappEnabled !== false);
+                        
+                        const waMsg = `🎉 *LAMS Holiday Alert* 🎉\n\nToday is *${h.name}*.\nNo classes today. Enjoy!\n\n_System Admin_`;
+                        
+                        // We do these in chunks or map, but since it's a small app, map is fine for now
+                        await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
+                    } catch (waErr) {
+                        console.error("Holiday WhatsApp Error:", waErr);
+                    }
 
                     if (success) {
                         await db.collection('sent_notifications').doc(notifIdHoliday).set({
@@ -136,7 +176,222 @@ export default async function handler(req, res) {
             console.error("Error checking holidays:", hErr);
         }
 
-        // 3. Query Schedule
+        // 3. BIRTHDAY & ANNIVERSARY GREETINGS (8:00 AM IST) - Done first so they fire even on holidays
+        const greetingAlertTime = new Date(nowIST);
+        greetingAlertTime.setHours(8, 0, 0, 0);
+
+        if (nowIST >= greetingAlertTime) {
+            const greetingSentId = `greetings_${todayDateStr}`;
+            const alreadySentGreeting = await db.collection('sent_notifications').doc(greetingSentId).get();
+
+            if (!alreadySentGreeting.exists) {
+                try {
+                    const facultySnap = await db.collection('faculty').get();
+                    const greetingTasks = [];
+
+                    for (const doc of facultySnap.docs) {
+                        const fac = doc.data();
+                        if (!fac.mobile && !fac.phone) continue;
+                        if (fac.whatsappEnabled === false) continue;
+
+                        const targetNumber = String(fac.mobile || fac.phone).replace(/[^0-9]/g, '');
+                        if (targetNumber.length < 10) continue;
+
+                        const [todayMonth, todayDay] = todayDateStr.split('-').slice(1).map(Number); // [MM, DD]
+
+                        // BIRTHDAY CHECK
+                        if (fac.dob) {
+                            const [bYear, bMonth, bDay] = fac.dob.split('-').map(Number);
+                            if (bMonth === todayMonth && bDay === todayDay) {
+                                let bdayMsg = `🎂 *Happy Birthday, ${fac.name}!* 🎂\n\nOn behalf of the entire college, we wish you a fantastic day filled with joy and a year ahead full of success and happiness. Keep inspiring! ✨\n\n_Best Wishes,_\n*LAMS Administration*`;
+                                greetingTasks.push(sendWhatsApp(targetNumber, bdayMsg));
+                                console.log(`Birthday greeting triggered for ${fac.name}`);
+                            }
+                        }
+
+                        // ANNIVERSARY CHECK
+                        if (fac.joiningDate) {
+                            const [jYear, jMonth, jDay] = fac.joiningDate.split('-').map(Number);
+                            if (jMonth === todayMonth && jDay === todayDay) {
+                                const yearsCompleted = nowIST.getFullYear() - jYear;
+                                if (yearsCompleted > 0) {
+                                    let annMsg = `🎊 *Work Anniversary Celebration* 🎊\n\nCongratulations *${fac.name}* on completing *${yearsCompleted} ${yearsCompleted === 1 ? 'year' : 'years'}* with our institution! 🏫\n\nThank you for your dedication, hard work, and the positive impact you've made. We are proud to have you on our team!\n\n_Warm Regards,_\n*College Management*`;
+                                    greetingTasks.push(sendWhatsApp(targetNumber, annMsg));
+                                    console.log(`Anniversary greeting triggered for ${fac.name} (${yearsCompleted} years)`);
+                                }
+                            }
+                        }
+                    }
+
+                    if (greetingTasks.length > 0) {
+                        await Promise.all(greetingTasks);
+                    }
+                    await db.collection('sent_notifications').doc(greetingSentId).set({ sentAt: new Date(), type: 'greetings_broadcast' });
+                } catch (greetErr) {
+                    console.error("Greetings Error:", greetErr);
+                }
+            }
+        }
+
+        // 4. BLOCK CLASS NOTIFICATIONS ON HOLIDAYS
+        const holidaySnap = await db.collection('settings').where('date', '==', todayDateStr).get();
+        const activeHoliday = holidaySnap.docs.find(d => d.data().type === 'holiday');
+        if (activeHoliday) {
+             return res.status(200).json({ status: "holiday", message: "Classes paused for holiday." });
+        }
+
+        // 3. WEEKLY PREVIEW (Sunday 7:00 PM Broadcast)
+        const weeklyAlertTime = new Date(nowIST);
+        weeklyAlertTime.setHours(19, 0, 0, 0);
+
+        if (dayName === 'Sunday' && nowIST >= weeklyAlertTime) {
+            const weeklySentId = `weekly_preview_${todayDateStr}`;
+            const alreadySentWeekly = await db.collection('sent_notifications').doc(weeklySentId).get();
+
+            if (!alreadySentWeekly.exists) {
+                try {
+                    const fullScheduleSnap = await db.collection('schedule')
+                        .where('academicYear', '==', activeAcademicYear)
+                        .get();
+                    const allSchedule = fullScheduleSnap.docs.map(d => d.data());
+                    
+                    // UNIFIED TARGET FETCHING
+                    const [uSnap, fSnap] = await Promise.all([db.collection('users').get(), db.collection('faculty').get()]);
+                    const usersMap = new Map();
+                    uSnap.forEach(d => usersMap.set(d.id, d.data()));
+                    
+                    const waTargets = fSnap.docs.map(d => {
+                        const fac = d.data();
+                        const user = fac.uid ? usersMap.get(fac.uid) : null;
+                        return {
+                            name: fac.name,
+                            empId: fac.empId,
+                            mobile: fac.mobile || fac.phone || user?.mobile || null,
+                            whatsappEnabled: (fac.whatsappEnabled !== false) && (user?.whatsappEnabled !== false)
+                        };
+                    }).filter(t => t.mobile && t.whatsappEnabled);
+
+                    await Promise.all(waTargets.map(async (target) => {
+                        const mySchedule = allSchedule.filter(cls => 
+                            cls.facultyEmpId === target.empId || cls.faculty === target.name || 
+                            cls.faculty2EmpId === target.empId || cls.faculty2 === target.name
+                        );
+
+                        if (mySchedule.length > 0) {
+                            let previewMsg = `🗓️ *Weekly Preview for ${target.name}* 🗓️\n\nPrep for the upcoming week! You have *${mySchedule.length} sessions* scheduled.\n\n`;
+                            
+                            // Group by day
+                            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                            days.forEach(d => {
+                                const dayClasses = mySchedule.filter(cls => cls.day === d);
+                                if (dayClasses.length > 0) {
+                                    previewMsg += `*${d}*: ${dayClasses.length} class(es)\n`;
+                                }
+                            });
+
+                            previewMsg += `\n🌐 _Check the portal for full timetable._\nGood luck for the week! 💪`;
+                            await sendWhatsApp(target.mobile, previewMsg);
+                        }
+                    }));
+                    await db.collection('sent_notifications').doc(weeklySentId).set({ sentAt: new Date(), type: 'weekly_preview' });
+                } catch (wErr) { console.error("Weekly Preview Error:", wErr); }
+            }
+        }
+
+        // 4. MORNING SCHEDULE SUMMARY (7:30 AM Broadcast)
+        const summaryAlertTime = new Date(nowIST);
+        summaryAlertTime.setHours(7, 30, 0, 0);
+
+        if (nowIST >= summaryAlertTime) {
+            const summarySentId = `morning_summary_${todayDateStr}`;
+            const alreadySentSummary = await db.collection('sent_notifications').doc(summarySentId).get();
+
+            if (!alreadySentSummary.exists) {
+                try {
+                    // Fetch all schedule for today
+                    const dayScheduleSnap = await db.collection('schedule')
+                        .where('academicYear', '==', activeAcademicYear)
+                        .where('day', '==', dayName)
+                        .get();
+
+                    if (!dayScheduleSnap.empty) {
+                        const allTodaysClasses = dayScheduleSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        
+                        // Fetch substitution data to reflect changes in summary
+                        const subSnap = await db.collection('substitutions')
+                            .where('date', '==', todayDateStr)
+                            .where('status', '==', 'approved')
+                            .get();
+                        const subsMap = new Map();
+                        subSnap.forEach(s => subsMap.set(s.data().assignmentId, s.data()));
+
+                        // UNIFIED TARGET FETCHING
+                        const [uSnap, fSnap] = await Promise.all([db.collection('users').get(), db.collection('faculty').get()]);
+                        const usersMap = new Map();
+                        uSnap.forEach(d => usersMap.set(d.id, d.data()));
+
+                        const waTargets = fSnap.docs.map(d => {
+                            const fac = d.data();
+                            const user = fac.uid ? usersMap.get(fac.uid) : null;
+                            return {
+                                name: fac.name,
+                                empId: fac.empId,
+                                mobile: fac.mobile || fac.phone || user?.mobile || null,
+                                whatsappEnabled: (fac.whatsappEnabled !== false) && (user?.whatsappEnabled !== false)
+                            };
+                        }).filter(t => t.mobile && t.whatsappEnabled);
+                        
+                        await Promise.all(waTargets.map(async (target) => {
+                            // Find classes where they are the primary, co-faculty, or substitute
+                            const targetClasses = allTodaysClasses.filter(cls => {
+                                const sub = subsMap.get(cls.id);
+                                if (sub) {
+                                    return sub.substituteEmpId === target.empId || sub.substituteName === target.name;
+                                }
+                                return cls.facultyEmpId === target.empId || cls.faculty === target.name || 
+                                       cls.faculty2EmpId === target.empId || cls.faculty2 === target.name;
+                            });
+
+                            if (targetClasses.length > 0) {
+                                // Sort by time
+                                targetClasses.sort((a,b) => parseTimeStr(a.time.split(' - ')[0], nowIST) - parseTimeStr(b.time.split(' - ')[0], nowIST));
+
+                                let waMsg = `📅 *Today's Briefing: ${target.name}* 📅\n`;
+                                waMsg += `Day: *${dayName}* | Classes: *${targetClasses.length}*\n\n`;
+                                
+                                targetClasses.forEach((cls, idx) => {
+                                    const sub = subsMap.get(cls.id);
+                                    const isSub = sub && (sub.substituteEmpId === target.empId || sub.substituteName === target.name);
+                                    
+                                    let typeIcon = cls.subject?.toLowerCase().includes('lab') ? '🧪' : '📖';
+                                    let time = cls.time.split(' - ')[0];
+                                    
+                                    waMsg += `${idx + 1}. *${time}* | ${typeIcon} *${cls.subject}*\n`;
+                                    waMsg += `   📍 Room: ${cls.room} | Group: ${cls.dept}-${cls.section}\n`;
+                                    
+                                    // Co-Faculty Info
+                                    if (cls.faculty && cls.faculty2) {
+                                        const otherFac = (cls.facultyEmpId === target.empId || cls.faculty === target.name) ? cls.faculty2 : cls.faculty;
+                                        waMsg += `   🤝 With: ${otherFac}\n`;
+                                    }
+
+                                    if (isSub) waMsg += `   🔄 _(Substitution for ${cls.faculty})_\n`;
+                                    waMsg += `\n`;
+                                });
+
+                                waMsg += `Have a productive day! ✨\n_LAMS Admin_`;
+                                await sendWhatsApp(target.mobile, waMsg);
+                            }
+                        }));
+                    }
+                    await db.collection('sent_notifications').doc(summarySentId).set({ sentAt: new Date(), type: 'morning_summary' });
+                } catch (summaryErr) {
+                    console.error("Morning Summary Error:", summaryErr);
+                }
+            }
+        }
+
+        // 5. Query Schedule for Real-Time Warnings (Original Logic)
         const scheduleSnap = await db.collection('schedule')
             .where('academicYear', '==', activeAcademicYear)
             .where('day', '==', dayName)
@@ -290,12 +545,23 @@ export default async function handler(req, res) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_first`;
                     const exists = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!exists) {
+                        const msgText = getAICopy(minutesLeft, cls.subject, groupStr, cls.room, resolvedCoFacultyName);
                         const success = await sendOneSignal(
                             targetPayload, 'Upcoming Class',
-                            getAICopy(minutesLeft, cls.subject, groupStr, cls.room, resolvedCoFacultyName),
+                            msgText,
                             { type: 'class_reminder', assignmentId: cls.id, minutesLeft },
                             targetType, { collapse_id: `class_${cls.id}`, ttl: 1800, group: 'class_alerts', android_channel_id: "lams_alerts" }
                         );
+
+                        // WhatsApp Warning 1
+                        try {
+                            const waTargets = users.filter(u => u.mobile && u.whatsappEnabled !== false);
+                            if (waTargets.length > 0) {
+                                const waMsg = `🔔 *Upcoming Class Alert* 🔔\n\n${msgText}\n\n_System Admin_`;
+                                await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
+                            }
+                        } catch (waErr) { console.error("WA Warn1 Error:", waErr); }
+
                         if (success) {
                             await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning', assignmentId: cls.id });
                             sentCount++;
@@ -310,12 +576,23 @@ export default async function handler(req, res) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_second`;
                     const exists = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!exists) {
+                        const msgText = getAICopy(minutesLeft, cls.subject, groupStr, cls.room, resolvedCoFacultyName);
                         const success = await sendOneSignal(
                             targetPayload, 'Class Starting!',
-                            getAICopy(minutesLeft, cls.subject, groupStr, cls.room, resolvedCoFacultyName),
+                            msgText,
                             { type: 'class_reminder', assignmentId: cls.id, minutesLeft },
                             targetType, { collapse_id: `class_${cls.id}`, ttl: 900, group: 'class_alerts', android_channel_id: "lams_alerts" }
                         );
+
+                        // WhatsApp Warning 2
+                        try {
+                            const waTargets = users.filter(u => u.mobile && u.whatsappEnabled !== false);
+                            if (waTargets.length > 0) {
+                                const waMsg = `🚀 *Class Starting Soon* 🚀\n\n${msgText}\n\n_System Admin_`;
+                                await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
+                            }
+                        } catch (waErr) { console.error("WA Warn2 Error:", waErr); }
+
                         if (success) {
                             await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning', assignmentId: cls.id });
                             sentCount++;
@@ -351,12 +628,14 @@ async function getFacultyData(targets) {
     let discoveredUsers = [];
 
     try {
-        // Fetch all users once for manual fuzzy matching (performance is fine for < 500 users)
-        const allUsersSnap = await db.collection('users').get();
-        const allUsers = allUsersSnap.docs.map(doc => ({
-            uid: doc.id,
-            ...doc.data()
-        }));
+        // Fetch all users and faculty once for manual fuzzy matching
+        const [usersSnap, facultySnap] = await Promise.all([
+            db.collection('users').get(),
+            db.collection('faculty').get()
+        ]);
+
+        const allUsers = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+        const allFaculty = facultySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         targets.forEach(target => {
             if (!target || (!target.id && !target.name)) return;
@@ -364,27 +643,85 @@ async function getFacultyData(targets) {
             const targetId = target.id ? target.id.toString().trim().toLowerCase() : null;
             const targetName = target.name ? target.name.toString().trim().toLowerCase() : null;
 
-            // 1. Direct Match by EmpId (Case Insensitive)
-            let match = allUsers.find(u => {
-                const uEmpId = u.empId ? u.empId.toString().trim().toLowerCase() : null;
-                return targetId && uEmpId === targetId;
-            });
+            // 1. SEARCH BY ID (STRICT PRIMARY) - If ID exists, we ONLY use ID.
+            if (targetId) {
+                // Check Users
+                const userMatch = allUsers.find(u => 
+                    u.empId && u.empId.toString().trim().toLowerCase() === targetId
+                );
+                
+                if (userMatch) {
+                    discoveredUsers.push({
+                        uid: userMatch.uid,
+                        oneSignalId: userMatch.oneSignalId || null,
+                        name: userMatch.name,
+                        empId: userMatch.empId,
+                        mobile: userMatch.mobile || null,
+                        whatsappEnabled: userMatch.whatsappEnabled !== false,
+                        isExactMatch: true
+                    });
+                    return; // ⛔ STOP: ID matched. Never guess by name.
+                }
 
-            // 2. Fallback: Fuzzy Match by Name
-            if (!match && targetName) {
-                match = allUsers.find(u => {
+                // Check Faculty Master
+                const facMatch = allFaculty.find(f => 
+                    f.empId && f.empId.toString().trim().toLowerCase() === targetId
+                );
+
+                if (facMatch) {
+                    discoveredUsers.push({
+                        uid: facMatch.uid || facMatch.id,
+                        oneSignalId: null,
+                        name: facMatch.name,
+                        empId: facMatch.empId,
+                        mobile: facMatch.mobile || facMatch.phone || null,
+                        whatsappEnabled: facMatch.whatsappEnabled !== false,
+                        isExactMatch: true
+                    });
+                    return; // ⛔ STOP: ID matched. Never guess by name.
+                }
+
+                // ⚠️ IMPORTANT: If targetId was provided but not found, 
+                // we ABORT for this target. We do NOT fall back to name-guessing.
+                return;
+            }
+
+            // 2. SEARCH BY NAME (LEGACY FALLBACK) - Only if target.id is truly blank.
+            if (targetName) {
+                let nameMatch = allUsers.find(u => {
                     const uName = u.name ? u.name.toString().trim().toLowerCase() : null;
                     return uName && (uName === targetName || uName.includes(targetName) || targetName.includes(uName));
                 });
-            }
 
-            if (match) {
-                discoveredUsers.push({
-                    uid: match.uid,
-                    oneSignalId: match.oneSignalId || null,
-                    name: match.name,
-                    empId: match.empId
-                });
+                if (!nameMatch) {
+                    nameMatch = allFaculty.find(f => {
+                        const fName = f.name ? f.name.toString().trim().toLowerCase() : null;
+                        return fName && (fName === targetName || fName.includes(targetName) || targetName.includes(fName));
+                    });
+                    if (nameMatch) {
+                        nameMatch = {
+                            uid: nameMatch.uid || nameMatch.id,
+                            oneSignalId: null,
+                            name: nameMatch.name,
+                            empId: nameMatch.empId,
+                            mobile: nameMatch.mobile || nameMatch.phone || null,
+                            whatsappEnabled: nameMatch.whatsappEnabled !== false
+                        };
+                    }
+                } else {
+                    nameMatch = {
+                        uid: nameMatch.uid,
+                        oneSignalId: nameMatch.oneSignalId || null,
+                        name: nameMatch.name,
+                        empId: nameMatch.empId,
+                        mobile: nameMatch.mobile || null,
+                        whatsappEnabled: nameMatch.whatsappEnabled !== false
+                    };
+                }
+
+                if (nameMatch) {
+                    discoveredUsers.push({ ...nameMatch, isExactMatch: false });
+                }
             }
         });
 

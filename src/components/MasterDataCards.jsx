@@ -25,6 +25,20 @@ export const FacultyCard = ({ item }) => {
                 <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
                     ID: {item.empId} {item.shortCode && `• Code: ${item.shortCode}`}
                 </div>
+                {(item.dob || item.joiningDate) && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        {item.dob && (
+                            <span title="Date of Birth" style={{ fontSize: '0.7rem', color: '#60a5fa', background: 'rgba(96, 165, 250, 0.1)', padding: '1px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                🎂 {new Date(item.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                        )}
+                        {item.joiningDate && (
+                            <span title="Joining Date" style={{ fontSize: '0.7rem', color: '#34d399', background: 'rgba(52, 211, 153, 0.1)', padding: '1px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                🎊 {new Date(item.joiningDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

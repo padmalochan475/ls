@@ -234,6 +234,8 @@ const Profile = () => {
                         await updateDoc(facultyDoc.ref, {
                             // name: formData.name, // DO NOT SYNC NAME from here. unsafe.
                             mobile: formData.mobile,
+                            dob: formData.dob,
+                            joiningDate: formData.joiningDate,
                             whatsappEnabled: formData.whatsappEnabled !== false
                         });
                     }
@@ -249,6 +251,43 @@ const Profile = () => {
             setMessage({ type: 'error', text: 'Failed to update profile.' });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleWhatsAppToggle = async (e) => {
+        // Toggle the state immediately in local form
+        const newValue = e.target.checked;
+        setFormData(prev => ({ ...prev, whatsappEnabled: newValue }));
+
+        // Autosave to Firebase
+        try {
+            const userRef = doc(db, 'users', currentUser.uid);
+            await updateDoc(userRef, { whatsappEnabled: newValue });
+
+            if (userProfile?.empId) {
+                try {
+                    const q = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
+                    const snapshot = await getDocs(q);
+                    if (!snapshot.empty) {
+                        const facRef = snapshot.docs[0].ref;
+                        const facData = snapshot.docs[0].data();
+                        
+                        // Check if we have permission to write to this faculty doc
+                        if (userProfile.role === 'admin' || facData.uid === currentUser.uid) {
+                            await updateDoc(facRef, { whatsappEnabled: newValue });
+                        }
+                    }
+                } catch (syncErr) {
+                    console.warn("Minor: Failed to sync toggle to faculty record (Rules restriction)", syncErr);
+                    // We don't throw here so the user profile update still counts as success
+                }
+            }
+            toast.success(`WhatsApp notifications ${newValue ? 'enabled' : 'disabled'}`);
+        } catch (error) {
+            console.error("CRITICAL: Failed to update user settings:", error);
+            toast.error("Failed to update settings. Please try again.");
+            // Revert local state if server fails
+            setFormData(prev => ({ ...prev, whatsappEnabled: !newValue }));
         }
     };
 
@@ -530,25 +569,13 @@ const Profile = () => {
                                     <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#25D366' }}>WhatsApp Notifications</div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Receive updates and substitution alerts directly on your WhatsApp number.</div>
                                 </div>
-                                <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '40px', height: '24px' }}>
+                                <label className="switch">
                                     <input 
                                         type="checkbox" 
-                                        style={{ opacity: 0, width: 0, height: 0 }}
                                         checked={formData.whatsappEnabled !== false}
-                                        onChange={e => setFormData({ ...formData, whatsappEnabled: e.target.checked })}
-                                        disabled={!isEditing}
+                                        onChange={handleWhatsAppToggle}
                                     />
-                                    <span style={{
-                                        position: 'absolute', cursor: isEditing ? 'pointer' : 'not-allowed', top: 0, left: 0, right: 0, bottom: 0,
-                                        backgroundColor: formData.whatsappEnabled !== false ? '#25D366' : 'rgba(255,255,255,0.1)',
-                                        transition: '.4s', borderRadius: '24px', opacity: isEditing ? 1 : 0.6
-                                    }}>
-                                        <span style={{
-                                            position: 'absolute', content: '""', height: '18px', width: '18px',
-                                            left: formData.whatsappEnabled !== false ? '18px' : '3px', bottom: '3px',
-                                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%'
-                                        }}></span>
-                                    </span>
+                                    <span className="slider"></span>
                                 </label>
                             </div>
 
