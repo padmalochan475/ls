@@ -576,34 +576,36 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                     return uName && (uName === targetName || uName.includes(targetName) || targetName.includes(uName));
                 });
 
+                let final_name_match = null;
+
                 if (!nameMatch) {
-                    nameMatch = allFaculty.find(f => {
+                    const facMatch = allFaculty.find(f => {
                         const fName = f.name ? f.name.toString().trim().toLowerCase() : null;
                         return fName && (fName === targetName || fName.includes(targetName) || targetName.includes(fName));
                     });
-                    if (nameMatch) {
-                        nameMatch = {
-                            uid: nameMatch.uid || nameMatch.id,
+                    if (facMatch) {
+                        final_name_match = {
+                            uid: facMatch.uid || facMatch.id,
                             oneSignalId: null,
-                            name: nameMatch.name,
-                            empId: nameMatch.empId,
-                            mobile: nameMatch.mobile || nameMatch.phone || null,
-                            whatsappEnabled: nameMatch.whatsappEnabled !== false
+                            name: facMatch.name,
+                            empId: facMatch.empId,
+                            mobile: facMatch.mobile || facMatch.phone || null,
+                            whatsappEnabled: facMatch.whatsappEnabled !== false
                         };
                     }
                 } else {
-                    nameMatch = {
+                    final_name_match = {
                         uid: nameMatch.uid,
                         oneSignalId: nameMatch.oneSignalId || null,
                         name: nameMatch.name,
                         empId: nameMatch.empId,
-                        mobile: nameMatch.mobile || null,
+                        mobile: nameMatch.mobile || nameMatch.phone || null,
                         whatsappEnabled: nameMatch.whatsappEnabled !== false
                     };
                 }
 
-                if (nameMatch) {
-                    discoveredUsers.push({ ...nameMatch, isExactMatch: false });
+                if (final_name_match) {
+                    discoveredUsers.push({ ...final_name_match, isExactMatch: false });
                 }
             }
         });

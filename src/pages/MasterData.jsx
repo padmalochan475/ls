@@ -159,7 +159,9 @@ const MasterData = ({ initialTab }) => {
                         batch.update(doc(db, 'faculty', facDoc.id), {
                             photoURL: userData.photoURL || null,
                             email: userData.email || facData.email,
-                            name: userData.name || facData.name
+                            name: userData.name || facData.name,
+                            mobile: userData.mobile || facData.mobile || null,
+                            phone: userData.mobile || facData.phone || null
                         });
                         count++;
                         batchCount++;
