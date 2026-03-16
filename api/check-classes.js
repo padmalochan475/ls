@@ -74,7 +74,7 @@ async function sendOneSignal(target, title, body, data, targetType = 'external_i
 }
 
 const WHATSAPP_API_URL = 'https://lams-whatsapp-bot.onrender.com/api/sendText';
-const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || process.env.VITE_WHATSAPP_API_KEY || 'lams_local_dev_key_123';
+const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || process.env.VITE_WHATSAPP_API_KEY;
 
 async function sendWhatsApp(phoneNumber, message) {
     if (!phoneNumber || !message) return false;
@@ -153,14 +153,22 @@ export default async function handler(req, res) {
 
                     // WhatsApp Holiday Broadcast
                     try {
-                        const usersSnap = await db.collection('users').get();
-                        const waTargets = usersSnap.docs
-                            .map(d => d.data())
-                            .filter(u => u.mobile && u.whatsappEnabled !== false);
+                        // REUSE logic or fetch once. Re-using once-per-execution pattern.
+                        const [uSnap, fSnap] = await Promise.all([db.collection('users').get(), db.collection('faculty').get()]);
+                        const usersMap = new Map();
+                        uSnap.forEach(d => usersMap.set(d.id, d.data()));
+                        
+                        const waTargets = fSnap.docs.map(d => {
+                            const fac = d.data();
+                            const user = fac.uid ? usersMap.get(fac.uid) : null;
+                            return {
+                                mobile: fac.mobile || fac.phone || user?.mobile || null,
+                                whatsappEnabled: (fac.whatsappEnabled !== false) && (user?.whatsappEnabled !== false)
+                            };
+                        }).filter(u => u.mobile && u.whatsappEnabled);
                         
                         const waMsg = `🎉 *LAMS Holiday Alert* 🎉\n\nToday is *${h.name}*.\nNo classes today. Enjoy!\n\n_System Admin_`;
                         
-                        // We do these in chunks or map, but since it's a small app, map is fine for now
                         await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
                     } catch (waErr) {
                         console.error("Holiday WhatsApp Error:", waErr);
