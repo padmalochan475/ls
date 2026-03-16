@@ -27,14 +27,13 @@ const getEnv = (val, defaultValue, validator = null) => {
 };
 
 const firebaseConfig = {
-    // We add length validation for API Key (approx 39 chars) to filter out garbage vars
-    apiKey: getEnv(import.meta.env.VITE_FIREBASE_API_KEY, "AIzaSyDwGYhgu3Hx_Fdycq3-6tfKNTPYXVZV5ck", (v) => v.startsWith("AIza") && v.length > 30),
-    authDomain: getEnv(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, "lams-59998.firebaseapp.com"),
-    projectId: getEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID, "lams-59998"),
-    storageBucket: getEnv(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, "lams-59998.firebasestorage.app"),
-    messagingSenderId: getEnv(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, "250431971958"),
-    appId: getEnv(import.meta.env.VITE_FIREBASE_APP_ID, "1:250431971958:web:aa4db54237825bcd0f7557"),
-    measurementId: getEnv(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, "G-0HN1E0VMRS")
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 export default firebaseConfig;
