@@ -102,42 +102,41 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log("Starting check-classes (OneSignal + WhatsApp)...");
+        // 1. Determine Current Time in IST immediately
+        const nowUTC = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const nowIST = new Date(nowUTC.getTime() + istOffset);
+        const dayName = nowUTC.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+        const todayDateStr = nowUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
-        // 1. Get Settings
-        const configSnap = await db.collection('settings').doc('config').get();
+        console.log(`Starting check-classes (${todayDateStr} ${nowIST.toLocaleTimeString()})...`);
+
+        // 2. Parallel Fetch of settings and today's holiday status
+        const [configSnap, notifSnap, holidaySnap] = await Promise.all([
+            db.collection('settings').doc('config').get(),
+            db.collection('settings').doc('notifications').get(),
+            db.collection('settings').where('date', '==', todayDateStr).get()
+        ]);
+
         const activeAcademicYear = configSnap.exists ? configSnap.data().activeAcademicYear : '2024-2025';
-
-        const notifSnap = await db.collection('settings').doc('notifications').get();
         const notifSettings = notifSnap.exists ? notifSnap.data() : {};
-
         const warn1Min = parseInt(notifSettings.firstWarning) || 15;
         const warn2Min = parseInt(notifSettings.secondWarning) || 5;
         const holidayTime = notifSettings.holidayTime || '09:00';
 
-        // 2. Determine Current Time in IST
-        const nowUTC = new Date();
-        const istOffset = 5.5 * 60 * 60 * 1000;
-        const nowIST = new Date(nowUTC.getTime() + istOffset);
+        // 3. CHECK HOLIDAYS
+        const holidayDoc = holidaySnap.docs.find(d => d.data().type === 'holiday');
 
-        const dayName = nowUTC.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
-        const todayDateStr = nowUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        if (holidayDoc) {
+            const h = holidayDoc.data();
+            const [hHour, hMin] = holidayTime.split(':').map(Number);
+            const holidayAlertTime = new Date(nowIST);
+            holidayAlertTime.setHours(hHour, hMin, 0, 0);
 
-        // CHECK HOLIDAYS
-        try {
-            const holidaySnap = await db.collection('settings').where('date', '==', todayDateStr).get();
-            const holidayDoc = holidaySnap.docs.find(d => d.data().type === 'holiday');
+            const notifIdHoliday = `holiday_notif_${todayDateStr}`;
+            const alreadySentHoliday = await db.collection('sent_notifications').doc(notifIdHoliday).get();
 
-            if (holidayDoc) {
-                const h = holidayDoc.data();
-                const [hHour, hMin] = holidayTime.split(':').map(Number);
-                const holidayAlertTime = new Date(nowIST);
-                holidayAlertTime.setHours(hHour, hMin, 0, 0);
-
-                const notifIdHoliday = `holiday_notif_${todayDateStr}`;
-                const alreadySentHoliday = await db.collection('sent_notifications').doc(notifIdHoliday).get();
-
-                if (!alreadySentHoliday.exists && nowIST >= holidayAlertTime) {
+            if (!alreadySentHoliday.exists && nowIST >= holidayAlertTime) {
                     const title = '🎉 Holiday Alert';
                     const body = `Today is ${h.name}. No classes today. Enjoy!`;
                     
@@ -170,10 +169,7 @@ export default async function handler(req, res) {
                         return res.status(200).json({ message: `Holiday Broadcast Sent: ${h.name}`, count: 1 });
                     }
                 }
-                return res.status(200).json({ message: `Holiday: ${h.name}. Automation Active.`, count: 0 });
-            }
-        } catch (hErr) {
-            console.error("Error checking holidays:", hErr);
+            return res.status(200).json({ message: `Holiday: ${h.name}. Automation Active.`, count: 0 });
         }
 
         // 3. BIRTHDAY & ANNIVERSARY GREETINGS (8:00 AM IST) - Done first so they fire even on holidays
@@ -233,10 +229,7 @@ export default async function handler(req, res) {
             }
         }
 
-        // 4. BLOCK CLASS NOTIFICATIONS ON HOLIDAYS
-        const holidaySnap = await db.collection('settings').where('date', '==', todayDateStr).get();
-        const activeHoliday = holidaySnap.docs.find(d => d.data().type === 'holiday');
-        if (activeHoliday) {
+        if (holidayDoc) {
              return res.status(200).json({ status: "holiday", message: "Classes paused for holiday." });
         }
 
