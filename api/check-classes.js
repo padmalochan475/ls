@@ -384,220 +384,103 @@ export default async function handler(req, res) {
             }
         }
 
-        // 5. Query Schedule for Real-Time Warnings (Original Logic)
-        const scheduleSnap = await db.collection('schedule')
-            .where('academicYear', '==', activeAcademicYear)
-            .where('day', '==', dayName)
-            .get();
-
-        if (scheduleSnap.empty) {
-            return res.status(200).json({ message: 'No classes today.', count: 0 });
-        }
-
+        // 5. CACHE DATA FOR REMINDERS (Fetch once to save Firebase Reads/Costs)
+        let cachedUsers = null;
+        let cachedFaculty = null;
+        
         const upcomingClasses = [];
         const debugLogs = [];
         const lookaheadMinutes = warn1Min + 15;
 
-        // 4. Filter Upcoming Classes
+        // Filter Upcoming Classes
         for (const doc of scheduleSnap.docs) {
             const data = doc.data();
             if (!data.time) continue;
-
             const [startStr] = data.time.split(' - ');
             if (!startStr) continue;
 
             const classTime = parseTimeStr(startStr, nowIST);
-            const diffMs = classTime.getTime() - nowIST.getTime();
-            const diffMinutes = diffMs / (1000 * 60);
-
-            // Audit
-            const debugEntry = {
-                subject: data.subject || 'Unknown',
-                timeStr: startStr,
-                parsedTime: classTime.toString(),
-                diffMinutes: Math.round(diffMinutes),
-                status: 'Rejected'
-            };
+            const diffMinutes = (classTime.getTime() - nowIST.getTime()) / 60000;
 
             if (diffMinutes > 0 && diffMinutes <= lookaheadMinutes) {
                 upcomingClasses.push({ id: doc.id, ...data, startTime: classTime });
-                debugEntry.status = 'UPCOMING - MATCHED';
-                debugLogs.push(debugEntry);
-            } else {
-                if (debugLogs.length < 50) debugLogs.push(debugEntry);
             }
         }
 
-        // 5. Send Notifications
+        if (upcomingClasses.length > 0) {
+            // Fetch Directory ONCE for all upcoming classes
+            const [uSnap, fSnap] = await Promise.all([
+                db.collection('users').get(),
+                db.collection('faculty').get()
+            ]);
+            cachedUsers = uSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+            cachedFaculty = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+
+        // 6. Send Notifications
         const notifDateKey = todayDateStr;
         let sentCount = 0;
 
-        // eslint-disable-next-line sonarjs/cognitive-complexity
         await Promise.all(upcomingClasses.map(async (cls) => {
-            const logIdx = debugLogs.findIndex(l => l.subject === cls.subject && l.status === 'UPCOMING - MATCHED');
-            const log = (logIdx >= 0) ? debugLogs[logIdx] : {};
-
             try {
                 const minutesLeft = Math.round((cls.startTime - nowIST) / 60000);
-                log.minutesLeft = minutesLeft;
-
-                let groupStr = `${cls.dept || ''}-${cls.section || ''}`;
-                if (cls.group && cls.group !== 'All') groupStr += `-${cls.group}`;
-                groupStr = groupStr.toUpperCase();
-
-                const facultyTargets = [
+                let groupStr = `${cls.dept || ''}-${cls.section || ''}`.toUpperCase();
+                
+                // Get Full User Objects using CACHED data
+                const users = await getFacultyData([
                     { id: cls.facultyEmpId, name: cls.faculty },
                     { id: cls.faculty2EmpId, name: cls.faculty2 }
-                ];
+                ], cachedUsers, cachedFaculty);
 
-                // Get Full User Objects (including Name) for primary faculty
-                const users = await getFacultyData(facultyTargets);
+                // Substitution Logic
+                const subSnap = await db.collection('substitutions')
+                    .where('assignmentId', '==', cls.id)
+                    .where('date', '==', todayDateStr)
+                    .where('status', '==', 'approved')
+                    .get();
 
-                // DATA ENRICHMENT: Resolve Names for Template
-                let resolvedCoFacultyName = cls.faculty2;
-                if (cls.faculty2 && cls.faculty2.length > 5) { // Heuristic for ID/External Name
-                    const foundUser = users.find(u => u.uid === cls.faculty2 || u.empId === cls.faculty2 || u.name === cls.faculty2);
-                    if (foundUser && foundUser.name) {
-                        resolvedCoFacultyName = foundUser.name;
-                    }
+                let finalUsers = users;
+                if (!subSnap.empty) {
+                    const subData = subSnap.docs[0].data();
+                    const subs = await getFacultyData([{ id: subData.substituteEmpId, name: subData.substituteName }], cachedUsers, cachedFaculty);
+                    if (subs.length > 0) finalUsers = subs;
                 }
 
-                log.usersFound = users.length;
-                if (users.length === 0) {
-                    log.status = "No users found";
-                    // Still continue to see if substitution exists
-                }
+                if (finalUsers.length === 0) return;
 
-                let targetPayload = [];
-                let targetType = 'external_id';
-                const uids = users.map(u => u.uid).filter(Boolean);
-                if (uids.length > 0) {
-                    targetPayload = uids;
-                } else {
-                    targetPayload = users.map(u => u.oneSignalId).filter(Boolean);
-                    if (targetPayload.length > 0) targetType = 'player_id';
-                }
+                const targetPayload = finalUsers.map(u => u.uid).filter(Boolean);
+                if (targetPayload.length === 0) return;
 
-                // DATA ENRICHMENT: Check for Substitutions (Master Overwrite)
-                try {
-                    const subSnap = await db.collection('substitutions')
-                        .where('assignmentId', '==', cls.id)
-                        .where('date', '==', todayDateStr)
-                        .where('status', '==', 'approved')
-                        .get();
-
-                    if (!subSnap.empty) {
-                        const subData = subSnap.docs[0].data();
-                        log.substitutionFound = true;
-                        log.originalFaculty = cls.faculty;
-                        log.substituteFaculty = subData.substituteName;
-
-                        // We replace the primary targets with the substitute
-                        const substituteUsers = await getFacultyData([{ id: subData.substituteEmpId, name: subData.substituteName }]);
-                        if (substituteUsers.length > 0) {
-                            const subUids = substituteUsers.map(u => u.uid).filter(Boolean);
-                            if (subUids.length > 0) {
-                                targetPayload = subUids;
-                                targetType = 'external_id';
-                            } else {
-                                const subPids = substituteUsers.map(u => u.oneSignalId).filter(Boolean);
-                                if (subPids.length > 0) {
-                                    targetPayload = subPids;
-                                    targetType = 'player_id';
-                                }
-                            }
-                        }
-                    }
-                } catch (subErr) {
-                    console.error("Substitution Lookup Error:", subErr);
-                }
-
-                if (targetPayload.length === 0) {
-                    log.status = log.status || "No targets found";
-                    return;
-                }
-
-                const getAICopy = (minutes, sub, grp, room, coFac) => {
-                    let urgency = 'info';
-                    if (minutes <= 5) urgency = 'urgent';
-                    else if (minutes <= 15) urgency = 'warning';
-
-                    // Use resolved name here
-                    const coFacStr = coFac ? ` WITH ${coFac} ` : ' ';
-                    const templates = {
-                        urgent: [`🚀 ACTION: Run to Room ${room}! ${sub} of (${grp})${coFacStr}is starting NOW!`],
-                        warning: [`🔔 Heads Up: ${sub} of (${grp})${coFacStr}starts in ${minutes} mins at Room ${room}.`],
-                        info: [`📅 Reminder: ${sub} of (${grp})${coFacStr}is scheduled in ${minutes} mins.`]
-                    };
-                    const options = templates[urgency] || templates['warning'];
-                    return options[Date.now() % options.length];
+                const getAICopy = (min, sub, grp, room) => {
+                    if (min <= 5) return `🚀 ACTION: Run to Room ${room}! ${sub} (${grp}) is starting NOW!`;
+                    return `🔔 Heads Up: ${sub} (${grp}) starts in ${min} mins at Room ${room}.`;
                 };
 
-                // Warnings
+                // Triggers
                 if (minutesLeft > warn2Min && minutesLeft <= (warn1Min + 5)) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_first`;
-                    const exists = (await db.collection('sent_notifications').doc(notifId).get()).exists;
-                    if (!exists) {
-                        const msgText = getAICopy(minutesLeft, cls.subject, groupStr, cls.room, resolvedCoFacultyName);
-                        const success = await sendOneSignal(
-                            targetPayload, 'Upcoming Class',
-                            msgText,
-                            { type: 'class_reminder', assignmentId: cls.id, minutesLeft },
-                            targetType, { collapse_id: `class_${cls.id}`, ttl: 1800, group: 'class_alerts', android_channel_id: "lams_alerts" }
-                        );
-
-                        // WhatsApp Warning 1
-                        try {
-                            const waTargets = users.filter(u => u.mobile && u.whatsappEnabled !== false);
-                            if (waTargets.length > 0) {
-                                const waMsg = `🔔 *Upcoming Class Alert* 🔔\n\n${msgText}\n\n_System Admin_`;
-                                await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
-                            }
-                        } catch (waErr) { console.error("WA Warn1 Error:", waErr); }
-
-                        if (success) {
-                            await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning', assignmentId: cls.id });
-                            sentCount++;
-                            log.action = "Sent First Warning";
-                        }
-                    } else {
-                        log.status = "First warning already sent";
+                    const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
+                    if (!alreadySent) {
+                        const msg = getAICopy(minutesLeft, cls.subject, groupStr, cls.room);
+                        await sendOneSignal(targetPayload, 'Upcoming Class', msg, { type: 'class_reminder', id: cls.id }, 'external_id');
+                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled !== false).map(u => sendWhatsApp(u.mobile, `🔔 *Upcoming* 🔔\n\n${msg}`)));
+                        await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning' });
+                        sentCount++;
                     }
                 }
 
                 if (minutesLeft > 0 && minutesLeft <= warn2Min) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_second`;
-                    const exists = (await db.collection('sent_notifications').doc(notifId).get()).exists;
-                    if (!exists) {
-                        const msgText = getAICopy(minutesLeft, cls.subject, groupStr, cls.room, resolvedCoFacultyName);
-                        const success = await sendOneSignal(
-                            targetPayload, 'Class Starting!',
-                            msgText,
-                            { type: 'class_reminder', assignmentId: cls.id, minutesLeft },
-                            targetType, { collapse_id: `class_${cls.id}`, ttl: 900, group: 'class_alerts', android_channel_id: "lams_alerts" }
-                        );
-
-                        // WhatsApp Warning 2
-                        try {
-                            const waTargets = users.filter(u => u.mobile && u.whatsappEnabled !== false);
-                            if (waTargets.length > 0) {
-                                const waMsg = `🚀 *Class Starting Soon* 🚀\n\n${msgText}\n\n_System Admin_`;
-                                await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
-                            }
-                        } catch (waErr) { console.error("WA Warn2 Error:", waErr); }
-
-                        if (success) {
-                            await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning', assignmentId: cls.id });
-                            sentCount++;
-                            log.action = "Sent Second Warning";
-                        }
-                    } else {
-                        log.status = "Second warning already sent";
+                    const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
+                    if (!alreadySent) {
+                        const msg = getAICopy(minutesLeft, cls.subject, groupStr, cls.room);
+                        await sendOneSignal(targetPayload, 'Class Starting!', msg, { type: 'class_reminder', id: cls.id }, 'external_id');
+                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled !== false).map(u => sendWhatsApp(u.mobile, `🚀 *Now* 🚀\n\n${msg}`)));
+                        await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning' });
+                        sentCount++;
                     }
                 }
-            } catch (err) {
-                log.error = err.message;
-            }
+            } catch (err) { console.error("Reminder Error for", cls.subject, err); }
         }));
 
         return res.status(200).json({
@@ -616,19 +499,23 @@ export default async function handler(req, res) {
     }
 }
 
-async function getFacultyData(targets) {
+async function getFacultyData(targets, existingUsers = null, existingFaculty = null) {
     if (!targets || targets.length === 0) return [];
     let discoveredUsers = [];
 
     try {
-        // Fetch all users and faculty once for manual fuzzy matching
-        const [usersSnap, facultySnap] = await Promise.all([
-            db.collection('users').get(),
-            db.collection('faculty').get()
-        ]);
+        // Use provided cache OR fetch fresh if necessary
+        let allUsers = existingUsers;
+        let allFaculty = existingFaculty;
 
-        const allUsers = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-        const allFaculty = facultySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (!allUsers || !allFaculty) {
+            const [uSnap, fSnap] = await Promise.all([
+                db.collection('users').get(),
+                db.collection('faculty').get()
+            ]);
+            allUsers = uSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+            allFaculty = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
 
         targets.forEach(target => {
             if (!target || (!target.id && !target.name)) return;
