@@ -157,19 +157,29 @@ const Profile = () => {
                 await updateDoc(userRef, { photoURL: base64String });
 
                 // 4. SYNC TO FACULTY MASTER DATA
-                // If this user is linked to a faculty member, update their master data image too.
-                if (userProfile?.empId) {
+                // Resilient lookup: Try finding by UID first (strongest link), then fallback to empId
+                if (currentUser?.uid || userProfile?.empId) {
                     try {
-                        const q = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
-                        const snapshot = await getDocs(q);
-                        if (!snapshot.empty) {
-                            const facultyDoc = snapshot.docs[0];
-                            await updateDoc(facultyDoc.ref, { photoURL: base64String });
-                            // console.log("Synced profile image to Faculty Master Data");
+                        let facDoc = null;
+                        
+                        // 1. Try UID lookup
+                        const uidQ = query(collection(db, 'faculty'), where('uid', '==', currentUser.uid));
+                        const uidSnap = await getDocs(uidQ);
+                        
+                        if (!uidSnap.empty) {
+                            facDoc = uidSnap.docs[0];
+                        } else if (userProfile?.empId) {
+                            // 2. Fallback to EmpId lookup
+                            const empQ = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
+                            const empSnap = await getDocs(empQ);
+                            if (!empSnap.empty) facDoc = empSnap.docs[0];
+                        }
+
+                        if (facDoc) {
+                            await updateDoc(facDoc.ref, { photoURL: base64String });
                         }
                     } catch (syncErr) {
                         console.error("Failed to sync image to faculty:", syncErr);
-                        // Don't block the UI success, just log it.
                     }
                 }
 
@@ -225,15 +235,29 @@ const Profile = () => {
             await updateDoc(userRef, updateData);
 
             // SYNC TO FACULTY MASTER DATA
-            if (userProfile?.empId) {
+            // Resilient lookup: Try finding by UID first (strongest link), then fallback to empId
+            if (currentUser?.uid || userProfile?.empId) {
                 try {
-                    const q = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
-                    const snapshot = await getDocs(q);
-                    if (!snapshot.empty) {
-                        const facultyDoc = snapshot.docs[0];
-                        await updateDoc(facultyDoc.ref, {
+                    let facDoc = null;
+                    
+                    // 1. Try UID lookup
+                    const uidQ = query(collection(db, 'faculty'), where('uid', '==', currentUser.uid));
+                    const uidSnap = await getDocs(uidQ);
+                    
+                    if (!uidSnap.empty) {
+                        facDoc = uidSnap.docs[0];
+                    } else if (userProfile?.empId) {
+                        // 2. Fallback to EmpId lookup
+                        const empQ = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
+                        const empSnap = await getDocs(empQ);
+                        if (!empSnap.empty) facDoc = empSnap.docs[0];
+                    }
+
+                    if (facDoc) {
+                        await updateDoc(facDoc.ref, {
                             // name: formData.name, // DO NOT SYNC NAME from here. unsafe.
-                            mobile: formData.mobile,
+                            mobile: formData.mobile, // Sync standard mobile
+                            phone: formData.mobile,  // SYNC TO PHONE (Primary for Master Data UI)
                             dob: formData.dob,
                             joiningDate: formData.joiningDate,
                             whatsappEnabled: formData.whatsappEnabled !== false

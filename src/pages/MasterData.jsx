@@ -1197,6 +1197,9 @@ const MasterData = ({ initialTab }) => {
                     await handleCascadeUpdate(activeCollection, originalItem, formData);
                 }
 
+                if (activeCollection === 'faculty' && formData.phone) {
+                    formData.mobile = formData.phone;
+                }
                 await updateDoc(doc(db, activeCollection, editingId), formData);
 
                 // FORCE SYNC: Ensure User Profile is always up to date when editing Faculty
@@ -1227,6 +1230,9 @@ const MasterData = ({ initialTab }) => {
                 }
                 if (activeCollection === 'faculty' && dataToSave.whatsappEnabled === undefined) {
                     dataToSave.whatsappEnabled = true;
+                }
+                if (activeCollection === 'faculty' && dataToSave.phone) {
+                    dataToSave.mobile = dataToSave.phone;
                 }
                 await addDoc(collection(db, activeCollection), dataToSave);
 
