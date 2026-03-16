@@ -24,8 +24,8 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // OneSignal Config (Dynamic from Env)
-const ONE_SIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID || "6764f541-4220-4ffd-85d2-6660b86d5a48";
-const ONE_SIGNAL_API_KEY = process.env.ONESIGNAL_REST_API_KEY || "os_v2_app_m5spkqkcebh73bosmzqlq3k2jbg2vlaf5qmuwmurufnife2zoxh52xfshmyaedy3z2i4iojios5kh37dj4x4azvlgwxrlga64lrsgey";
+const ONE_SIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+const ONE_SIGNAL_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
 
 async function sendOneSignal(target, title, body, data, targetType = 'external_id', options = {}) {
     if (!target) return false;
