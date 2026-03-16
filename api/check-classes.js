@@ -111,6 +111,10 @@ export default async function handler(req, res) {
 
         console.log(`Starting check-classes (${todayDateStr} ${nowIST.toLocaleTimeString()})...`);
 
+        // 🛡️ AUTO-WAKE: Every time LAMS runs, it "pokes" the WhatsApp bot to keep it awake.
+        // No more opening the browser manually!
+        axios.get('https://lams-whatsapp-bot.onrender.com/').catch(() => {});
+
         // 2. Parallel Fetch of settings and today's holiday status
         const [configSnap, notifSnap, holidaySnap] = await Promise.all([
             db.collection('settings').doc('config').get(),
