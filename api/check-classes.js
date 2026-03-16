@@ -385,6 +385,15 @@ export default async function handler(req, res) {
         }
 
         // 5. CACHE DATA FOR REMINDERS (Fetch once to save Firebase Reads/Costs)
+        const scheduleSnap = await db.collection('schedule')
+            .where('academicYear', '==', activeAcademicYear)
+            .where('day', '==', dayName)
+            .get();
+
+        if (scheduleSnap.empty) {
+            return res.status(200).json({ success: true, checked: 0, message: 'No classes today.' });
+        }
+
         let cachedUsers = null;
         let cachedFaculty = null;
         
