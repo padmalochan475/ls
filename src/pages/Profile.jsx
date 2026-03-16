@@ -251,17 +251,24 @@ const Profile = () => {
                         const empQ = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
                         const empSnap = await getDocs(empQ);
                         if (!empSnap.empty) facDoc = empSnap.docs[0];
+                    } else if (currentUser?.email) {
+                        // 3. Fallback to Email lookup (Last resort)
+                        const emailQ = query(collection(db, 'faculty'), where('email', '==', currentUser.email));
+                        const emailSnap = await getDocs(emailQ);
+                        if (!emailSnap.empty) facDoc = emailSnap.docs[0];
                     }
 
                     if (facDoc) {
                         await updateDoc(facDoc.ref, {
-                            // name: formData.name, // DO NOT SYNC NAME from here. unsafe.
-                            mobile: formData.mobile, // Sync standard mobile
-                            phone: formData.mobile,  // SYNC TO PHONE (Primary for Master Data UI)
+                            uid: currentUser.uid, // Ensure link is established
+                            mobile: formData.mobile, 
+                            phone: formData.mobile,
                             dob: formData.dob,
                             joiningDate: formData.joiningDate,
                             whatsappEnabled: formData.whatsappEnabled !== false
                         });
+                        // Proactive success notification
+                        toast.success("Synced with Faculty Master Data", { icon: "🔄" });
                     }
                 } catch (syncErr) {
                     console.error("Failed to sync profile to faculty:", syncErr);

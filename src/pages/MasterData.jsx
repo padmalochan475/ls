@@ -823,6 +823,7 @@ const MasterData = ({ initialTab }) => {
                 department: formData.department || '',
                 designation: formData.designation || '',
                 phone: selectedUser.mobile || selectedUser.phone || formData.phone || '',
+                mobile: selectedUser.mobile || selectedUser.phone || formData.phone || '',
                 whatsappEnabled: formData.whatsappEnabled !== undefined ? formData.whatsappEnabled : true
             });
         } else {
