@@ -216,8 +216,11 @@ const Profile = () => {
             // Prepare update data
             // LOCK NAME: If linked to Faculty (has empId), do NOT allow name change here.
             // It must be done via Master Data to trigger cascade.
+            // Deep Sanitization: Strip spaces/dashes before save for Bot compatibility
+            const sanitizedPhone = formData.mobile ? formData.mobile.replace(/[^0-9]/g, '').slice(-10) : '';
+
             let updateData = {
-                mobile: formData.mobile,
+                mobile: sanitizedPhone,
                 dob: formData.dob,
                 joiningDate: formData.joiningDate,
                 whatsappEnabled: formData.whatsappEnabled !== false
@@ -261,8 +264,8 @@ const Profile = () => {
                     if (facDoc) {
                         await updateDoc(facDoc.ref, {
                             uid: currentUser.uid, // Ensure link is established
-                            mobile: formData.mobile, 
-                            phone: formData.mobile,
+                            mobile: sanitizedPhone, 
+                            phone: sanitizedPhone,
                             dob: formData.dob,
                             joiningDate: formData.joiningDate,
                             whatsappEnabled: formData.whatsappEnabled !== false
