@@ -37,7 +37,8 @@ const Profile = () => {
         name: '',
         mobile: '',
         dob: '',
-        joiningDate: ''
+        joiningDate: '',
+        whatsappEnabled: true
     });
 
     // Password Change State
@@ -98,7 +99,8 @@ const Profile = () => {
                 name: userProfile.name || '',
                 mobile: userProfile.mobile || '',
                 dob: userProfile.dob || '',
-                joiningDate: userProfile.joiningDate || ''
+                joiningDate: userProfile.joiningDate || '',
+                whatsappEnabled: userProfile.whatsappEnabled !== false
             });
         }
     }, [userProfile]);
@@ -207,7 +209,8 @@ const Profile = () => {
             let updateData = {
                 mobile: formData.mobile,
                 dob: formData.dob,
-                joiningDate: formData.joiningDate
+                joiningDate: formData.joiningDate,
+                whatsappEnabled: formData.whatsappEnabled !== false
             };
 
             if (!userProfile.empId) {
@@ -230,7 +233,8 @@ const Profile = () => {
                         const facultyDoc = snapshot.docs[0];
                         await updateDoc(facultyDoc.ref, {
                             // name: formData.name, // DO NOT SYNC NAME from here. unsafe.
-                            mobile: formData.mobile
+                            mobile: formData.mobile,
+                            whatsappEnabled: formData.whatsappEnabled !== false
                         });
                     }
                 } catch (syncErr) {
@@ -519,6 +523,33 @@ const Profile = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
                                 <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Employee ID:</div>
                                 <div style={{ fontSize: '1.1rem', fontWeight: 600, fontFamily: 'monospace', letterSpacing: '1px' }}>{userProfile.empId || 'N/A'}</div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(37, 211, 102, 0.05)', borderRadius: '12px', border: '1px solid rgba(37, 211, 102, 0.2)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                    <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#25D366' }}>WhatsApp Notifications</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Receive updates and substitution alerts directly on your WhatsApp number.</div>
+                                </div>
+                                <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '40px', height: '24px' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        style={{ opacity: 0, width: 0, height: 0 }}
+                                        checked={formData.whatsappEnabled !== false}
+                                        onChange={e => setFormData({ ...formData, whatsappEnabled: e.target.checked })}
+                                        disabled={!isEditing}
+                                    />
+                                    <span style={{
+                                        position: 'absolute', cursor: isEditing ? 'pointer' : 'not-allowed', top: 0, left: 0, right: 0, bottom: 0,
+                                        backgroundColor: formData.whatsappEnabled !== false ? '#25D366' : 'rgba(255,255,255,0.1)',
+                                        transition: '.4s', borderRadius: '24px', opacity: isEditing ? 1 : 0.6
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute', content: '""', height: '18px', width: '18px',
+                                            left: formData.whatsappEnabled !== false ? '18px' : '3px', bottom: '3px',
+                                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%'
+                                        }}></span>
+                                    </span>
+                                </label>
                             </div>
 
                             {isEditing && (

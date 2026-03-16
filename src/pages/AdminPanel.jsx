@@ -224,7 +224,7 @@ const AdminPanel = () => {
             // Send WhatsApp Notification if approved
             if (newStatus === 'approved') {
                 const targetUser = users.find(u => u.id === userId);
-                if (targetUser && targetUser.mobile) {
+                if (targetUser && targetUser.mobile && targetUser.whatsappEnabled !== false) {
                     const approveMsg = `✅ *Account Approved* ✅\n\nHi ${targetUser.name},\nYour LAMS account has been verified and approved by the Administrator.\n\nYou can now log in and access the portal.`;
                     sendWhatsAppNotification(targetUser.mobile, approveMsg);
                 }
