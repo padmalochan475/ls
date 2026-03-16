@@ -68,7 +68,7 @@
     "crons": [
         {
             "path": "/api/check-classes",
-            "schedule": "*/5 * * * *"
+            "schedule": "30 2 * * *"
         }
     ]
 }
