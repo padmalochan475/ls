@@ -120,7 +120,7 @@ export const sendNotification = async ({
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-secret-key': 'lams_secure_notification_v1'
+                        'x-secret-key': import.meta.env.VITE_LAMS_SECRET || 'lams_secure_notification_v1'
                     },
                     body: JSON.stringify({
                         targetUids,
