@@ -7,85 +7,174 @@ import {
     onAuthStateChanged,
     sendPasswordResetEmail
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
-import { FlaskConical } from 'lucide-react';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
+// FlaskConical and Logo removed (unused)
+import QuantumLoader from '../components/QuantumLoader';
+import toast from 'react-hot-toast';
+import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 
-const AuthContext = createContext();
+const AuthContext = createContext({
+    currentUser: null,
+    userProfile: null,
+    loading: true,
+    login: async () => { },
+    signup: async () => { },
+    logout: async () => { },
+    resetPassword: async () => { }
+});
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
+const cleanYears = (years) => {
+    if (!Array.isArray(years)) return [];
+
+    // Normalize: Trim strings, deduplicate, and remove nulls/empty
+    let unique = Array.from(new Set(
+        years.filter(y => y).map(y => y.toString().trim())
+    ));
+
+    // Identify existing specific years (e.g. "2025-2026 (EVEN)")
+    const specificYears = unique.filter(y => y.includes('('));
+    const baseOfSpecific = specificYears.map(y => y.replace(/ \((ODD|EVEN)\)/i, '').trim());
+
+    // Filter out plain base years if their specific version exists
+    unique = unique.filter(y => {
+        const isBase = !y.includes('(');
+        const trimmedY = y.trim();
+        // Keep non-base years OR base years whose specific version doesn't exist
+        return !isBase || !baseOfSpecific.includes(trimmedY);
+    });
+
+    // Filter valid patterns (YYYY-YYYY), sort descending
+    const valid = unique.filter(y => /^\d{4}-\d{4}/.test(y));
+    return valid.sort().reverse();
+};
+
+const predictCurrentYear = () => {
+    const now = new Date();
+    const month = now.getMonth(); // 0-11. June(5) is start of academic year usually.
+    const startYear = month >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${startYear}-${startYear + 1}`;
+};
+
+const STORAGE_KEYS = {
+    SELECTED_YEAR: 'lams_sel_year',
+    SYSTEM_YEAR: 'lams_sys_year',
+    ALL_YEARS: 'lams_all_years'
+};
+
 export const AuthProvider = ({ children }) => {
+    // --- ROBUST STATE INITIALIZATION ---
+
     const [currentUser, setCurrentUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
-    const [systemAcademicYear, setSystemAcademicYear] = useState('2024-2025'); // Global System Default
-    const [selectedAcademicYear, setSelectedAcademicYear] = useState(() => localStorage.getItem('selectedAcademicYear') || null); // User's View Choice (Defaults to System)
-    const [academicYears, setAcademicYears] = useState(['2024-2025']); // List of all years
-    const [maxFacultyLoad, setMaxFacultyLoad] = useState(18); // Default Max Load
+
+    // 3. State: Academic Years List (STRICT SERVER MODE)
+    // IMPROVED: Try to hydrate from cache first to avoid content flashing, fall back to prediction.
+    const [academicYears, setAcademicYears] = useState(() => {
+        try {
+            const cached = localStorage.getItem(STORAGE_KEYS.ALL_YEARS);
+            if (cached) return JSON.parse(cached);
+        } catch (e) {
+            console.warn("Failed to parse cached years", e);
+        }
+        return [predictCurrentYear()];
+    });
+
+    // 4. State: Active/System Year
+    const [systemAcademicYear, setSystemAcademicYear] = useState(() => {
+        // We can trust the "System Year" cache slightly more, or just wait for server.
+        // Let's rely on server to avoid mismatch.
+        return localStorage.getItem(STORAGE_KEYS.SYSTEM_YEAR) || predictCurrentYear();
+    });
+
+    // 5. State: User Selection (Persist this, it's a user preference)
+    const [selectedAcademicYear, setSelectedAcademicYear] = useState(() => {
+        return localStorage.getItem(STORAGE_KEYS.SELECTED_YEAR) || null;
+    });
+
+    const [maxFacultyLoad, setMaxFacultyLoad] = useState(18);
     const [yearConfigs, setYearConfigs] = useState({});
     const [loading, setLoading] = useState(true);
+    const [isSystemSyncing, setIsSystemSyncing] = useState(false); // Global Sync Shield
+
+    const selectedAcademicYearRef = useRef(null);
+    const previousSystemYear = useRef(null);
+
+    // Initialize Ref from storage on mount (handling page reloads)
+    useEffect(() => {
+        previousSystemYear.current = localStorage.getItem(STORAGE_KEYS.SYSTEM_YEAR);
+    }, []);
+
+    // Keep Ref in sync with State
+    useEffect(() => {
+        selectedAcademicYearRef.current = selectedAcademicYear;
+    }, [selectedAcademicYear]);
 
     const login = async (identifier, password) => {
         let email = identifier;
-
-        // Check if input is NOT an email (assume it is EmpID)
         if (!identifier.includes('@')) {
             try {
-                // 1. Try Secure "Lookup Doc" (Best Logic / Zero-Cost)
-                // We read a single doc from 'emp_lookups' where ID is the EmpID.
-                // Security Rules allow 'get' but deny 'list', preventing scraping.
                 const lookupDoc = await getDoc(doc(db, 'emp_lookups', identifier));
-
                 if (lookupDoc.exists()) {
                     email = lookupDoc.data().email;
                 } else {
-                    // "Best Logic" for Spark Plan:
-                    // If secure lookup fails, do NOT fallback to insecure methods or paid Cloud Functions.
-                    // Instead, enforce data consistency.
                     console.warn(`EmpID ${identifier} not found in secure lookup.`);
                     throw new Error("Employee ID not linked. Please ask Admin to link your profile.");
                 }
             } catch (err) {
                 console.error("Login Lookup Error:", err);
-                // Preserve the specific error message if we threw it above
                 if (err.message.includes("not linked")) throw err;
                 throw new Error("Login failed. Please use your Email Address.");
             }
         }
-
         return signInWithEmailAndPassword(auth, email, password);
     };
 
     const signup = async (empId, password, name, recoveryEmail, mobileNumber) => {
-        // Use Real Email for Firebase Auth
         const { user } = await createUserWithEmailAndPassword(auth, recoveryEmail, password);
-
-        // Check if this is the first user
         const usersSnapshot = await getDocs(collection(db, 'users'));
         const isFirstUser = usersSnapshot.empty;
-
-        // Create user profile in Firestore
+        let facultySnap = await getDocs(query(collection(db, 'faculty'), where('empId', '==', empId)));
+        if (facultySnap.empty && recoveryEmail) {
+            facultySnap = await getDocs(query(collection(db, 'faculty'), where('email', '==', recoveryEmail)));
+        }
+        let linkedDept = null;
+        let isFaculty = false;
+        if (!facultySnap.empty) {
+            const facDoc = facultySnap.docs[0];
+            const facData = facDoc.data();
+            linkedDept = facData.department || facData.dept;
+            isFaculty = true;
+            await updateDoc(doc(db, 'faculty', facDoc.id), {
+                uid: user.uid,
+                isRegistered: true,
+                email: recoveryEmail,
+                empId: empId
+            });
+        }
         const userProfileData = {
             empId,
             name,
-            email: recoveryEmail, // Store real email for recovery
+            email: recoveryEmail,
             mobile: mobileNumber,
-            role: isFirstUser ? 'admin' : 'user', // First user is Admin
-            status: isFirstUser ? 'approved' : 'pending', // First user is Approved
+            role: isFirstUser ? 'admin' : 'user',
+            status: isFirstUser ? 'approved' : 'pending',
+            dept: linkedDept,
+            isFaculty: isFaculty,
             createdAt: new Date().toISOString()
         };
-
         await setDoc(doc(db, 'users', user.uid), userProfileData);
-
-        // Create Secure Lookup Entry (EmpID -> Email)
-        // This allows unauthenticated users (Login/Forgot Password) to lookup email securely
         await setDoc(doc(db, 'emp_lookups', empId), { email: recoveryEmail });
-
-        // Create Secure Lookup Entry (for Login)
         if (empId) {
-            await setDoc(doc(db, 'emp_lookups', empId), {
-                email: recoveryEmail,
-                uid: user.uid
-            });
+            await setDoc(doc(db, 'emp_lookups', empId), { email: recoveryEmail, uid: user.uid });
+        }
+
+        // WhatsApp Notification on Signup
+        if (mobileNumber) {
+            const welcomeMsg = `🤖 *Welcome to LAMS* 🤖\n\nHi ${name},\nYour account has been successfully created and is pending approval.\n\n_You will receive updates directly on this number._`;
+            sendWhatsAppNotification(mobileNumber, welcomeMsg);
         }
 
         return user;
@@ -96,52 +185,105 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
-        localStorage.removeItem('selectedAcademicYear'); // Clear preference on logout
         return signOut(auth);
     };
 
     const handleSetSelectedYear = (year) => {
-        if (year) {
-            localStorage.setItem('selectedAcademicYear', year);
-        } else {
-            localStorage.removeItem('selectedAcademicYear');
-        }
         setSelectedAcademicYear(year);
+        if (year) localStorage.setItem(STORAGE_KEYS.SELECTED_YEAR, year);
+        else localStorage.removeItem(STORAGE_KEYS.SELECTED_YEAR);
     };
 
-    const previousSystemYear = useRef(null);
+    const [allowUserYearChange, setAllowUserYearChange] = useState(false);
 
-    // Listen for Academic Year Changes (Global Config)
+    // --- LOGIC: SYNC WITH SERVER CONFIG (The Single Source of Truth) ---
+    // Switched to Real-Time (onSnapshot) to ensure new years appear instantly.
     useEffect(() => {
-        const unsubscribe = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                const fetchedSystemYear = data.activeAcademicYear || '2024-2025';
-                const fetchedYears = data.academicYears || ['2024-2025'];
-                const fetchedConfigs = data.yearConfigs || {};
+        if (!currentUser) return;
 
-                // Update Global Context State
-                setSystemAcademicYear(fetchedSystemYear);
-                setAcademicYears(fetchedYears);
-                setYearConfigs(fetchedConfigs);
+        const unsub = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
+            try {
+                if (docSnap.exists()) {
+                    setIsSystemSyncing(true); // TRIGGER LOADERS
+                    const data = docSnap.data();
 
-                // Validation: If currently viewed year is deleted, reset to system default
-                if (selectedAcademicYear && !fetchedYears.includes(selectedAcademicYear)) {
-                    setSelectedAcademicYear(null);
-                }
-            } else {
-                // Initialize Default Config if Missing
-                setDoc(doc(db, 'settings', 'config'), {
-                    activeAcademicYear: '2024-2025',
-                    academicYears: ['2024-2025'],
-                    yearConfigs: {
-                        '2024-2025': { maxFacultyLoad: 18 }
+                    // A. Validate & Clean Server Data
+                    const fetchedSystemYear = data.activeAcademicYear || predictCurrentYear();
+                    const fetchedYears = cleanYears(data.academicYears || []);
+                    const fetchedConfigs = data.yearConfigs || {};
+                    const fetchedAllowChange = data.allowUserYearChange || false;
+
+                    // B. Source of Truth: Server Data + Active System Year.
+                    const finalYears = cleanYears([...fetchedYears, fetchedSystemYear]);
+
+                    // C. Update States
+                    setSystemAcademicYear(fetchedSystemYear);
+                    setAcademicYears(finalYears);
+                    setYearConfigs(fetchedConfigs);
+                    setAllowUserYearChange(fetchedAllowChange);
+
+                    // D. Auto-Heal: If User Selection is now invalid (ghost), reset it
+                    const currentSelection = localStorage.getItem(STORAGE_KEYS.SELECTED_YEAR);
+                    if (currentSelection && !finalYears.includes(currentSelection)) {
+                        console.warn(`Auto-Healing: Invalid selection ${currentSelection} removed.`);
+                        setSelectedAcademicYear(null);
+                        localStorage.removeItem(STORAGE_KEYS.SELECTED_YEAR);
                     }
-                });
+
+                    // NEW ROBUST SYNC: Prevent Race Conditions across Tabs
+                    // We compare against a Ref (memory) instead of localStorage (disk) inside the callback.
+                    // This ensures EVERY active tab detects the change independently, even if another tab updated storage first.
+                    if (previousSystemYear.current && previousSystemYear.current !== fetchedSystemYear) {
+                        console.log(`System Year Change Detected (Ref): ${previousSystemYear.current} -> ${fetchedSystemYear}`);
+                        setSelectedAcademicYear(null);
+                        localStorage.removeItem(STORAGE_KEYS.SELECTED_YEAR);
+                    }
+
+                    // Update the Ref and Storage for next time
+                    previousSystemYear.current = fetchedSystemYear;
+                    localStorage.setItem(STORAGE_KEYS.SYSTEM_YEAR, fetchedSystemYear);
+
+                    // E. Persistence
+                    localStorage.setItem(STORAGE_KEYS.ALL_YEARS, JSON.stringify(finalYears));
+
+                    // Short artificial delay to let contexts catch up visually
+                    setTimeout(() => setIsSystemSyncing(false), 800);
+
+                } else {
+                    console.log("No Remote Config Found - Running in Offline/Fallback Mode");
+                    setAcademicYears(prev => {
+                        const predicted = predictCurrentYear();
+                        if (!prev.includes(predicted)) {
+                            return cleanYears([...prev, predicted]);
+                        }
+                        return prev;
+                    });
+                }
+            } catch (err) {
+                console.error("Global Config Sync Error:", err);
+                setIsSystemSyncing(false); // Force dismiss loader on error
             }
+        }, (err) => {
+            console.error("Config Snapshot Error:", err);
+            setIsSystemSyncing(false); // Force dismiss loader on snapshot error
         });
-        return () => unsubscribe();
-    }, [selectedAcademicYear]);
+
+        return () => unsub();
+    }, [currentUser]);
+
+    // ENFORCE YEAR LOCK: Kick user back to Active Year if they are restricted
+    useEffect(() => {
+        if (!userProfile) return;
+        const isAdmin = userProfile.role === 'admin';
+
+        // If User is NOT Admin AND Year Change is DISABLED AND they are on a custom year
+        if (!isAdmin && !allowUserYearChange && selectedAcademicYear) {
+            console.log("Year Lock Enforced: Resetting user to System Year");
+            setSelectedAcademicYear(null);
+            localStorage.removeItem(STORAGE_KEYS.SELECTED_YEAR);
+            toast("Year navigation is locked by Admin", { icon: '🔒', style: { borderRadius: '10px', background: '#333', color: '#fff' } });
+        }
+    }, [allowUserYearChange, userProfile, selectedAcademicYear]);
 
     // Update Max Load when Year or Configs Change
     useEffect(() => {
@@ -167,26 +309,27 @@ export const AuthProvider = ({ children }) => {
         let unsubscribeProfile = () => { };
 
         if (currentUser) {
+            // Using onSnapshot for Real-Time Role/Profile Updates
+            // This allows Admins to Ban/Promote users instantly.
             setLoading(true);
             const docRef = doc(db, 'users', currentUser.uid);
-            unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
 
-                    // Standard Profile Processing
-                    // (Hardcoded overrides removed for authenticity)
-
-
-                    setUserProfile(data);
-                } else {
-                    console.error("No user profile found in Firestore!");
-                    setUserProfile(null);
+            unsubscribeProfile = onSnapshot(docRef,
+                (docSnap) => {
+                    if (docSnap.exists()) {
+                        setUserProfile(docSnap.data());
+                    } else {
+                        console.warn("User Profile Missing!");
+                        setUserProfile(null);
+                    }
+                    setLoading(false);
+                },
+                (err) => {
+                    console.error("Profile Sync Error:", err);
+                    setLoading(false);
                 }
-                setLoading(false);
-            }, (err) => {
-                console.error("Error fetching user profile:", err);
-                setLoading(false);
-            });
+            );
+
         } else {
             setUserProfile(null);
         }
@@ -206,77 +349,14 @@ export const AuthProvider = ({ children }) => {
         signup,
         resetPassword,
         logout,
-        loading
+        loading,
+        isSystemSyncing,
+        allowUserYearChange // Expose the new setting
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {loading ? (
-                <div style={{
-                    height: '100vh',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    color: 'white',
-                    background: 'radial-gradient(circle at center, #1e293b 0%, #0f172a 100%)',
-                    zIndex: 9999,
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0
-                }}>
-                    <div style={{
-                        position: 'relative',
-                        marginBottom: '2rem'
-                    }}>
-                        {/* Glow Effect */}
-                        <div style={{
-                            position: 'absolute',
-                            top: '50%', left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: '120px', height: '120px',
-                            background: 'radial-gradient(circle, rgba(59,130,246,0.4) 0%, transparent 70%)',
-                            borderRadius: '50%',
-                            animation: 'pulse-glow 2s infinite'
-                        }}></div>
-
-                        {/* Logo */}
-                        <div style={{
-                            width: '80px', height: '80px',
-                            background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                            borderRadius: '20px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 10px 25px rgba(59, 130, 246, 0.5)',
-                            position: 'relative',
-                            zIndex: 2
-                        }}>
-                            <FlaskConical size={40} color="white" />
-                        </div>
-                    </div>
-
-                    <div style={{ textAlign: 'center', zIndex: 2 }}>
-                        <h2 style={{
-                            fontSize: '1.5rem', fontWeight: 'bold', margin: '0 0 0.5rem 0',
-                            background: 'linear-gradient(to right, #fff, #94a3b8)',
-                            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
-                        }}>
-                            LAMS 2.0
-                        </h2>
-                        <div style={{
-                            fontSize: '0.9rem', color: '#64748b',
-                            display: 'flex', alignItems: 'center', gap: '0.5rem'
-                        }}>
-                            <span style={{
-                                display: 'inline-block', width: '8px', height: '8px',
-                                borderRadius: '50%', background: '#3b82f6',
-                                animation: 'pulse-glow 1s infinite'
-                            }}></span>
-                            Initializing System...
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                children
-            )}
+            {loading ? <QuantumLoader /> : children}
         </AuthContext.Provider>
     );
 };

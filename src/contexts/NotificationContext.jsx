@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { db, messaging } from '../lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { getToken, onMessage } from 'firebase/messaging';
+﻿import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import OneSignal from 'react-onesignal';
+import { db } from '../lib/firebase';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-
 import toast from 'react-hot-toast';
 
 const NotificationContext = createContext();
@@ -12,194 +11,180 @@ const NotificationContext = createContext();
 export const useNotifications = () => useContext(NotificationContext);
 
 export const NotificationProvider = ({ children }) => {
-    const { userProfile, activeAcademicYear, currentUser } = useAuth();
-    const [permission, setPermission] = useState('default');
-    const [todayClasses, setTodayClasses] = useState([]);
-    const [fcmToken, setFcmToken] = useState(null);
+    const { currentUser } = useAuth();
+    const [initialized, setInitialized] = useState(false);
+    const [permission, setPermission] = useState(Notification.permission);
+    const [oneSignalId, setOneSignalId] = useState(null);
+    const lastLoginUid = useRef(null);
 
-    const notifiedClassesRef = useRef(new Set());
-
-    // 1. Request Permission & Get Token
+    // 1. Initialize OneSignal (Run Once)
     useEffect(() => {
-        const initMessaging = async () => {
-            if ('Notification' in window) {
-                // Update local state if it differs from browser state
-                if (Notification.permission !== permission) {
-                    setPermission(Notification.permission);
-                }
+        const runInit = async () => {
+            try {
+                if (window.OneSignalInitialized) return;
+                window.OneSignalInitialized = true;
 
-                if (Notification.permission === 'granted' && currentUser && messaging) {
-                    try {
-                        const token = await getToken(messaging, {
-                            vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY
-                        });
-                        if (token) {
-                            console.log('FCM Token:', token);
-                            setFcmToken(token);
-                            await updateDoc(doc(db, 'users', currentUser.uid), {
-                                fcmTokens: arrayUnion(token)
-                            });
-                        }
-                    } catch (err) {
-                        console.error('An error occurred while retrieving token. ', err);
-                    }
+                await OneSignal.init({
+                    appId: import.meta.env.VITE_ONESIGNAL_APP_ID || "6764f541-4220-4ffd-85d2-6660b86d5a48",
+                    allowLocalhostAsSecureOrigin: true,
+                    notifyButton: { enable: false },
+                });
+
+                setInitialized(true);
+            } catch (error) {
+                if (error.message?.includes("Can only be used on") && window.location.hostname === 'localhost') {
+                    console.warn("OneSignal: Testing only on Production. Normal.");
+                } else {
+                    console.error("OneSignal Init Error:", error);
                 }
             }
         };
 
-        if (currentUser) {
-            initMessaging();
-        }
-    }, [currentUser, permission]);
-
-    // Handle Foreground Messages
-    useEffect(() => {
-        if (!messaging) return;
-
-        onMessage(messaging, (payload) => {
-            console.log('Message received. ', payload);
-            const title = payload.notification?.title || payload.data?.title;
-            const body = payload.notification?.body || payload.data?.body;
-
-            if (title) {
-                toast((t) => (
-                    <div onClick={() => toast.dismiss(t.id)}>
-                        <p className="font-bold">{title}</p>
-                        <p className="text-sm">{body}</p>
-                    </div>
-                ), { duration: 5000, icon: '🔔' });
-            }
-        });
+        runInit();
     }, []);
 
-    const requestPermission = async () => {
-        if ('Notification' in window) {
-            const result = await Notification.requestPermission();
-            setPermission(result);
-            return result; // Token logic handled in useEffect
-        }
-        return 'denied';
-    };
-
-    // 2. Fetch User's Classes for TODAY 
+    // 2. Handle User Identity (Login/Logout)
     useEffect(() => {
-        if (!userProfile || !activeAcademicYear) return;
+        if (!initialized) return;
 
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const todayName = days[new Date().getDay()];
-
-        const q = query(
-            collection(db, 'schedule'),
-            where('academicYear', '==', activeAcademicYear),
-            where('day', '==', todayName)
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const myClasses = [];
-            const empId = userProfile.empId;
-            const userName = userProfile.name;
-
-            snapshot.forEach(doc => {
-                const data = { id: doc.id, ...doc.data() };
-                let isMine = false;
-                if (empId && (data.facultyEmpId === empId || data.faculty2EmpId === empId)) isMine = true;
-                if (!isMine && userName && (data.faculty === userName || data.faculty2 === userName)) isMine = true;
-
-                if (isMine) myClasses.push(data);
-            });
-
-            setTodayClasses(myClasses);
-        });
-
-        return () => unsubscribe();
-    }, [userProfile, activeAcademicYear]);
-
-
-    // 3. Monitor Time & Trigger Local Notifications
-    useEffect(() => {
-        if (permission !== 'granted' || todayClasses.length === 0) return;
-
-        // Fetch settings - default to 15/5 if not set
-        let firstWarning = 15;
-        let secondWarning = 5;
-
-        // Simple real-time listener for settings (optional, or just fetch once)
-        // For efficiency, we can just fetch inside this effect or use a separate effect.
-        // Let's assume we want real-time updates.
-        const settingsRef = doc(db, 'settings', 'notifications');
-        const unsubSettings = onSnapshot(settingsRef, (snap) => {
-            if (snap.exists()) {
-                const data = snap.data();
-                if (data.firstWarning) firstWarning = data.firstWarning;
-                if (data.secondWarning) secondWarning = data.secondWarning;
+        if (currentUser?.uid) {
+            try {
+                if (typeof currentUser.uid === 'string' && currentUser.uid.trim() !== '') {
+                    if (lastLoginUid.current !== currentUser.uid) {
+                        OneSignal.login(currentUser.uid);
+                        lastLoginUid.current = currentUser.uid;
+                        toast.success("Device Linked to User!", { id: 'os-sync', icon: '🔗' });
+                    }
+                }
+            } catch (e) {
+                console.warn("OneSignal Login Failed", e);
             }
-        });
 
-        const checkTime = () => {
-            const now = new Date();
-            const nowTime = now.getTime();
+            // Foreground Listener
+            try {
+                OneSignal.Notifications?.addEventListener('foregroundWillDisplay', (event) => {
+                    event.preventDefault();
+                    const data = event.notification.additionalData;
+                    const primaryUrl = data?.url || event.notification.launchURL;
 
-            todayClasses.forEach(cls => {
-                if (!cls.time) return;
+                    toast.custom((t) => (
+                        <div
+                            onClick={() => {
+                                if (primaryUrl) window.location.href = primaryUrl;
+                                toast.dismiss(t.id);
+                            }}
+                            className="glass-panel"
+                            style={{
+                                background: 'rgba(15, 23, 42, 0.95)',
+                                backdropFilter: 'blur(12px)',
+                                padding: '16px',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(59, 130, 246, 0.4)',
+                                color: 'white',
+                                maxWidth: '380px',
+                                boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+                                display: 'flex',
+                                gap: '16px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <div style={{ fontSize: '24px' }}>
+                                {data?.type === 'urgent' ? '🚨' : '🔔'}
+                            </div>
+                            <div>
+                                <div style={{ fontWeight: '700', color: '#60a5fa' }}>{event.notification.title}</div>
+                                <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>{event.notification.body}</div>
+                            </div>
+                        </div>
+                    ), { duration: 8000, position: 'top-right' });
+                });
+            } catch (e) { /* silent */ }
 
-                const [timeStr] = cls.time.split(' - ');
-                const [time, modifier] = timeStr.split(' ');
-                let [hours, minutes] = time.split(':').map(Number);
+        } else if (lastLoginUid.current) {
+            try {
+                OneSignal.logout();
+                lastLoginUid.current = null;
+            } catch (e) { /* silent */ }
+        }
+    }, [currentUser, initialized]);
 
-                if (modifier === 'PM' && hours < 12) hours += 12;
-                if (modifier === 'AM' && hours === 12) hours = 0;
+    // 3. Sync Subscription to Firestore
+    useEffect(() => {
+        if (!initialized || !currentUser) return;
 
-                const classTime = new Date();
-                classTime.setHours(hours, minutes, 0, 0);
-                const classTimeMs = classTime.getTime();
+        const syncUser = async () => {
+            try {
+                let id = OneSignal.User?.PushSubscription?.id;
+                let optedIn = OneSignal.User?.PushSubscription?.optedIn;
 
-                const diff = classTimeMs - nowTime;
-                const minutesLeft = diff / 1000 / 60;
-
-                const idFirst = `${cls.id}-first-${new Date().toDateString()}`;
-                const idSecond = `${cls.id}-second-${new Date().toDateString()}`;
-                const details = `${cls.dept || ''} ${cls.section || ''} ${cls.group && cls.group !== 'All' ? `(${cls.group})` : ''}`.trim();
-
-                // Dynamic First Warning
-                if (minutesLeft > secondWarning && minutesLeft <= firstWarning && !notifiedClassesRef.current.has(idFirst)) {
-                    new Notification(`Upcoming Class: ${cls.subject}`, {
-                        body: `${Math.ceil(minutesLeft)} Minutes left! ${details} in Room ${cls.room}.`,
-                        icon: '/logo.svg',
-                        tag: idFirst
-                    });
-                    notifiedClassesRef.current.add(idFirst);
+                if (Notification.permission === 'granted' && !id) {
+                    for (let i = 0; i < 5; i++) {
+                        await new Promise(r => setTimeout(r, 1000));
+                        id = OneSignal.User?.PushSubscription?.id;
+                        optedIn = OneSignal.User?.PushSubscription?.optedIn;
+                        if (id) break;
+                    }
                 }
 
-                // Dynamic Second Warning
-                if (minutesLeft > 0 && minutesLeft <= secondWarning && !notifiedClassesRef.current.has(idSecond)) {
-                    new Notification(`Hurry Up! Class Starting: ${cls.subject}`, {
-                        body: `Starts in ${Math.ceil(minutesLeft)} mins! ${details} in ${cls.room}.`,
-                        icon: '/logo.svg',
-                        tag: idSecond,
-                        requireInteraction: true
+                if (optedIn && id) {
+                    setOneSignalId(id);
+                    await updateDoc(doc(db, 'users', currentUser.uid), {
+                        oneSignalId: id,
+                        oneSignalIds: arrayUnion(id),
+                        webPushActive: true,
+                        lastSeen: new Date()
                     });
-                    notifiedClassesRef.current.add(idSecond);
                 }
-            });
+            } catch (e) { console.error("Sync Error", e); }
         };
 
-        const interval = setInterval(checkTime, 60 * 1000);
-        checkTime();
+        syncUser();
 
-        return () => {
-            clearInterval(interval);
-            unsubSettings();
+        // 🛡️ Auto-Healer 🛡️
+        const runHealer = async () => {
+            if (!initialized || !currentUser || Notification.permission !== 'granted') return;
+
+            const sw = await navigator.serviceWorker.getRegistration();
+            const osId = OneSignal.User?.PushSubscription?.id;
+
+            if (!sw || !osId) {
+                const attempts = parseInt(sessionStorage.getItem('ah_attempts') || '0');
+                if (attempts > 2) return;
+                sessionStorage.setItem('ah_attempts', (attempts + 1).toString());
+
+                try {
+                    if (!sw) await navigator.serviceWorker.register('/OneSignalSDKWorker.js');
+                    if (!osId) {
+                        await OneSignal.User.PushSubscription.optOut();
+                        setTimeout(() => OneSignal.User.PushSubscription.optIn(), 1000);
+                    }
+                } catch (e) { /* silent */ }
+            }
         };
-    }, [todayClasses, permission]);
 
-    const value = {
-        permission,
-        requestPermission,
-        fcmToken // Expose token if needed
+        const timer = setTimeout(runHealer, 10000);
+        return () => clearTimeout(timer);
+    }, [initialized, currentUser]);
+
+    const registerForPush = async () => {
+        if (Notification.permission === 'denied') {
+            alert("Blocked. Enable in browser settings.");
+            return;
+        }
+        try {
+            await OneSignal.Slidedown?.promptPush();
+            OneSignal.User?.PushSubscription?.optIn();
+
+            setTimeout(() => {
+                setPermission(Notification.permission);
+                const id = OneSignal.User?.PushSubscription?.id;
+                if (id) toast.success("Active!");
+            }, 2000);
+        } catch (e) { console.error(e); }
     };
 
     return (
-        <NotificationContext.Provider value={value}>
+        <NotificationContext.Provider value={{ registerForPush, permission, oneSignalId, initialized }}>
             {children}
         </NotificationContext.Provider>
     );

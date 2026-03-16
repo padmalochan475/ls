@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText = "Delete", cancelText = "Cancel", isDangerous = false }) => {
@@ -7,7 +7,7 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText
 
     useEffect(() => {
         if (isOpen) {
-            setIsVisible(true);
+            requestAnimationFrame(() => setIsVisible(true));
         } else {
             const timer = setTimeout(() => setIsVisible(false), 300); // Wait for animation
             return () => clearTimeout(timer);

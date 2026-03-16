@@ -1,0 +1,30 @@
+﻿
+> lab@1.0.0 build
+> vite build
+
+[36mvite v7.2.6 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 2848 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mmanifest.webmanifest                [39m[1m[2m    0.48 kB[22m[1m[22m
+[2mdist/[22m[32mindex.html                          [39m[1m[2m    1.37 kB[22m[1m[22m[2m Γöé gzip:   0.58 kB[22m
+[2mdist/[22m[35massets/index-BWzcX6GF.css           [39m[1m[2m   24.22 kB[22m[1m[22m[2m Γöé gzip:   5.74 kB[22m
+[2mdist/[22m[36massets/file-vendor-BB_AjnJz.js      [39m[1m[2m    2.63 kB[22m[1m[22m[2m Γöé gzip:   1.27 kB[22m
+[2mdist/[22m[36massets/purify.es-Bzr520pe.js        [39m[1m[2m   22.45 kB[22m[1m[22m[2m Γöé gzip:   8.63 kB[22m
+[2mdist/[22m[36massets/react-vendor-DNDZPXnP.js     [39m[1m[2m   45.43 kB[22m[1m[22m[2m Γöé gzip:  16.31 kB[22m
+[2mdist/[22m[36massets/index.es-BlnvlKGr.js         [39m[1m[2m  158.59 kB[22m[1m[22m[2m Γöé gzip:  52.93 kB[22m
+[2mdist/[22m[36massets/html2canvas.esm-Ge7aVWlp.js  [39m[1m[2m  201.40 kB[22m[1m[22m[2m Γöé gzip:  47.48 kB[22m
+[2mdist/[22m[36massets/firebase-vendor-DnpR_Mm5.js  [39m[1m[2m  393.02 kB[22m[1m[22m[2m Γöé gzip: 121.77 kB[22m
+[2mdist/[22m[36massets/pdf-vendor-BnHyPqWE.js       [39m[1m[2m  416.59 kB[22m[1m[22m[2m Γöé gzip: 135.66 kB[22m
+[2mdist/[22m[36massets/ui-vendor-Dn4TV3T2.js        [39m[1m[2m  443.12 kB[22m[1m[22m[2m Γöé gzip: 131.23 kB[22m
+[2mdist/[22m[36massets/xlsx-vendor-NtsZI5GC.js      [39m[1m[2m  938.57 kB[22m[1m[22m[2m Γöé gzip: 270.53 kB[22m
+[2mdist/[22m[36massets/index-BQcgOsMz.js            [39m[1m[2m2,709.27 kB[22m[1m[22m[2m Γöé gzip: 602.21 kB[22m
+[32mΓ£ô built in 18.67s[39m
+
+PWA v1.2.0
+mode      generateSW
+precache  17 entries (5231.82 KiB)
+files generated
+  dist/sw.js
+  dist/workbox-8c29f6e4.js

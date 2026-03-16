@@ -1,32 +1,28 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getStorage } from "firebase/storage";
-
-import firebaseConfig from '../firebaseConfig';
-
-// const firebaseConfig = {
-//   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-//   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-//   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-//   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-//   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-//   appId: import.meta.env.VITE_FIREBASE_APP_ID
-// };
-
 import { getMessaging } from "firebase/messaging";
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+import firebaseConfig from './firebaseConfig';
+
+// Guard: Only initialize once. During Vite HMR, this module may re-execute —
+// getApps() checks if Firebase is already initialized to prevent duplicate-app errors
+// which cause Firestore WebSocket assertion failures (ID: b815 / ca9).
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
+
 let messaging;
 try {
     messaging = getMessaging(app);
 } catch (err) {
-    console.warn("Firebase Messaging failed to initialize", err);
+    // getMessaging throws in non-browser environments (SSR/service workers)
+    console.warn("Firebase Messaging unavailable:", err.message);
 }
+
 const googleProvider = new GoogleAuthProvider();
 
 export { db, auth, storage, messaging, googleProvider };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useToast } from '../contexts/ToastContext';
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 import '../styles/design-system.css';
@@ -15,26 +15,17 @@ const ToastItem = ({ toast }) => {
     // Auto-dismiss logic is in Context, but handle the generic animation here if needed
 
     let Icon = Info;
-    let colorClass = 'text-blue-400';
-    let bgClass = 'bg-blue-900/40'; // Fallback using standard CSS if tailwind not available
-    let borderClass = '#3b82f6';
+    let borderClass = '#3b82f6'; // Default Blue
 
-    switch (toast.type) {
-        case 'success':
-            Icon = CheckCircle;
-            borderClass = '#10b981';
-            break;
-        case 'error':
-            Icon = AlertCircle;
-            borderClass = '#ef4444';
-            break;
-        case 'warning':
-            Icon = AlertTriangle;
-            borderClass = '#f59e0b';
-            break;
-        default:
-            Icon = Info;
-            borderClass = '#3b82f6';
+    if (toast.type === 'success') {
+        Icon = CheckCircle;
+        borderClass = '#10b981';
+    } else if (toast.type === 'error') {
+        Icon = AlertCircle;
+        borderClass = '#ef4444';
+    } else if (toast.type === 'warning') {
+        Icon = AlertTriangle;
+        borderClass = '#f59e0b';
     }
 
     return (

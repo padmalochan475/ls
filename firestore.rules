@@ -13,7 +13,6 @@ service cloud.firestore {
     // We look up the 'users' collection for the current user's ID and check the 'role' field
     function isAdmin() {
       return isAuth() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
@@ -25,11 +24,20 @@ service cloud.firestore {
     match /departments/{docId} { allow read: if isAuth(); allow write: if isAdmin(); }
     match /semesters/{docId}   { allow read: if isAuth(); allow write: if isAdmin(); }
     match /subjects/{docId}    { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /faculty/{docId}     { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /faculty/{docId}     { 
+        allow read: if isAuth(); 
+        allow write: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid); 
+    }
     match /rooms/{docId}       { allow read: if isAuth(); allow write: if isAdmin(); }
     match /groups/{docId}      { allow read: if isAuth(); allow write: if isAdmin(); }
     match /days/{docId}        { allow read: if isAuth(); allow write: if isAdmin(); }
     match /timeslots/{docId}   { allow read: if isAuth(); allow write: if isAdmin(); }
+// ...
+    // 6. Config/Settings
+    match /settings/{docId} {
+        allow read: if isAuth();
+        allow write: if isAdmin();
+    }
 
     // 2. Schedule Collection
     // Auth users can READ (View Only).
@@ -46,6 +54,16 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuth();
       allow write: if isAuth() && (request.auth.uid == userId || isAdmin());
+      
+      // Free Tier Notification System:
+      // Allow any auth user to DROP a message into another user's mailbox.
+      // They cannot read other people's messages, only write new ones.
+      match /notifications/{notifId} {
+        allow read: if isAuth() && request.auth.uid == userId;
+        allow create: if isAuth(); // Anyone can send a message
+        allow update: if isAuth() && request.auth.uid == userId; // User can mark as read
+        allow delete: if isAuth() && request.auth.uid == userId; // User can delete
+      }
     }
 
     // 5. Secure Login Lookup (The "Best Logic" Pattern)
@@ -60,7 +78,7 @@ service cloud.firestore {
 
     // 6. Config/Settings
     match /settings/{docId} {
-        allow read: if isAuth(); // Changed from true to isAuth() for better security, but needs to match client
+        allow read: if true; // Public access for Active Year config
         allow write: if isAdmin();
     }
     
@@ -69,6 +87,40 @@ service cloud.firestore {
         allow create: if isAdmin();
         allow read: if isAdmin();
         allow update: if isAdmin(); // For status updates if done by client-side admin logic (though optimized for CF)
+    }
+
+    // 8. Suggestions Box
+    match /suggestions/{docId} {
+        allow create: if isAuth();
+        allow read: if isAdmin() || (isAuth() && resource.data.userId == request.auth.uid);
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+    }
+    // 9. Celebrations
+    match /celebrations/{docId} {
+        allow read: if isAuth();
+        allow write: if isAdmin();
+    }
+
+    // 10. Substitutions & Adjustments
+    match /adjustments/{docId} {
+      allow read: if isAuth();
+      // Allow faculty to CREATE adjustments when accepting substitution requests
+      // Only admins can UPDATE or DELETE
+      allow create: if isAuth();
+      allow update, delete: if isAdmin();
+    }
+
+    match /substitution_requests/{docId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+      allow delete: if isAdmin() || (isAuth() && resource.data.requesterUid == request.auth.uid && resource.data.status == 'pending');
+    }
+
+    // 11. Students
+    match /students/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
     }
   }
 }

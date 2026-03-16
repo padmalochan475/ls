@@ -1,11 +1,67 @@
 {
-    "rewrites": [
+    "functions": {
+        "api/**/*.js": {
+            "includeFiles": "service-account.json"
+        }
+    },
+    "cleanUrls": false,
+    "trailingSlash": false,
+    "headers": [
         {
-            "source": "/api/(.*)",
-            "destination": "/api/$1"
+            "source": "/OneSignalSDK.sw.js",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/javascript"
+                },
+                {
+                    "key": "Service-Worker-Allowed",
+                    "value": "/"
+                }
+            ]
         },
         {
-            "source": "/(.*)",
+            "source": "/OneSignalSDKWorker.js",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/javascript"
+                },
+                {
+                    "key": "Service-Worker-Allowed",
+                    "value": "/"
+                }
+            ]
+        },
+        {
+            "source": "/manifest.json",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/manifest+json"
+                }
+            ]
+        }
+    ],
+    "rewrites": [
+        {
+            "source": "/OneSignalSDK.sw.js",
+            "destination": "/OneSignalSDK.sw.js"
+        },
+        {
+            "source": "/OneSignalSDKWorker.js",
+            "destination": "/OneSignalSDKWorker.js"
+        },
+        {
+            "source": "/manifest.json",
+            "destination": "/manifest.json"
+        },
+        {
+            "source": "/api/:path*",
+            "destination": "/api/:path*"
+        },
+        {
+            "source": "/((?!api/|OneSignalSDK.sw.js|OneSignalSDKWorker.js|manifest.json|logo.svg|vite.svg).*)",
             "destination": "/index.html"
         }
     ]

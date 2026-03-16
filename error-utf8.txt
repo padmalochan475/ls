@@ -1,0 +1,102 @@
+﻿git : remote: error: GH013: 
+Repository rule violations 
+found for refs/heads/master. 
+       
+At line:1 char:1
++ git push -f 2> error.txt ; 
+ $content = Get-Content 
+-Encoding Unknown  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (remote:  
+   error: ...master.         
+   :String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+remote: 
+remote: - GITHUB PUSH 
+PROTECTION        
+remote:   ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓ
+ÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇö
+ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓ
+ÇöΓÇöΓÇöΓÇöΓÇöΓÇö        
+remote:     Resolve the 
+following violations before 
+pushing again        
+remote: 
+remote:     - Push cannot 
+contain secrets        
+remote: 
+remote:             
+remote:      (?) Learn how 
+to resolve a blocked push    
+    
+remote:      https://docs.git
+hub.com/code-security/secret-
+scanning/working-with-secret-
+scanning-and-push-protection/
+working-with-push-protection-
+from-the-command-line#resolvi
+ng-a-blocked-push        
+remote:             
+remote:             
+remote:       ΓÇöΓÇö Google 
+Cloud Service Account 
+Credentials ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇö        
+remote:        locations:    
+    
+remote:          - commit: 07
+d20d4bb0e1068714c7c9a454cf3ac
+18e643ffb        
+remote:            path: 
+service-account.json:1       
+ 
+remote:             
+remote:        (?) To push, 
+remove secret from commit(s) 
+or follow this URL to allow 
+the secret.        
+remote:        https://github
+.com/padmalochan475/ls/securi
+ty/secret-scanning/unblock-se
+cret/3B0qCWKGYmHTQwRyNOBn1lm3
+Phe        
+remote:             
+remote:             
+remote:       ΓÇöΓÇö Google 
+Cloud Service Account 
+Credentials ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇö        
+remote:        locations:    
+    
+remote:          - commit: 07
+d20d4bb0e1068714c7c9a454cf3ac
+18e643ffb        
+remote:            path: 
+production.env:12        
+remote:             
+remote:        (?) To push, 
+remove secret from commit(s) 
+or follow this URL to allow 
+the secret.        
+remote:        https://github
+.com/padmalochan475/ls/securi
+ty/secret-scanning/unblock-se
+cret/3B0qCYKxb4HwnRo7mDUNv0US
+v70        
+remote:             
+remote: 
+remote: 
+To https://github.com/padmalo
+chan475/ls.git
+ ! [remote rejected] master 
+-> master (push declined due 
+to repository rule 
+violations)
+error: failed to push some 
+refs to 'https://github.com/p
+admalochan475/ls.git'

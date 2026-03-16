@@ -1,27 +1,37 @@
-import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { MasterDataProvider } from './contexts/MasterDataContext';
+import { MasterDataProvider, useMasterData } from './contexts/MasterDataContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { useScheduleData } from './hooks/useScheduleData';
 import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Scheduler from './pages/Scheduler';
+import PublicView from './pages/PublicView';
 import AdminPanel from './pages/AdminPanel';
 import MasterData from './pages/MasterData';
 import Profile from './pages/Profile';
 import Assignments from './pages/Assignments';
+import Suggestions from './pages/Suggestions';
+import Substitutions from './pages/Substitutions';
+import Students from './pages/Students';
+import Resources from './pages/Resources';
+import Syllabus from './pages/Syllabus';
 import ErrorBoundary from './components/ErrorBoundary';
 import Analytics from './pages/Analytics';
-import ConfirmModal from './components/ConfirmModal';
+
 import OfflineAlert from './components/OfflineAlert';
+
+import QuantumLoader from './components/QuantumLoader';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { userProfile, loading, logout } = useAuth();
+  const { loading: masterLoading } = useMasterData();
+  const { loading: scheduleLoading } = useScheduleData();
   const location = useLocation();
 
-
-  if (loading) return <div style={{ color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+  if (loading || masterLoading || scheduleLoading) return <QuantumLoader />;
 
   if (!userProfile) {
     // In a real app, you might redirect to login if no user, but useAuth handles initial load.
@@ -54,84 +64,134 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   return children;
 };
 
+
+import { ScheduleProvider } from './contexts/ScheduleContext';
+import VersionManager from './components/VersionManager';
+
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
         <MasterDataProvider>
           <NotificationProvider>
-            <Toaster position="top-right" toastOptions={{
-              style: {
-                background: '#1e293b',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.1)'
-              }
-            }} />
-            <Router>
-              <OfflineAlert />
-              <Routes>
-                <Route path="/login" element={<Login />} />
+            <ScheduleProvider>
+              <VersionManager />
+              <Toaster position="top-right" toastOptions={{
+                style: {
+                  background: '#1e293b',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.1)'
+                }
+              }} />
+              <Router>
+                <OfflineAlert />
+                <Routes>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/view" element={<PublicView />} />
 
-                <Route path="/" element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Dashboard />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                  <Route path="/" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Dashboard />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
 
-                <Route path="/schedule" element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Scheduler />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                  <Route path="/schedule" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Scheduler />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
 
-                <Route path="/assignments" element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Assignments />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                  <Route path="/assignments" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Assignments />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
 
-                <Route path="/master-data" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Layout>
-                      <MasterData />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                  <Route path="/master-data" element={
+                    <ProtectedRoute requiredRole="admin">
+                      <Layout>
+                        <MasterData />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
 
 
-                <Route path="/analytics" element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Analytics />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                  <Route path="/analytics" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Analytics />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
 
-                <Route path="/admin" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Layout>
-                      <AdminPanel />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                  <Route path="/admin" element={
+                    <ProtectedRoute requiredRole="admin">
+                      <Layout>
+                        <AdminPanel />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
 
-                <Route path="/profile" element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Profile />
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Profile />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
 
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Router>
+                  <Route path="/suggestions" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Suggestions />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+
+                  <Route path="/substitutions" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Substitutions />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+
+                  <Route path="/students" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Students />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+
+                  <Route path="/resources" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Resources />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+
+                  <Route path="/syllabus" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Syllabus />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+
+
+              </Router>
+            </ScheduleProvider>
           </NotificationProvider>
         </MasterDataProvider>
       </AuthProvider>

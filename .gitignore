@@ -12,7 +12,9 @@ dist
 dist-ssr
 *.local
 .env
+production.env
 
+service-account.json
 
 # Editor directories and files
 .vscode/*
@@ -26,3 +28,6 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Safety backups (created by backup-src.ps1)
+__backups/
