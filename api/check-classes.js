@@ -544,46 +544,29 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
             const targetId = target.id ? target.id.toString().trim().toLowerCase() : null;
             const targetName = target.name ? target.name.toString().trim().toLowerCase() : null;
 
-            // 1. SEARCH BY ID (STRICT PRIMARY) - If ID exists, we ONLY use ID.
+            // 1. SEARCH BY ID (STRICT PRIMARY)
             if (targetId) {
-                // Check Users
                 const userMatch = allUsers.find(u => 
                     u.empId && u.empId.toString().trim().toLowerCase() === targetId
                 );
                 
-                if (userMatch) {
-                    discoveredUsers.push({
-                        uid: userMatch.uid,
-                        oneSignalId: userMatch.oneSignalId || null,
-                        name: userMatch.name,
-                        empId: userMatch.empId,
-                        mobile: userMatch.mobile || null,
-                        whatsappEnabled: userMatch.whatsappEnabled !== false,
-                        isExactMatch: true
-                    });
-                    return; // ⛔ STOP: ID matched. Never guess by name.
-                }
-
-                // Check Faculty Master
                 const facMatch = allFaculty.find(f => 
                     f.empId && f.empId.toString().trim().toLowerCase() === targetId
                 );
 
-                if (facMatch) {
+                if (userMatch || facMatch) {
+                    // MERGE: Prefer User profile data, fallback to Faculty Master
                     discoveredUsers.push({
-                        uid: facMatch.uid || facMatch.id,
-                        oneSignalId: null,
-                        name: facMatch.name,
-                        empId: facMatch.empId,
-                        mobile: facMatch.mobile || facMatch.phone || null,
-                        whatsappEnabled: facMatch.whatsappEnabled !== false,
+                        uid: userMatch?.uid || facMatch?.uid || facMatch?.id,
+                        oneSignalId: userMatch?.oneSignalId || null,
+                        name: userMatch?.name || facMatch?.name,
+                        empId: userMatch?.empId || facMatch?.empId,
+                        mobile: userMatch?.mobile || facMatch?.mobile || facMatch?.phone || null,
+                        whatsappEnabled: (userMatch?.whatsappEnabled !== false) && (facMatch?.whatsappEnabled !== false),
                         isExactMatch: true
                     });
-                    return; // ⛔ STOP: ID matched. Never guess by name.
+                    return; 
                 }
-
-                // ⚠️ IMPORTANT: If targetId was provided but not found, 
-                // we ABORT for this target. We do NOT fall back to name-guessing.
                 return;
             }
 
