@@ -1201,7 +1201,9 @@ const MasterData = ({ initialTab }) => {
                 }
 
                 if (activeCollection === 'faculty' && formData.phone) {
-                    formData.mobile = formData.phone;
+                    const cleanPhone = formData.phone.replace(/[^0-9]/g, '').slice(-10);
+                    formData.phone = cleanPhone;
+                    formData.mobile = cleanPhone;
                 }
                 await updateDoc(doc(db, activeCollection, editingId), formData);
 
@@ -1235,7 +1237,9 @@ const MasterData = ({ initialTab }) => {
                     dataToSave.whatsappEnabled = true;
                 }
                 if (activeCollection === 'faculty' && dataToSave.phone) {
-                    dataToSave.mobile = dataToSave.phone;
+                    const cleanPhone = dataToSave.phone.replace(/[^0-9]/g, '').slice(-10);
+                    dataToSave.phone = cleanPhone;
+                    dataToSave.mobile = cleanPhone;
                 }
                 await addDoc(collection(db, activeCollection), dataToSave);
 
