@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, or, orderBy, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useScheduleData } from '../hooks/useScheduleData';
 import { useMasterData } from '../contexts/MasterDataContext';
@@ -347,13 +347,38 @@ const Dashboard = () => {
         setTimeout(() => setWeekDates(week), 0);
     }, [masterDays, currentDate, setWeekDates]);
 
-    // Fetch Adjustments (Real-Time Sync)
+    // Fetch Adjustments (Surgical Real-Time Sync)
     const [adjustments, setAdjustments] = useState([]);
     useEffect(() => {
         let unsubscribe = () => { };
 
         if (activeAcademicYear && userProfile?.empId) {
-            const q = query(collection(db, 'adjustments'), where('academicYear', '==', activeAcademicYear));
+            const targetDateStr = formatDateLocal(currentDate);
+            const adjustmentsRef = collection(db, 'adjustments');
+            
+            // --- SURGICAL DASHBOARD ADJUSTMENTS ---
+            // Mode A: Faculty/Personal - Listen to THEIR OWN adjustments for the year (Small/Fast)
+            // Mode B: Admin/All - Listen to ONLY TODAY'S adjustments (Small/Fast)
+            let q;
+            if (dashboardView === 'personal' && selectedFaculty !== 'All Assignments') {
+                q = query(adjustmentsRef, 
+                    and(
+                        where('academicYear', '==', activeAcademicYear),
+                        or(
+                            where('originalFacultyEmpId', '==', userProfile.empId),
+                            where('substituteEmpId', '==', userProfile.empId)
+                        )
+                    )
+                );
+            } else {
+                q = query(adjustmentsRef, 
+                    and(
+                        where('academicYear', '==', activeAcademicYear),
+                        where('date', '==', targetDateStr)
+                    )
+                );
+            }
+
             unsubscribe = onSnapshot(q, (snap) => {
                 const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setAdjustments(data);
@@ -361,11 +386,11 @@ const Dashboard = () => {
                 console.error("Dashboard Adjustments Sync Error:", err);
             });
         } else {
-            setTimeout(() => setAdjustments([]), 0);
+            setAdjustments([]);
         }
 
         return () => unsubscribe();
-    }, [activeAcademicYear, userProfile?.empId]);
+    }, [activeAcademicYear, userProfile?.empId, dashboardView, selectedFaculty, currentDate]);
 
     // Derived Schedules (Memoized)
     const { todaySchedule, weeklySchedule } = useMemo(() => {

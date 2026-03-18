@@ -24,7 +24,8 @@ import {
     AlertCircle,
     Library,
     BookOpen,
-    Search
+    Search,
+    FileText
 } from 'lucide-react';
 import AcademicYearSelector from './AcademicYearSelector';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -168,6 +169,7 @@ const Layout = ({ children }) => {
         { path: '/schedule', label: 'Schedule', icon: <Calendar size={20} /> },
         ...(isAdmin ? [{ path: '/master-data', label: 'Master Data', icon: <Settings size={20} /> }] : []),
         { path: '/analytics', label: 'Analytics', icon: <ChartBar size={20} /> },
+        ...(isAdmin ? [{ path: '/certificates', label: 'Certificates', icon: <FileText size={20} /> }] : []),
         {
             path: '/substitutions',
             label: 'Substitutions',

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, or, and } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 
@@ -9,13 +9,14 @@ const ScheduleContext = createContext();
 export const useScheduleContext = () => useContext(ScheduleContext);
 
 export const ScheduleProvider = ({ children }) => {
-    const { currentUser, activeAcademicYear } = useAuth();
+    const { currentUser, userProfile, activeAcademicYear } = useAuth();
     const [schedule, setSchedule] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         let unsubscribe = () => { };
+        let isActive = true;
 
         const setupLiveSchedule = () => {
             // Validation: Ensure we have a valid string year and user is logged in
@@ -28,54 +29,68 @@ export const ScheduleProvider = ({ children }) => {
             setLoading(true);
 
             try {
-                // Fuzzy Query Logic: Handle "(EVEN)" or "(ODD)" suffixes causing mismatches
                 const baseYear = activeAcademicYear.replace(/ \((ODD|EVEN)\)/i, '').trim();
                 let searchYears = [activeAcademicYear];
-
-                // If current is specific (has suffix), add base
-                if (baseYear !== activeAcademicYear) {
-                    searchYears.push(baseYear);
-                } else {
-                    // If current is base, add potential variants
+                if (baseYear !== activeAcademicYear) searchYears.push(baseYear);
+                else {
                     searchYears.push(`${baseYear} (EVEN)`);
                     searchYears.push(`${baseYear} (ODD)`);
                 }
-
-                // Deduplicate
                 searchYears = [...new Set(searchYears)];
 
-                const q = query(
-                    collection(db, 'schedule'),
-                    where('academicYear', 'in', searchYears)
-                );
+                const isAdmin = userProfile?.role === 'admin';
+                const empId = userProfile?.empId;
+                let q;
+                const scheduleRef = collection(db, 'schedule');
+
+                if (isAdmin) {
+                    q = query(scheduleRef, where('academicYear', 'in', searchYears));
+                } else if (empId) {
+                    q = query(scheduleRef, 
+                        and(
+                            where('academicYear', 'in', searchYears),
+                            or(where('facultyEmpId', '==', empId), where('faculty2EmpId', '==', empId))
+                        )
+                    );
+                } else {
+                    q = query(scheduleRef, where('academicYear', 'in', searchYears));
+                }
 
                 unsubscribe = onSnapshot(q, (snapshot) => {
-                    // eslint-disable-next-line sonarjs/no-nested-functions
-                    const data = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data(),
-                    }));
+                    if (!isActive) return;
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setSchedule(data);
                     setLoading(false);
                 }, (err) => {
                     console.error("Critical Schedule Snapshot Error:", err);
-                    setError(err);
                     setLoading(false);
                 });
 
             } catch (e) {
                 console.error("Setup Error:", e);
-                setError(e);
                 setLoading(false);
             }
         };
 
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log("[Schedule] Resuming live sync...");
+                setupLiveSchedule();
+            } else {
+                console.log("[Schedule] Suspending sync for quota conservation...");
+                unsubscribe();
+            }
+        };
+
         setupLiveSchedule();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
+            isActive = false;
             unsubscribe();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [activeAcademicYear, currentUser]);
+    }, [activeAcademicYear, currentUser, userProfile]);
 
     // Manual refresh is no longer needed with real-time listeners, 
     // but kept as a stub to prevent breaking components that call it.

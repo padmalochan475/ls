@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { useWritePermission } from '../hooks/useWritePermission';
 import { normalizeStr, parseTimeToDate } from '../utils/timeUtils';
 import { FacultyCard, DepartmentCard, SubjectCard, RoomCard, GroupCard, DayCard, TimeSlotCard, SemesterCard, HolidayCard } from '../components/MasterDataCards';
+import { useMasterData } from '../contexts/MasterDataContext';
 
 const GroupFields = ({ formData, setFormData }) => {
     const handleAddSubGroup = () => {
@@ -363,10 +364,44 @@ const MasterData = ({ initialTab }) => {
         setSearchTerm('');
     }, [activeTab]);
 
-    // Real-Time Data Listener
+    const { 
+        faculty: masterFaculty, 
+        departments: masterDepts, 
+        subjects: masterSubjects, 
+        rooms: masterRooms,
+        days: masterDays,
+        timeSlots: masterTimeSlots,
+        semesters: masterSemesters,
+        groups: masterGroups,
+        holidays: masterHolidays,
+        loading: masterContextLoading 
+    } = useMasterData();
+
+    // Mapping tabs to Context Data
+    const contextDataMap = {
+        faculty: masterFaculty,
+        departments: masterDepts,
+        subjects: masterSubjects,
+        rooms: masterRooms,
+        days: masterDays,
+        timeslots: masterTimeSlots,
+        semesters: masterSemesters,
+        groups: masterGroups,
+        holidays: masterHolidays
+    };
+
+    // Real-Time Listener (Only for Config / Non-Context Tabs)
     useEffect(() => {
         if (!activeCollection || !userProfile) return;
-        setData([]); // Clear previous data to prevent ghosting
+        
+        // If the data is in context, we don't need a local listener!
+        if (contextDataMap[activeTab]) {
+            setData(contextDataMap[activeTab]);
+            setLoading(masterContextLoading);
+            return;
+        }
+
+        setData([]); 
         setLoading(true);
 
         let unsubscribe = () => { };
@@ -387,68 +422,6 @@ const MasterData = ({ initialTab }) => {
                         setLoading(false);
                     }
                 );
-            } else if (activeTab === 'holidays') {
-                const q = query(collection(db, 'settings'), where('type', '==', 'holiday'));
-                unsubscribe = onSnapshot(q,
-                    (snapshot) => {
-                        const items = [];
-                        snapshot.forEach((doc) => {
-                            items.push({ id: doc.id, ...doc.data() });
-                        });
-                        items.sort((a, b) => new Date(a.date) - new Date(b.date));
-                        setData(items);
-                        setLoading(false);
-                    },
-                    (err) => {
-                        console.error("Holidays listener error:", err);
-                        toast.error(`Sync error: ${err.code}`);
-                        setLoading(false);
-                    }
-                );
-            } else {
-                unsubscribe = onSnapshot(collection(db, activeCollection), (snapshot) => {
-                    const items = [];
-                    snapshot.forEach((doc) => {
-                        items.push({ id: doc.id, ...doc.data() });
-                    });
-
-                    // Sort items logic (Client-side sort for now, cheap for Master Data)
-                    if (activeCollection === 'days') {
-                        items.sort((a, b) => a.order - b.order);
-                    } else if (activeCollection === 'timeslots') {
-                        items.sort((a, b) => {
-                            const t1 = parseTimeToDate(a.startTime).getTime();
-                            const t2 = parseTimeToDate(b.startTime).getTime();
-                            return t1 - t2;
-                        });
-                        const naturalSort = (a, b) => {
-                            // eslint-disable-next-line sonarjs/no-nested-functions
-                            const splitAlphaNum = (str) => {
-                                // eslint-disable-next-line sonarjs/slow-regex
-                                const match = String(str).match(/^(\D*)(\d+)(.*)$/);
-                                if (!match) return [String(str), 0, ''];
-                                return [match[1], parseInt(match[2] || 0, 10), match[3]];
-                            };
-                            const [aPre, aNum, aSuf] = splitAlphaNum(a);
-                            const [bPre, bNum, bSuf] = splitAlphaNum(b);
-                            const preCmp = aPre.localeCompare(bPre);
-                            if (preCmp !== 0) return preCmp;
-                            if (aNum !== bNum) return aNum - bNum;
-                            return aSuf.localeCompare(bSuf);
-                        };
-                        items.sort((a, b) => naturalSort(a.name || '', b.name || ''));
-                    }
-
-                    setData(items);
-                    setLoading(false);
-                    if (activeCollection === 'faculty') {
-                        toast.success(`Debug: Found ${items.length} faculty entries in DB`);
-                    }
-                }, (error) => {
-                    console.error("Error fetching data:", error);
-                    toast.error(`Sync error: ${error.code}`);
-                    setLoading(false);
-                });
             }
         } catch (err) {
             console.error("Listener setup error:", err);
@@ -456,7 +429,7 @@ const MasterData = ({ initialTab }) => {
         }
 
         return () => unsubscribe();
-    }, [activeTab, activeCollection, userProfile]);
+    }, [activeTab, activeCollection, userProfile, masterFaculty, masterDepts, masterSubjects, masterRooms, masterDays, masterTimeSlots, masterSemesters, masterGroups, masterHolidays, masterContextLoading]);
 
     const fetchDependencies = async () => {
         try {

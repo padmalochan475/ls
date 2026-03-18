@@ -303,7 +303,18 @@ export const AuthProvider = ({ children }) => {
             }
         });
 
-        return unsubscribe;
+        // SAFETY: If Auth hangs (Limit Exhausted), force load after 7s to try offline mode
+        const safetyTimer = setTimeout(() => {
+            setLoading(prev => {
+                if (prev) console.warn("Auth initialization timed out (Likely Firestore Limit). Forcing degraded mode.");
+                return false;
+            });
+        }, 7000);
+
+        return () => {
+            unsubscribe();
+            clearTimeout(safetyTimer);
+        };
     }, []);
 
     useEffect(() => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, writeBatch, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, writeBatch, orderBy, onSnapshot, or, where, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
 import QuantumLoader from '../components/QuantumLoader';
@@ -25,53 +25,65 @@ const Students = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     // --- Data Fetching (Real-time) ---
-    useEffect(() => {
-        let isActive = true;
-        let unsubscribeFn = () => { };
+    // --- Data Fetching (Surgical & One-time) ---
+    const fetchStudents = async () => {
+        setLoading(true);
+        try {
+            const studentRef = collection(db, 'students');
+            const filters = [];
+            const sorting = [orderBy('regNo')];
 
-        const startListener = (useOrderBy = true) => {
+            // --- SURGICAL FILTERS ---
+            if (filterBatch && filterBatch !== 'All Batches') {
+                filters.push(or(
+                    where('branch', '==', filterBatch),
+                    where('section', '==', filterBatch)
+                ));
+            }
+            if (filterSem && filterSem !== 'All Semesters') {
+                filters.push(where('semester', '==', filterSem));
+            }
+
+            let q;
+            if (filters.length > 1) {
+                q = query(studentRef, and(...filters), ...sorting);
+            } else if (filters.length === 1) {
+                q = query(studentRef, filters[0], ...sorting);
+            } else {
+                q = query(studentRef, ...sorting);
+            }
+            const snapshot = await getDocs(q);
+            const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            setStudents(data);
+        } catch (error) {
+            console.error('Surgical Fetch Error (likely missing index):', error);
+            // Fallback: If index is missing, fetch with simple filter or everything and sort in memory
             try {
                 const studentRef = collection(db, 'students');
-                const q = useOrderBy
-                    ? query(studentRef, orderBy('regNo'))
-                    : query(studentRef);
-
-                unsubscribeFn = onSnapshot(q, (snapshot) => {
-                    if (!isActive) return;
-                    const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); // eslint-disable-line sonarjs/no-nested-functions
-                    if (!useOrderBy) data.sort((a, b) => (a.regNo || '').localeCompare(b.regNo || '')); // eslint-disable-line sonarjs/no-nested-functions
-                    setStudents(data);
-                    setLoading(false);
-                }, (error) => {
-                    if (!isActive) return;
-                    console.error('Error fetching students:', error.code, error.message);
-                    if (useOrderBy) {
-                        // Retry once without orderBy (handles missing index OR broken SDK state)
-                        console.warn('[Students] Retrying without orderBy in 1.5s...');
-                        // eslint-disable-next-line sonarjs/no-nested-functions
-                        setTimeout(() => { if (isActive) startListener(false); }, 1500);
-                    } else {
-                        toast.error('Failed to load students — please refresh the page');
-                        setLoading(false);
-                    }
-                });
-            } catch (e) {
-                console.error('[Students] Listener setup error:', e);
-                if (isActive) {
-                    toast.error('Failed to load students — please refresh the page');
-                    setLoading(false);
+                let qFallback;
+                if (filterSem && filterSem !== 'All Semesters') {
+                    qFallback = query(studentRef, where('semester', '==', filterSem));
+                } else if (filterBatch && filterBatch !== 'All Batches') {
+                    qFallback = query(studentRef, where('branch', '==', filterBatch));
+                } else {
+                    qFallback = query(studentRef);
                 }
+                const snapshot = await getDocs(qFallback);
+                const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Manual sort if server-side sort failed
+                data.sort((a,b) => (a.regNo || '').localeCompare(b.regNo || ''));
+                setStudents(data);
+            } catch (e) {
+                toast.error('Failed to load students surgicaly.');
             }
-        };
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        startListener(true);
-
-        return () => {
-            isActive = false;
-            // eslint-disable-next-line sonarjs/no-ignored-exceptions, no-unused-vars
-            try { unsubscribeFn(); } catch (e) { /* ignore cleanup errors */ }
-        };
-    }, []);
+    useEffect(() => {
+        fetchStudents();
+    }, [filterBatch, filterSem]); // Refresh whenever filters change
 
 
     // --- Manage Tab Logic ---
@@ -131,6 +143,7 @@ const Students = () => {
             setIsAddModalOpen(false);
             setEditingStudent(null);
             setFormData({});
+            fetchStudents(); // Manual Refresh
         } catch (error) {
             console.error(error);
             toast.error("Error saving student");
@@ -141,9 +154,8 @@ const Students = () => {
         if (!window.confirm("Are you sure?")) return;
         try {
             await deleteDoc(doc(db, 'students', id));
-            // Real-time listener handles state update
             toast.success("Student deleted");
-            // eslint-disable-next-line sonarjs/no-ignored-exceptions, no-unused-vars
+            fetchStudents(); // Manual Refresh
         } catch (error) {
             toast.error("Error deleting student");
         }

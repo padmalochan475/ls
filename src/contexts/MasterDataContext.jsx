@@ -28,6 +28,17 @@ export const MasterDataProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+    // Dynamic Refs for Quota-Safe Caching (Capture latest snapshot without stale closures)
+    const departmentsRef = useRef([]);
+    const semestersRef = useRef([]);
+    const subjectsRef = useRef([]);
+    const facultyRef = useRef([]);
+    const roomsRef = useRef([]);
+    const daysRef = useRef([]);
+    const timeSlotsRef = useRef([]);
+    const groupsRef = useRef([]);
+    const holidaysRef = useRef([]);
+
     // Use a ref to track active unsubscribers so we can safely tear them down
     const unsubsRef = useRef([]);
 
@@ -41,160 +52,171 @@ export const MasterDataProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        // Wait until AuthContext is fully settled before starting Firestore listeners.
-        // Without this, listeners fire during auth's async profile fetch → data appears
-        // to stall on first login, fixed only by refresh (when cache is warm).
         if (authLoading) return;
 
-        if (!currentUser) {
-            cleanupListeners();
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setDepartments([]);
-            setSemesters([]);
-            setSubjects([]);
-            setFaculty([]);
-            setRooms([]);
-            setDays([]);
-            setTimeSlots([]);
-            setGroups([]);
-            setHolidays([]);
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
-        cleanupListeners(); // Ensure no stale listeners before creating new ones
-
-        // Track which collections have finished their initial load
-        const loadStatus = {
-            departments: false,
-            semesters: false,
-            subjects: false,
-            faculty: false,
-            rooms: false,
-            days: false,
-            timeslots: false,
-            groups: false,
-            settings: false
-        };
-
-        // Track if this effect instance is still active (prevents stale state updates)
+        // --- DYNAMIC HIBERNATION LOGIC ---
+        // We stop all listeners when the tab is hidden to prevent "background leaks"
+        // and re-sync only when the user returns.
         let isActive = true;
         let setupTimer = null;
 
-        const checkAllLoaded = () => {
-            if (isActive && Object.values(loadStatus).every(s => s)) {
+        const syncMasterData = () => {
+            if (!currentUser) {
+                cleanupListeners();
+                setDepartments([]); setSemesters([]); setSubjects([]); setFaculty([]);
+                setRooms([]); setDays([]); setTimeSlots([]); setGroups([]); setHolidays([]);
                 setLoading(false);
+                return;
             }
-        };
 
-        /**
-         * Setup a real-time Firestore listener with safe error handling.
-         * Uses try/catch around both setup AND the snapshot callback to
-         * prevent Firestore SDK assertion failures from propagating up to React.
-         */
-        const setupListener = (collectionName, setState, sortFn, statusKey, customQuery = null) => {
+            // TRY LOAD FROM CACHE FIRST (Instant UX)
+            // eslint-disable-next-line sonarjs/no-ignored-exceptions
             try {
+                const cache = JSON.parse(localStorage.getItem(`lams_master_cache_${currentUser.uid}`) || '{}');
+                if (cache.faculty) {
+                    setDepartments(cache.departments || []);
+                    setSemesters(cache.semesters || []);
+                    setSubjects(cache.subjects || []);
+                    setFaculty(cache.faculty || []);
+                    setRooms(cache.rooms || []);
+                    setDays(cache.days || []);
+                    setTimeSlots(cache.timeSlots || []);
+                    setGroups(cache.groups || []);
+                    setHolidays(cache.holidays || []);
+                    // We stay in "loading" state until live sync finishes, but UI has data!
+                }
+            } catch (e) { console.warn("Cache load failed"); }
+
+            setLoading(true);
+            cleanupListeners();
+
+            const loadStatus = {
+                departments: false, semesters: false, subjects: false, 
+                faculty: false, rooms: false, days: false, 
+                timeslots: false, groups: false, settings: false
+            };
+
+            const checkAllLoaded = () => {
+                const allLoaded = Object.values(loadStatus).every(s => s);
+                if (isActive && allLoaded) {
+                    setLoading(false);
+                    // UPDATE CACHE
+                    const newCache = { 
+                        departments: departmentsRef.current, 
+                        semesters: semestersRef.current, 
+                        subjects: subjectsRef.current, 
+                        faculty: facultyRef.current, 
+                        rooms: roomsRef.current, 
+                        days: daysRef.current, 
+                        timeSlots: timeSlotsRef.current, 
+                        groups: groupsRef.current, 
+                        holidays: holidaysRef.current 
+                    };
+                    localStorage.setItem(`lams_master_cache_${currentUser.uid}`, JSON.stringify(newCache));
+                }
+            };
+
+            const naturalSort = (a, b) => {
+                const splitAlphaNum = (str) => {
+                    const match = String(str).match(/^(\D*)(\d+)(.*)$/);
+                    if (!match) return [String(str), 0, ''];
+                    return [match[1], parseInt(match[2] || 0, 10), match[3]];
+                };
+                const [aPre, aNum, aSuf] = splitAlphaNum(a);
+                const [bPre, bNum, bSuf] = splitAlphaNum(b);
+                const preCmp = aPre.localeCompare(bPre);
+                if (preCmp !== 0) return preCmp;
+                if (aNum !== bNum) return aNum - bNum;
+                return aSuf.localeCompare(bSuf);
+            };
+
+            const setupListener = (collectionName, setState, statusKey, customQuery = null) => {
                 const q = customQuery || query(collection(db, collectionName));
-
-                const unsubscribe = onSnapshot(
-                    q,
-                    (snapshot) => {
-                        if (!isActive) return; // Effect was cleaned up — discard stale updates
-
-                        try {
-                            // eslint-disable-next-line sonarjs/no-nested-functions
-                            const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                            if (sortFn) {
-                                items.sort(sortFn);
-                            } else if (!customQuery) {
-                                // eslint-disable-next-line sonarjs/no-nested-functions
-                                items.sort((a, b) =>
-                                    (a.name || '').toString().localeCompare((b.name || '').toString(), undefined, { numeric: true, sensitivity: 'base' })
-                                );
-                            }
-
-                            setState(items);
-                            loadStatus[statusKey] = true;
-                            checkAllLoaded();
-                        } catch (processErr) {
-                            console.error(`[MasterData] Error processing ${collectionName} snapshot:`, processErr);
-                            loadStatus[statusKey] = true;
-                            checkAllLoaded();
-                        }
-                    },
-                    (error) => {
-                        // Non-fatal: mark as loaded and log. Don't crash the app.
-                        console.warn(`[MasterData] Listener error for ${collectionName} (will continue):`, error.code || error.message);
-                        if (isActive) {
-                            loadStatus[statusKey] = true;
-                            checkAllLoaded();
-                        }
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    if (!isActive) return;
+                    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
+                    // --- INTELLIGENT MASTER HUB SORT ---
+                    if (statusKey === 'days') {
+                        items.sort((a, b) => (a.order || 0) - (b.order || 0));
+                    } else if (statusKey === 'timeslots') {
+                        items.sort((a, b) => {
+                            const t1 = parseTimeToDate(a.startTime).getTime();
+                            const t2 = parseTimeToDate(b.startTime).getTime();
+                            if (t1 !== t2) return t1 - t2;
+                            return naturalSort(a.name || '', b.name || '');
+                        });
+                    } else if (statusKey === 'faculty') {
+                        items.sort((a, b) => {
+                            if (a.slNo !== undefined && b.slNo !== undefined) return a.slNo - b.slNo;
+                            return naturalSort(a.name || '', b.name || '');
+                        });
+                    } else {
+                        items.sort((a, b) => naturalSort(a.name || '', b.name || ''));
                     }
-                );
+                    
+                    // Update State + Ref for caching
+                    setState(items);
+                    if (statusKey === 'departments') departmentsRef.current = items;
+                    if (statusKey === 'semesters') semestersRef.current = items;
+                    if (statusKey === 'subjects') subjectsRef.current = items;
+                    if (statusKey === 'faculty') facultyRef.current = items;
+                    if (statusKey === 'rooms') roomsRef.current = items;
+                    if (statusKey === 'days') daysRef.current = items;
+                    if (statusKey === 'timeslots') timeSlotsRef.current = items;
+                    if (statusKey === 'groups') groupsRef.current = items;
+                    if (statusKey === 'settings') holidaysRef.current = items;
 
+                    loadStatus[statusKey] = true;
+                    checkAllLoaded();
+                }, (error) => {
+                    console.warn(`[MasterData] Listener failed for ${collectionName}:`, error.code);
+                    loadStatus[statusKey] = true;
+                    checkAllLoaded();
+                });
                 unsubsRef.current.push(unsubscribe);
-            } catch (setupErr) {
-                // If listener setup itself fails (e.g. Firestore not ready), mark loaded and move on
-                console.warn(`[MasterData] Failed to setup listener for ${collectionName}:`, setupErr.message);
-                loadStatus[statusKey] = true;
-                checkAllLoaded();
+            };
+
+            setupTimer = setTimeout(() => {
+                setupListener('departments', setDepartments, 'departments');
+                setupListener('semesters', setSemesters, 'semesters');
+                setupListener('subjects', setSubjects, 'subjects');
+                setupListener('faculty', setFaculty, 'faculty');
+                setupListener('rooms', setRooms, 'rooms');
+                setupListener('days', setDays, 'days');
+                setupListener('timeslots', setTimeSlots, 'timeslots');
+                setupListener('groups', setGroups, 'groups');
+                setupListener('settings', setHolidays, 'settings', query(collection(db, 'settings'), where('type', '==', 'holiday')));
+            }, 300);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log("[MasterData] Focus detected. Resuming sync...");
+                syncMasterData();
+            } else {
+                console.log("[MasterData] Background detected. Suspending sync for quota...");
+                cleanupListeners();
             }
         };
 
-        // --- Set up all listeners ---
+        // Initial Start
+        syncMasterData();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Small delay to allow Auth claims to propagate to Firestore internals
-        setupTimer = setTimeout(() => {
-            // 1. Departments
-            setupListener('departments', setDepartments, null, 'departments');
+        // SAFETY: If MasterData hangs (Limit Exhausted), force load after 8s to show cached data
+        const masterSafetyTimer = setTimeout(() => {
+            setLoading(prev => {
+                if (prev) console.warn("MasterData initialization timed out. Forcing degraded mode.");
+                return false;
+            });
+        }, 8000);
 
-            // 2. Semesters (sort by number)
-            setupListener('semesters', setSemesters, (a, b) => (a.number || 0) - (b.number || 0), 'semesters');
-
-            // 3. Subjects
-            setupListener('subjects', setSubjects, null, 'subjects');
-
-            // 4. Faculty
-            setupListener('faculty', setFaculty, null, 'faculty');
-
-            // 5. Rooms
-            setupListener('rooms', setRooms, null, 'rooms');
-
-            // 6. Days (sort by custom order index)
-            setupListener('days', setDays, (a, b) => (a.order || 0) - (b.order || 0), 'days');
-
-            // 7. TimeSlots (sort chronologically)
-            setupListener('timeslots', setTimeSlots, (a, b) => {
-                try {
-                    const t1 = parseTimeToDate(a.startTime).getTime();
-                    const t2 = parseTimeToDate(b.startTime).getTime();
-                    return t1 - t2;
-                } catch {
-                    return 0;
-                }
-            }, 'timeslots');
-
-            // 8. Groups
-            setupListener('groups', setGroups, null, 'groups');
-
-            // 9. Holidays (subset of settings collection)
-            setupListener(
-                'settings',
-                setHolidays,
-                null,
-                'settings',
-                query(collection(db, 'settings'), where('type', '==', 'holiday'))
-            );
-        }, 50);
-
-        // Fallback timer: if Firestore doesn't respond for some collections within 3 seconds,
-        // release the loading state so the UI isn't permanently blocked.
-        // Cleanup: mark effect as inactive and teardown all listeners
         return () => {
             isActive = false;
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (setupTimer) clearTimeout(setupTimer);
+            clearTimeout(masterSafetyTimer);
             cleanupListeners();
         };
     }, [currentUser, authLoading, refreshTrigger]);

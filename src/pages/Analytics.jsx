@@ -12,6 +12,7 @@ import {
 import { Users, BookOpen, Layers, Search, CalendarOff, ChartBar, Activity, MapPin, Calendar, Clock, X, User } from 'lucide-react';
 import '../styles/design-system.css';
 import { normalizeStr, parseTimeToDate } from '../utils/timeUtils';
+import { useMasterData } from '../contexts/MasterDataContext';
 
 const classifyTimeOfDay = (timeStr) => {
     if (!timeStr) return null;
@@ -26,6 +27,14 @@ const classifyTimeOfDay = (timeStr) => {
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const Analytics = () => {
     const { activeAcademicYear, userProfile } = useAuth();
+    const { 
+        faculty: masterFaculty, 
+        departments: masterDepts, 
+        subjects: masterSubjects, 
+        rooms: masterRooms,
+        loading: masterLoading 
+    } = useMasterData();
+
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedFaculty, setSelectedFaculty] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -55,34 +64,40 @@ const Analytics = () => {
         rooms: []
     });
 
+    const scheduleSessionCache = useRef({});
+
     const fetchData = useCallback(async () => {
         if (!activeAcademicYear) return;
+        
+        // --- DYNAMIC LOGIC: Reuse Master Data & Cache Schedule ---
         setLoading(true);
         try {
-            // Fetch assignments for the active year
-            const schedQuery = query(collection(db, 'schedule'), where('academicYear', '==', activeAcademicYear));
-
-            const [schedSnap, facSnap, deptSnap, subSnap, roomSnap] = await Promise.all([
-                getDocs(schedQuery),
-                getDocs(collection(db, 'faculty')),
-                getDocs(collection(db, 'departments')),
-                getDocs(collection(db, 'subjects')),
-                getDocs(collection(db, 'rooms'))
-            ]);
+            let schedData = [];
+            
+            if (scheduleSessionCache.current[activeAcademicYear]) {
+                console.log("[Analytics] Using session cache for", activeAcademicYear);
+                schedData = scheduleSessionCache.current[activeAcademicYear];
+            } else {
+                console.log("[Analytics] Fetching schedule surgicaly...");
+                const schedQuery = query(collection(db, 'schedule'), where('academicYear', '==', activeAcademicYear));
+                const snap = await getDocs(schedQuery);
+                schedData = snap.docs.map(d => d.data());
+                scheduleSessionCache.current[activeAcademicYear] = schedData;
+            }
 
             setData({
-                assignments: schedSnap?.docs?.map(d => d.data()) || [],
-                faculty: facSnap?.docs?.map(d => d.data()) || [],
-                departments: deptSnap?.docs?.map(d => d.data()) || [],
-                subjects: subSnap?.docs?.map(d => d.data()) || [],
-                rooms: roomSnap?.docs?.map(d => d.data()) || []
+                assignments: schedData,
+                faculty: masterFaculty || [],
+                departments: masterDepts || [],
+                subjects: masterSubjects || [],
+                rooms: masterRooms || []
             });
         } catch (error) {
             console.error("Error fetching analytics data:", error);
         } finally {
             setLoading(false);
         }
-    }, [activeAcademicYear]);
+    }, [activeAcademicYear, masterFaculty, masterDepts, masterSubjects, masterRooms]);
 
     useEffect(() => {
         fetchData();

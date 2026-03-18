@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, getDoc, runTransaction, and, or } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useScheduleContext } from '../contexts/ScheduleContext';
 import { useMasterData } from '../contexts/MasterDataContext';
@@ -51,7 +51,10 @@ const Substitutions = () => {
 
         const q = query(
             collection(db, 'substitution_requests'),
-            where('requesterId', '==', userProfile.empId)
+            and(
+                where('academicYear', '==', activeAcademicYear),
+                where('requesterId', '==', userProfile.empId)
+            )
         );
         const unsub = onSnapshot(q,
             (snap) => {
@@ -73,7 +76,10 @@ const Substitutions = () => {
         // Note: Using EmpID match. Ensure targetFacultyId is stored as EmpID.
         const q = query(
             collection(db, 'substitution_requests'),
-            where('targetFacultyId', '==', userProfile.empId)
+            and(
+                where('academicYear', '==', activeAcademicYear),
+                where('targetFacultyId', '==', userProfile.empId)
+            )
         );
         const unsub = onSnapshot(q,
             (snap) => {
@@ -93,7 +99,10 @@ const Substitutions = () => {
         if (!userProfile?.empId || !currentUser) return;
         const q = query(
             collection(db, 'adjustments'),
-            where('originalFacultyEmpId', '==', userProfile.empId)
+            and(
+                where('academicYear', '==', activeAcademicYear),
+                where('originalFacultyEmpId', '==', userProfile.empId)
+            )
         );
         const unsub = onSnapshot(q, (snap) => {
             const data = snap.docs.map(d => ({ id: d.id, ...d.data(), isAdjustment: true }));
@@ -108,7 +117,10 @@ const Substitutions = () => {
         if (!userProfile?.empId || !currentUser) return;
         const q = query(
             collection(db, 'adjustments'),
-            where('substituteEmpId', '==', userProfile.empId)
+            and(
+                where('academicYear', '==', activeAcademicYear),
+                where('substituteEmpId', '==', userProfile.empId)
+            )
         );
         const unsub = onSnapshot(q, (snap) => {
             const data = snap.docs.map(d => ({ id: d.id, ...d.data(), isAdjustment: true }));
@@ -290,9 +302,11 @@ const Substitutions = () => {
                 // Cancel Siblings
                 const siblingsQ = query(
                     collection(db, 'substitution_requests'),
-                    where('originalScheduleId', '==', reqData.originalScheduleId),
-                    where('date', '==', reqData.date),
-                    where('status', '==', 'pending')
+                    and(
+                        where('originalScheduleId', '==', reqData.originalScheduleId),
+                        where('date', '==', reqData.date),
+                        where('status', '==', 'pending')
+                    )
                 );
                 const siblingsSnap = await getDocs(siblingsQ);
                 const cancelPromises = siblingsSnap.docs
@@ -475,16 +489,15 @@ const Substitutions = () => {
         }
 
         try {
-            // Fetch everything relevant for this specific slot
-            const [facSnap, adjSnap] = await Promise.all([
-                getDocs(collection(db, 'faculty')),
-                getDocs(query(collection(db, 'adjustments'),
+            // Fetch adjustments for this specific date
+            const adjSnap = await getDocs(query(collection(db, 'adjustments'),
+                and(
                     where('date', '==', selectedDate),
                     where('academicYear', '==', activeAcademicYear)
-                ))
-            ]);
+                )
+            ));
 
-            const allFaculty = facSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const allFaculty = facultyList; // Use already-cached master data
             const currentAdjustments = adjSnap.docs.map(d => d.data());
 
             const dayName = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' });

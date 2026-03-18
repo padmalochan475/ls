@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, updateDoc, doc, onSnapshot, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, updateDoc, doc, onSnapshot, serverTimestamp, getDoc, setDoc, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useScheduleContext } from '../contexts/ScheduleContext';
 import {
@@ -94,9 +94,11 @@ const SubstitutionManager = () => {
                 // 2. Find linked 'approved' request (matches date & scheduleId)
                 const q = query(
                     collection(db, 'substitution_requests'),
-                    where('date', '==', adjData.date),
-                    where('originalScheduleId', '==', adjData.originalScheduleId),
-                    where('status', '==', 'approved')
+                    and(
+                        where('date', '==', adjData.date),
+                        where('originalScheduleId', '==', adjData.originalScheduleId),
+                        where('status', '==', 'approved')
+                    )
                 );
 
                 const reqSnap = await getDocs(q);
@@ -374,9 +376,11 @@ const SubstitutionManager = () => {
             if (adjData.originalScheduleId && adjData.date) {
                 const q = query(
                     collection(db, 'substitution_requests'),
-                    where('originalScheduleId', '==', adjData.originalScheduleId),
-                    where('date', '==', adjData.date),
-                    where('status', '==', 'approved')
+                    and(
+                        where('originalScheduleId', '==', adjData.originalScheduleId),
+                        where('date', '==', adjData.date),
+                        where('status', '==', 'approved')
+                    )
                 );
 
                 const reqSnaps = await getDocs(q);
