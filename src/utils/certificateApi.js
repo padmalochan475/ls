@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzueqxx7_cYkiNrP2YEMEEyCdanWJ88ymQ/exec"; // SET YOUR DEPLOYED URL HERE
 
