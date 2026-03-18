@@ -1,6 +1,6 @@
 import toast from 'react-hot-toast';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrfd96zLRlnQvkP_cLnB0L6nIUsx1C-c1yIRi2r4nIAIdIneinlpg6ti7w4y10IytIPw/exec"; // SET YOUR DEPLOYED URL HERE
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxafCLI6Y6if5d7XMxQfBj4OyKROVsP404AwpUucUDfb4TL3aufbHLjOllCFVAvTXteAA/exec"; // SET YOUR DEPLOYED URL HERE
 
 export const certApi = {
     async call(action, data = {}) {

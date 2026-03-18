@@ -131,6 +131,8 @@ function doPost(e) {
       result.data = getTableData(SHEET_AUDIT);
     } else if (action === 'runDiagnostics') {
       result.data = runDiagnostics();
+    } else if (action === 'preprocessCertificate') {
+      result.data = preprocessCertificate(payload.reqId, payload.templateId);
     } else {
       throw new Error("Action not recognized: " + action);
     }
@@ -443,7 +445,45 @@ function _currentAcademicYear() {
 function _deriveAcYear(date) {
   const m = date.getMonth() + 1;
   const y = date.getFullYear();
-  return (m >= 7) ? (y + '-' + String(y + 1).slice(-2)) : ((y - 1) + '-' + String(y).slice(-2));
+  // Return the full 4-year session format (e.g., 2023-2027) if preferred, 
+  // or the standard academic year (2023-24). 
+  // Since you mentioned 2023-2027, I am making it flexible:
+  return (m >= 7) ? (y + '-' + (y + 4)) : ((y - 1) + '-' + (y + 3));
+}
+
+/**
+ * Renders a template with dynamic variables for future-proofing.
+ */
+function preprocessCertificate(reqId, templateId) {
+  const ss = _getSS();
+  const requests = getTableData(SHEET_FORM);
+  const req = requests.find(r => r._row == reqId);
+  const templates = getTableData(SHEET_TEMPLATES);
+  const template = templates.find(t => t.TemplateID == templateId) || templates[0];
+
+  if (!req) throw new Error("Request not found");
+
+  let subject = template.SubjectLine || "";
+  let body = template.BodyParagraph || "";
+
+  const vars = {
+    "{{studentName}}": req.StudentFullName || "",
+    "{{regNo}}": req.RegistrationNumber || "",
+    "{{branch}}": req.Branch || "",
+    "{{dept}}": req.Department || "",
+    "{{year}}": req.YearofStudy || "",
+    "{{session}}": req.AcademicSession || "",
+    "{{company}}": req.Company || "",
+    "{{duration}}": req.Duration || "",
+    "{{salutation}}": req.Salutation || "Mr."
+  };
+
+  Object.keys(vars).forEach(k => {
+    subject = subject.replace(new RegExp(k, 'g'), vars[k]);
+    body = body.replace(new RegExp(k, 'g'), vars[k]);
+  });
+
+  return { subject, body, metadata: req };
 }
 
 // --- GENERIC CRUD ENGINE ---
