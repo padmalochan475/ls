@@ -11,6 +11,7 @@ const SHEET_COMPANIES = "Company Master";
 const SHEET_LOG = "Certificate Log";
 const SHEET_SETTINGS = "Settings";
 const SHEET_AUDIT = "Activity Log";
+const SHEET_TEMPLATES = "Template Master";
 
 /**
  * OPTIONAL: Hardcode your Spreadsheet ID here if running as a standalone script.
@@ -46,10 +47,21 @@ function setupSystem() {
 
   // 3. Company Master
   let compSheet = ss.getSheetByName(SHEET_COMPANIES) || ss.insertSheet(SHEET_COMPANIES);
-  compSheet.getRange(1, 1, 1, 6).setValues([[
-    "Company Name", "HR Address", "City", "PIN", "State", "HR Contact"
+  compSheet.getRange(1, 1, 1, 7).setValues([[
+    "Company Name", "HR Address", "City", "PIN", "State", "HR Contact", "HR Email"
   ]]);
   compSheet.setFrozenRows(1);
+
+  // 3.5 Template Master (New)
+  let templateSheet = ss.getSheetByName(SHEET_TEMPLATES) || ss.insertSheet(SHEET_TEMPLATES);
+  templateSheet.getRange(1, 1, 1, 4).setValues([[
+    "Template ID", "Display Name", "Subject Line", "Body Paragraph"
+  ]]);
+  if (templateSheet.getLastRow() === 1) {
+    templateSheet.appendRow(["internship", "Internship Opportunity", "Application for Internship Opportunity", "I am reaching out to formally request an internship opportunity on behalf of {{salutation}} {{studentName}}, a dedicated {{year}} student majoring in {{branch}}."]);
+    templateSheet.appendRow(["apprenticeship", "Apprenticeship Program", "Request for Apprenticeship Training", "{{salutation}} {{studentName}} is interested in the apprenticeship program in {{branch}}."]);
+  }
+  templateSheet.setFrozenRows(1);
 
   // 4. Log
   let logSheet = ss.getSheetByName(SHEET_LOG) || ss.insertSheet(SHEET_LOG);
@@ -90,6 +102,7 @@ function doPost(e) {
         requests: getTableData(SHEET_FORM),
         branches: getTableData(SHEET_BRANCHES),
         companies: getTableData(SHEET_COMPANIES),
+        templates: getTableData(SHEET_TEMPLATES),
         settings: getKeyValueSettings(SHEET_SETTINGS),
         academicYears: getAcademicYears(),
         sheetUrl: _getSS().getUrl()
