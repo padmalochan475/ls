@@ -32,8 +32,8 @@ function setupSystem() {
   let formSheet = ss.getSheetByName(SHEET_FORM) || ss.insertSheet(SHEET_FORM);
   formSheet.getRange(1, 1, 1, 12).setValues([[
     "Timestamp", "Salutation", "Student Full Name", "Registration Number", 
-    "Branch", "Year of Study", "Academic Session", "Certificate Type", 
-    "Company", "Duration", "Status", "Ref No"
+    "Father Name", "Contact No", "Branch", "Department", "Year of Study", "Academic Session", 
+    "Certificate Type", "Company", "Duration", "Status", "Ref No"
   ]]);
   formSheet.setFrozenRows(1);
 
@@ -54,7 +54,7 @@ function setupSystem() {
   // 4. Log
   let logSheet = ss.getSheetByName(SHEET_LOG) || ss.insertSheet(SHEET_LOG);
   logSheet.getRange(1, 1, 1, 11).setValues([[
-    "Ref No", "Student Name", "Registration No", "Branch", "Company", 
+    "Ref No", "Student Name", "Registration No", "Branch", "Department", "Company", 
     "Certificate Type", "Start Date", "Duration", "Generated On", "Academic Year", "Student Contact"
   ]]);
   logSheet.setFrozenRows(1);
@@ -201,11 +201,13 @@ function submitRequest(data) {
     const map = {
       'studentName': 'Student Full Name',
       'regNo':       'Registration Number',
+      'fatherName':  'Father Name',
+      'contact':     'Contact No',
       'branch':      'Branch',
+      'department':  'Department',
       'year':        'Year of Study',
       'type':        'Certificate Type',
       'company':     'Company',
-      'department':  'Department',
       'duration':    'Duration',
       'startDate':   'Proposed Start Date',
       'salutation':  'Salutation',
