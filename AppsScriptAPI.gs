@@ -13,6 +13,9 @@ const SHEET_SETTINGS = "Settings";
 const SHEET_AUDIT = "Activity Log";
 const SHEET_TEMPLATES = "Template Master";
 
+const CACHE_TTL = 300; // 5 minutes cache for dashboard
+const CACHE_KEY_DASH = "LAMS_DASH_SUMMARY";
+
 /**
  * OPTIONAL: Hardcode your Spreadsheet ID here if running as a standalone script.
  */
@@ -98,15 +101,23 @@ function doPost(e) {
     const action = payload.action;
 
     if (action === 'getAdminData') {
-      result.data = {
-        requests: getTableData(SHEET_FORM),
-        branches: getTableData(SHEET_BRANCHES),
-        companies: getTableData(SHEET_COMPANIES),
-        templates: getTableData(SHEET_TEMPLATES),
-        settings: getKeyValueSettings(SHEET_SETTINGS),
-        academicYears: getAcademicYears(),
-        sheetUrl: _getSS().getUrl()
-      };
+      const cache = CacheService.getScriptCache();
+      const cached = cache.get(CACHE_KEY_DASH);
+      if (cached && !payload.noCache) {
+        result.data = JSON.parse(cached);
+        result.data.fromCache = true;
+      } else {
+        result.data = {
+          requests: getTableData(SHEET_FORM),
+          branches: getTableData(SHEET_BRANCHES),
+          companies: getTableData(SHEET_COMPANIES),
+          templates: getTableData(SHEET_TEMPLATES),
+          settings: getKeyValueSettings(SHEET_SETTINGS),
+          academicYears: getAcademicYears(),
+          sheetUrl: _getSS().getUrl()
+        };
+        cache.put(CACHE_KEY_DASH, JSON.stringify(result.data), CACHE_TTL);
+      }
     } else if (action === 'submitRequest') {
       result.data = submitRequest(payload.data);
     } else if (action === 'updateStatus') {
@@ -234,6 +245,7 @@ function submitRequest(data) {
 
     const row = headers.map(h => rowData[h] !== undefined ? rowData[h] : "");
     sheet.appendRow(row);
+    CacheService.getScriptCache().remove(CACHE_KEY_DASH);
     return sheet.getLastRow();
   } finally {
     lock.releaseLock();
@@ -325,6 +337,7 @@ function updateStatus(rowId, status, manualRefNo, certData, lastKnownTimestamp) 
     }
 
     _logActivity("Update Status", `${status.toUpperCase()} row ${rowId}: Ref ${finalRefNo || 'N/A'}`);
+    CacheService.getScriptCache().remove(CACHE_KEY_DASH); // Invalidate cache on change
     return { status, refNo: finalRefNo, meta: certData };
   } finally {
     lock.releaseLock();
@@ -407,6 +420,7 @@ function deleteRequest(rowId) {
     const ss = _getSS();
     ss.getSheetByName(SHEET_FORM).deleteRow(rowId);
     _logActivity("Delete Request", `Deleted row ${rowId} from Form`);
+    CacheService.getScriptCache().remove(CACHE_KEY_DASH);
     return true;
   } finally {
     lock.releaseLock();
@@ -529,6 +543,7 @@ function saveGenericRow(sheetName, rowId, data) {
     } else {
       sheet.appendRow(rowValues);
     }
+    CacheService.getScriptCache().remove(CACHE_KEY_DASH);
     return true;
   } finally {
     lock.releaseLock();
@@ -543,6 +558,7 @@ function deleteGenericRow(sheetName, rowId) {
     const sheet = ss.getSheetByName(sheetName);
     if (sheet && rowId >= 2 && rowId <= sheet.getLastRow()) {
       sheet.deleteRow(rowId);
+      CacheService.getScriptCache().remove(CACHE_KEY_DASH);
     }
     return true;
   } finally {

@@ -36,11 +36,8 @@ const Certificates = () => {
     const [companies, setCompanies] = useState([]);
     const [academicYears, setAcademicYears] = useState([]);
     const [selectedYear, setSelectedYear] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterStatus, setFilterStatus] = useState('all');
-    
-    const [explorerData, setExplorerData] = useState({ headers: [], rows: [] });
     const [explorerLoading, setExplorerLoading] = useState(false);
+    const [liveMode, setLiveMode] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingRow, setEditingRow] = useState(null);
     const [editFormData, setEditFormData] = useState({});
@@ -58,11 +55,12 @@ const Certificates = () => {
         AUDIT: "Activity Log"
     };
 
-    const fetchData = async () => {
+    const fetchData = async (force = false) => {
         setLoading(true);
         try {
-            const res = await certApi.getAdminDashboard();
+            const res = await certApi.getAdminDashboard(force || liveMode);
             if (res.success) {
+                // ... normalize logic remains the same
                 setAcademicYears(res.data.academicYears || []);
                 const normalize = (list) => (list || []).map(r => ({
                     ...r,
@@ -77,6 +75,8 @@ const Certificates = () => {
                 setBackendSettings(res.data.settings || {});
                 setSheetUrl(res.data.sheetUrl || '');
                 if (res.data.settings?.active_year && !selectedYear) setSelectedYear(res.data.settings.active_year);
+                
+                if (res.data.fromCache) toast.success("Using System Cache (Fast Mode)", { icon: '⚡' });
             }
         } catch (err) { toast.error("Bridge Connection Failed"); }
         finally { setLoading(false); }
@@ -235,8 +235,34 @@ The institute has no objection to ${pronoun.toLowerCase()} attending the same fo
                         <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>LAMS 2.0 institutional Control Panel</p>
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <button className="btn btn-secondary" onClick={fetchData} title="Sync Data"><RefreshCw size={18} /></button>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div 
+                        onClick={() => setLiveMode(!liveMode)}
+                        style={{ 
+                            cursor: 'pointer',
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px', 
+                            padding: '6px 12px', 
+                            borderRadius: '20px',
+                            background: liveMode ? 'rgba(0, 255, 150, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                            border: `1px solid ${liveMode ? 'rgba(0, 255, 150, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                            transition: 'all 0.3s ease'
+                        }}
+                    >
+                        <div style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            borderRadius: '50%', 
+                            background: liveMode ? '#00ff96' : '#666',
+                            boxShadow: liveMode ? '0 0 10px #00ff96' : 'none',
+                            animation: liveMode ? 'pulse 2s infinite' : 'none'
+                        }} />
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: liveMode ? '#00ff96' : '#999' }}>
+                            {liveMode ? 'LIVE SYNC' : 'CACHED'}
+                        </span>
+                    </div>
+                    <button className="btn btn-secondary" onClick={() => fetchData(true)} title="Force Refresh"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
                     {sheetUrl && <a href={sheetUrl} target="_blank" rel="noopener" className="btn btn-secondary" title="Google Sheet"><Layout size={18} /> Sheet</a>}
                     <button className="btn btn-primary" onClick={handleHeartbeat} title="Run Diagnostics"><HeartPulse size={18} /></button>
                 </div>

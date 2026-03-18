@@ -24,7 +24,7 @@ export const certApi = {
     },
 
     // Standard Dashboard Data
-    getAdminDashboard: () => certApi.call('getAdminData'),
+    getAdminDashboard: (noCache = false) => certApi.call('getAdminData', { noCache }),
     getBranches: () => certApi.call('getBranches'),
     submitApplication: (data) => certApi.call('submitRequest', { data }),
     updateStatus: (id, status, refNo, certData, lastKnownTimestamp) => 
