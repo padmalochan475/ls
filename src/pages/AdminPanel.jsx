@@ -501,6 +501,11 @@ const AdminPanel = () => {
                     70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
                     100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
                 }
+                @keyframes pulse {
+                    0% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.5; transform: scale(0.85); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
                 .pulse-card { animation: pulse-ring 2s infinite; }
 
                 .admin-header {
@@ -545,8 +550,12 @@ const AdminPanel = () => {
                         letterSpacing: '-1px'
                     }}>
                         Admin Control Center
+                        <div style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '12px', verticalAlign: 'middle' }}>
+                            <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', boxShadow: '0 0 10px #10b981', animation: 'pulse 2s infinite' }}></div>
+                        </div>
                     </h2>
-                    <p style={{ color: 'var(--color-text-muted)', fontSize: '1.1rem', marginTop: '0.5rem' }}>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '1.1rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '4px', letterSpacing: '1px' }}>SYSTEM LIVE</span> 
                         Manage users, permissions, and system health
                     </p>
                 </div>
