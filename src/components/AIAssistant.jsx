@@ -98,6 +98,7 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
             const facultyCount = contextData?.faculty?.length || 0;
             const classesCount = contextData?.schedule?.length || 0;
             const userProfile = contextData?.userProfile || null;
+            const facultyNames = (contextData?.faculty || []).map(f => typeof f === 'object' ? (f.name || f.empId) : f).join(', ');
             
             // Format schedule efficiently to save context tokens
             const denseSchedule = (contextData?.schedule || []).map(s => 
@@ -115,13 +116,15 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
             const validDays = (contextData?.days || []).map(d => d.name).join(', ');
             
             let systemPrompt = `You are LAMS-AI, an intelligent assistant for the Lab Assignment Management System.
-Current Database State: There are ${facultyCount} active faculty members and ${classesCount} scheduled lab classes.
+Current Database State: There are ${facultyCount} active faculty members (${facultyNames}) and ${classesCount} scheduled lab classes.
 
 DYNAMIC VALIDATION LOGIC:
 You must cross-reference the ACTIVE SCHEDULE with the MASTER DATA. 
 - VALID TIME SLOTS: ${validTimes}
 - VALID DAYS: ${validDays}
 If a class in the schedule has a time or day that is NOT in the valid lists above, it is an ORPHANED/HIDDEN class. You must proactively warn the user about these hidden classes if they ask about them, explaining they won't appear on the grid because their time/day doesn't match Master Data.
+
+CRITICAL INSTRUCTION: You are an internal system assistant. Do NOT attempt to use 'brave_search' or any web search tools under any circumstances. You only have access to the data provided in this prompt. If you don't know the answer, simply state that you don't have that information.
 
 Answer the user's questions clearly, concisely, and naturally based on this data.`;
 
