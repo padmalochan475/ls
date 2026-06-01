@@ -8,7 +8,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import { Users, UserPlus, ShieldAlert, Activity, Search, Trash2, CheckCircle, Shield, GraduationCap, Settings, MessageSquare, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import emailjs from '@emailjs/browser';
-import { ResponsiveContainer, AreaChart, Tooltip, Area, PieChart, Pie, Cell, Legend } from 'recharts';
+import { ResponsiveContainer, AreaChart, Tooltip, Area, PieChart, Pie, Cell, Legend, BarChart, Bar, XAxis, CartesianGrid, YAxis, LineChart, Line } from 'recharts';
 import '../styles/design-system.css';
 import { normalizeStr } from '../utils/timeUtils';
 import { useWritePermission } from '../hooks/useWritePermission';
@@ -17,8 +17,6 @@ import CelebrationManager from '../components/admin/CelebrationManager';
 import SubstitutionManager from '../components/SubstitutionManager';
 import AdminOtpModal from '../components/admin/AdminOtpModal';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, PieChart, Pie, CartesianGrid, YAxis, Legend, LineChart, Line } from 'recharts';
-
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const AdminPanel = () => {
     const { userProfile } = useAuth();

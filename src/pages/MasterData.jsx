@@ -13,7 +13,6 @@ import toast from 'react-hot-toast';
 import { useWritePermission } from '../hooks/useWritePermission';
 import { normalizeStr, parseTimeToDate } from '../utils/timeUtils';
 import { FacultyCard, DepartmentCard, SubjectCard, RoomCard, GroupCard, DayCard, TimeSlotCard, SemesterCard, HolidayCard } from '../components/MasterDataCards';
-import { useMasterData } from '../contexts/MasterDataContext';
 
 const GroupFields = ({ formData, setFormData }) => {
     const handleAddSubGroup = () => {

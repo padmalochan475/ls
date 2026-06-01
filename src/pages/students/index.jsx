@@ -312,7 +312,7 @@ export default function StudentsPage() {
               onClick={() => setActiveTab(item.key)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem',
-                borderRadius: '12px', border: 'none', whiteSpace: 'nowrap',
+                borderRadius: '12px', whiteSpace: 'nowrap',
                 background: active ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.1))' : 'transparent',
                 color: active ? '#60a5fa' : COLORS.textMuted,
                 fontWeight: active ? 600 : 500, fontSize: '0.95rem',
