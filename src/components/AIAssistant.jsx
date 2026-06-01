@@ -187,7 +187,7 @@ Answer the user's questions clearly, concisely, and naturally based on this data
             ];
 
             const requestBody = {
-                model: 'llama-3.1-8b-instant',
+                model: 'llama-3.3-70b-versatile',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     // Filter out our internal 'tool_call' UI messages before sending to API
