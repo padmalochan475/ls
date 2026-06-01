@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,6 +48,25 @@ const Layout = ({ children }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
+    const profileDropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+                setIsProfileDropdownOpen(false);
+            }
+        };
+
+        if (isProfileDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, [isProfileDropdownOpen]);
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const { userProfile, currentUser, logout, isSystemSyncing, activeAcademicYear } = useAuth();
     const { permission, registerForPush } = useNotifications();
@@ -617,7 +636,7 @@ const Layout = ({ children }) => {
                             </button>
                         )}
 
-                        <div style={{ position: 'relative' }}>
+                        <div style={{ position: 'relative' }} ref={profileDropdownRef}>
                             <div
                                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                                 title="My Profile"
@@ -641,10 +660,6 @@ const Layout = ({ children }) => {
                             {/* Dropdown Menu */}
                             {isProfileDropdownOpen && (
                                 <>
-                                    <div
-                                        style={{ position: 'fixed', inset: 0, zIndex: 999 }}
-                                        onClick={() => setIsProfileDropdownOpen(false)}
-                                    />
                                     <div style={{
                                         position: 'absolute',
                                         top: 'calc(100% + 12px)',
