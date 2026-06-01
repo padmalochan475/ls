@@ -37,7 +37,8 @@ const Profile = () => {
         name: '',
         mobile: '',
         dob: '',
-        joiningDate: ''
+        joiningDate: '',
+        whatsappEnabled: true
     });
 
     // Password Change State
@@ -46,6 +47,10 @@ const Profile = () => {
         newPassword: '',
         confirmPassword: ''
     });
+
+    const [waVerifyCode, setWaVerifyCode] = useState(null);
+    const [generatingCode, setGeneratingCode] = useState(false);
+    const [botNumber, setBotNumber] = useState('919668593551'); // Fallback to current
 
     const [showPassword, setShowPassword] = useState({
         current: false,
@@ -98,10 +103,70 @@ const Profile = () => {
                 name: userProfile.name || '',
                 mobile: userProfile.mobile || '',
                 dob: userProfile.dob || '',
-                joiningDate: userProfile.joiningDate || ''
+                joiningDate: userProfile.joiningDate || '',
+                whatsappEnabled: userProfile.whatsappEnabled !== false
             });
         }
     }, [userProfile]);
+
+    // Fetch Dynamic Bot Number from System Settings
+    useEffect(() => {
+        const fetchBotSettings = async () => {
+            try {
+                const settingsRef = doc(db, 'settings', 'whatsapp');
+                const snap = await getDoc(settingsRef);
+                if (snap.exists() && snap.data().botNumber) {
+                    setBotNumber(snap.data().botNumber);
+                }
+            } catch (err) {
+                console.error("Error fetching bot settings:", err);
+            }
+        };
+        fetchBotSettings();
+    }, []);
+
+    const handleGeneratewaVerifyCode = async () => {
+        try {
+            setGeneratingCode(true);
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            
+            // Save code to user document
+            const userRef = doc(db, 'users', currentUser.uid);
+            await updateDoc(userRef, {
+                waVerifyCode: code,
+                waTimestamp: new Date().toISOString()
+            });
+            
+            setWaVerifyCode(code);
+            toast.success("Verification Code Generated!");
+        } catch (error) {
+            console.error("Error generating code:", error);
+            toast.error("Failed to generate code.");
+        } finally {
+            setGeneratingCode(false);
+        }
+    };
+
+    // --- PERSISTENT REAL-TIME SUCCESS LISTENER ---
+    useEffect(() => {
+        if (!currentUser || !waVerifyCode) return;
+        
+        const userRef = doc(db, 'users', currentUser.uid);
+        const unsub = onSnapshot(userRef, (doc) => {
+            const data = doc.data();
+            // If ID is linked and code is cleared (means bot successfully verified)
+            if (data && data.lid && data.waVerifyCode === null) {
+                toast.success("WhatsApp Linked Successfully! 🎉");
+                setWaVerifyCode(null);
+                // Also update local profile state to reflect link instantly
+                if (userProfile) {
+                    setUserProfile(prev => ({ ...prev, lid: data.lid }));
+                }
+            }
+        });
+
+        return () => unsub(); // Cleanup on unmount or code change
+    }, [waVerifyCode, currentUser, userProfile]);
 
     const onCropComplete = (croppedArea, croppedAreaPixels) => {
         setCroppedAreaPixels(croppedAreaPixels);
@@ -155,19 +220,29 @@ const Profile = () => {
                 await updateDoc(userRef, { photoURL: base64String });
 
                 // 4. SYNC TO FACULTY MASTER DATA
-                // If this user is linked to a faculty member, update their master data image too.
-                if (userProfile?.empId) {
+                // Resilient lookup: Try finding by UID first (strongest link), then fallback to empId
+                if (currentUser?.uid || userProfile?.empId) {
                     try {
-                        const q = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
-                        const snapshot = await getDocs(q);
-                        if (!snapshot.empty) {
-                            const facultyDoc = snapshot.docs[0];
-                            await updateDoc(facultyDoc.ref, { photoURL: base64String });
-                            // console.log("Synced profile image to Faculty Master Data");
+                        let facDoc = null;
+                        
+                        // 1. Try UID lookup
+                        const uidQ = query(collection(db, 'faculty'), where('uid', '==', currentUser.uid));
+                        const uidSnap = await getDocs(uidQ);
+                        
+                        if (!uidSnap.empty) {
+                            facDoc = uidSnap.docs[0];
+                        } else if (userProfile?.empId) {
+                            // 2. Fallback to EmpId lookup
+                            const empQ = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
+                            const empSnap = await getDocs(empQ);
+                            if (!empSnap.empty) facDoc = empSnap.docs[0];
+                        }
+
+                        if (facDoc) {
+                            await updateDoc(facDoc.ref, { photoURL: base64String });
                         }
                     } catch (syncErr) {
                         console.error("Failed to sync image to faculty:", syncErr);
-                        // Don't block the UI success, just log it.
                     }
                 }
 
@@ -204,10 +279,14 @@ const Profile = () => {
             // Prepare update data
             // LOCK NAME: If linked to Faculty (has empId), do NOT allow name change here.
             // It must be done via Master Data to trigger cascade.
+            // Deep Sanitization: Strip spaces/dashes before save for Bot compatibility
+            const sanitizedPhone = formData.mobile ? formData.mobile.replace(/[^0-9]/g, '').slice(-10) : '';
+
             let updateData = {
-                mobile: formData.mobile,
+                mobile: sanitizedPhone,
                 dob: formData.dob,
-                joiningDate: formData.joiningDate
+                joiningDate: formData.joiningDate,
+                whatsappEnabled: formData.whatsappEnabled !== false
             };
 
             if (!userProfile.empId) {
@@ -222,16 +301,40 @@ const Profile = () => {
             await updateDoc(userRef, updateData);
 
             // SYNC TO FACULTY MASTER DATA
-            if (userProfile?.empId) {
+            // Resilient lookup: Try finding by UID first (strongest link), then fallback to empId
+            if (currentUser?.uid || userProfile?.empId) {
                 try {
-                    const q = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
-                    const snapshot = await getDocs(q);
-                    if (!snapshot.empty) {
-                        const facultyDoc = snapshot.docs[0];
-                        await updateDoc(facultyDoc.ref, {
-                            // name: formData.name, // DO NOT SYNC NAME from here. unsafe.
-                            mobile: formData.mobile
+                    let facDoc = null;
+                    
+                    // 1. Try UID lookup
+                    const uidQ = query(collection(db, 'faculty'), where('uid', '==', currentUser.uid));
+                    const uidSnap = await getDocs(uidQ);
+                    
+                    if (!uidSnap.empty) {
+                        facDoc = uidSnap.docs[0];
+                    } else if (userProfile?.empId) {
+                        // 2. Fallback to EmpId lookup
+                        const empQ = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
+                        const empSnap = await getDocs(empQ);
+                        if (!empSnap.empty) facDoc = empSnap.docs[0];
+                    } else if (currentUser?.email) {
+                        // 3. Fallback to Email lookup (Last resort)
+                        const emailQ = query(collection(db, 'faculty'), where('email', '==', currentUser.email));
+                        const emailSnap = await getDocs(emailQ);
+                        if (!emailSnap.empty) facDoc = emailSnap.docs[0];
+                    }
+
+                    if (facDoc) {
+                        await updateDoc(facDoc.ref, {
+                            uid: currentUser.uid, // Ensure link is established
+                            mobile: sanitizedPhone, 
+                            phone: sanitizedPhone,
+                            dob: formData.dob,
+                            joiningDate: formData.joiningDate,
+                            whatsappEnabled: formData.whatsappEnabled !== false
                         });
+                        // Proactive success notification
+                        toast.success("Synced with Faculty Master Data", { icon: "🔄" });
                     }
                 } catch (syncErr) {
                     console.error("Failed to sync profile to faculty:", syncErr);
@@ -245,6 +348,43 @@ const Profile = () => {
             setMessage({ type: 'error', text: 'Failed to update profile.' });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleWhatsAppToggle = async (e) => {
+        // Toggle the state immediately in local form
+        const newValue = e.target.checked;
+        setFormData(prev => ({ ...prev, whatsappEnabled: newValue }));
+
+        // Autosave to Firebase
+        try {
+            const userRef = doc(db, 'users', currentUser.uid);
+            await updateDoc(userRef, { whatsappEnabled: newValue });
+
+            if (userProfile?.empId) {
+                try {
+                    const q = query(collection(db, 'faculty'), where('empId', '==', userProfile.empId));
+                    const snapshot = await getDocs(q);
+                    if (!snapshot.empty) {
+                        const facRef = snapshot.docs[0].ref;
+                        const facData = snapshot.docs[0].data();
+                        
+                        // Check if we have permission to write to this faculty doc
+                        if (userProfile.role === 'admin' || facData.uid === currentUser.uid) {
+                            await updateDoc(facRef, { whatsappEnabled: newValue });
+                        }
+                    }
+                } catch (syncErr) {
+                    console.warn("Minor: Failed to sync toggle to faculty record (Rules restriction)", syncErr);
+                    // We don't throw here so the user profile update still counts as success
+                }
+            }
+            toast.success(`WhatsApp notifications ${newValue ? 'enabled' : 'disabled'}`);
+        } catch (error) {
+            console.error("CRITICAL: Failed to update user settings:", error);
+            toast.error("Failed to update settings. Please try again.");
+            // Revert local state if server fails
+            setFormData(prev => ({ ...prev, whatsappEnabled: !newValue }));
         }
     };
 
@@ -519,6 +659,179 @@ const Profile = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
                                 <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Employee ID:</div>
                                 <div style={{ fontSize: '1.1rem', fontWeight: 600, fontFamily: 'monospace', letterSpacing: '1px' }}>{userProfile.empId || 'N/A'}</div>
+                            </div>
+
+                            {/* WhatsApp Linking Section - Premium Redesign */}
+                            <div style={{ 
+                                marginTop: '1.5rem', 
+                                padding: '1.5rem', 
+                                borderRadius: '20px', 
+                                background: userProfile.lid ? 'linear-gradient(135deg, rgba(37, 211, 102, 0.1) 0%, rgba(37, 211, 102, 0.02) 100%)' : 'rgba(255, 255, 255, 0.03)',
+                                border: `1px solid ${userProfile.lid ? 'rgba(37, 211, 102, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                                boxShadow: userProfile.lid ? '0 8px 32px rgba(37, 211, 102, 0.1)' : 'none',
+                                transition: 'all 0.3s ease'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <div style={{ 
+                                            width: '48px',
+                                            height: '48px',
+                                            borderRadius: '14px',
+                                            background: userProfile.lid ? '#25D366' : 'rgba(255, 255, 255, 0.05)',
+                                            color: userProfile.lid ? 'white' : 'var(--color-text-muted)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            boxShadow: userProfile.lid ? '0 4px 12px rgba(37, 211, 102, 0.3)' : 'none'
+                                        }}>
+                                            <Phone size={24} />
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'white' }}>WhatsApp Assistant</div>
+                                            <div style={{ 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                gap: '4px', 
+                                                fontSize: '0.8rem', 
+                                                fontWeight: 600, 
+                                                marginTop: '2px',
+                                                color: userProfile.lid ? '#2ecc71' : '#e74c3c'
+                                            }}>
+                                                {userProfile.lid ? (
+                                                    <><Check size={14} /> Account Linked</>
+                                                ) : (
+                                                    <><X size={14} /> Not Connected</>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {!userProfile.lid && !waVerifyCode && (
+                                        <button 
+                                            type="button"
+                                            onClick={handleGeneratewaVerifyCode}
+                                            disabled={generatingCode}
+                                            className="form-btn"
+                                            style={{ 
+                                                background: 'var(--color-primary)', 
+                                                color: 'white',
+                                                padding: '0.6rem 1.25rem',
+                                                borderRadius: '12px',
+                                                fontWeight: 600,
+                                                fontSize: '0.9rem',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                transition: 'transform 0.2s ease'
+                                            }}
+                                            onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
+                                            onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                                        >
+                                            {generatingCode ? '...' : (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <Zap size={16} /> Link WhatsApp
+                                                </div>
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+
+                                {!userProfile.lid && waVerifyCode && (
+                                    <div style={{ 
+                                        marginTop: '1.5rem',
+                                        background: 'rgba(255,255,255,0.04)', 
+                                        padding: '1.5rem', 
+                                        borderRadius: '16px', 
+                                        border: '1px dashed rgba(255,255,255,0.12)',
+                                        animation: 'fadeIn 0.5s ease'
+                                    }}>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem', textAlign: 'center' }}>
+                                            Step 2: Send this secure code to the bot
+                                        </div>
+                                        <div style={{ 
+                                            fontSize: '2.2rem', 
+                                            fontWeight: 800, 
+                                            letterSpacing: '8px', 
+                                            textAlign: 'center', 
+                                            color: '#25D366',
+                                            fontFamily: 'monospace',
+                                            margin: '0.75rem 0',
+                                            textShadow: '0 0 20px rgba(37, 211, 102, 0.2)'
+                                        }}>
+                                            {waVerifyCode}
+                                        </div>
+                                        
+                                        <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
+                                            <a 
+                                                href={`https://wa.me/${botNumber}?text=VERIFY%20${waVerifyCode}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{ 
+                                                    display: 'inline-flex', 
+                                                    alignItems: 'center', 
+                                                    gap: '10px', 
+                                                    background: '#25D366', 
+                                                    color: 'white',
+                                                    padding: '0.75rem 1.5rem',
+                                                    fontSize: '0.9rem',
+                                                    textDecoration: 'none',
+                                                    borderRadius: '12px',
+                                                    fontWeight: 700,
+                                                    boxShadow: '0 4px 15px rgba(37, 211, 102, 0.3)',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                                onMouseOver={e => {
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 211, 102, 0.4)';
+                                                }}
+                                                onMouseOut={e => {
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(37, 211, 102, 0.3)';
+                                                }}
+                                            >
+                                                <Phone size={18} fill="white" />
+                                                Open WhatsApp
+                                            </a>
+                                        </div>
+
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '1rem', opacity: 0.7 }}>
+                                            Code valid for 30 minutes. Refresh to regenerate.
+                                        </div>
+                                    </div>
+                                )}
+
+                                {userProfile.lid && (
+                                    <div style={{ 
+                                        marginTop: '1rem',
+                                        padding: '1rem',
+                                        background: 'rgba(37, 211, 102, 0.05)',
+                                        borderRadius: '12px',
+                                        fontSize: '0.85rem', 
+                                        color: '#bbf7d0', 
+                                        lineHeight: '1.5',
+                                        display: 'flex',
+                                        gap: '10px'
+                                    }}>
+                                        <div style={{ color: '#25D366', marginTop: '3px' }}><BadgeCheck size={18} /></div>
+                                        <div>
+                                            Your account is successfully bound to the LAMS Bot. You will receive real-time substitution alerts and status updates.
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(37, 211, 102, 0.05)', borderRadius: '12px', border: '1px solid rgba(37, 211, 102, 0.2)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                    <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#25D366' }}>WhatsApp Notifications</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Receive updates and substitution alerts directly on your WhatsApp number.</div>
+                                </div>
+                                <label className="switch">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={formData.whatsappEnabled !== false}
+                                        onChange={handleWhatsAppToggle}
+                                    />
+                                    <span className="slider"></span>
+                                </label>
                             </div>
 
                             {isEditing && (

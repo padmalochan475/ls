@@ -111,6 +111,7 @@ const NotificationManager = ({ users }) => {
                         <Settings size={20} />
                     </div>
                     <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Notification Settings</h3>
+                    <span style={{ fontSize: '0.7rem', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', padding: '2px 8px', borderRadius: '4px', marginLeft: 'auto', fontWeight: 600 }}>WhatsApp Active</span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem' }}>

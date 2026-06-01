@@ -1,0 +1,10 @@
+﻿Found 9 deployments.
+- AKfycbzuUeXNUyDAlBHR7DHUqfk6SIcM-CSJardgR1M-EfJW @HEAD 
+- AKfycbxafCLI6Y6if5d7XMxQfBj4OyKROVsP404AwpUucUDfb4TL3aufbHLjOllCFVAvTXteAA @8 - Dynamic Templates and 4-Year BTech Session Logic
+- AKfycbzueqxx7_cYkiNrP2YEMEElytDjq4fBA1i2ugpl_vU7XDmsWyR7iU7uNGyCdanWJ88ymQ @2 
+- AKfycbxd5l9KSwn4DsmHpvrdmGC9x-L5Nh7y9cggpSu-MwpEYIYci4xv75gf4xZ7VG_LMzwvnA @9 - High Performance Dashboard with CacheService and Quota Optimization
+- AKfycbzTuw_0mVLElTncV30QRDmuaDyuikqWdZBmlE6EIfPjJjIgd5gtAY8qEFEanpcWLd6Nhw @3 - Production Deployment Final
+- AKfycbxjKkMRpyjcC4W7CO8zB6au8C8ku9rkblQz2huI7LaC0CV2BF3pUXrOvXz0GW4tgr9UKg @1 
+- AKfycbz7sdozGBs1zpjuB7-QccUcUoWgntA-FdbXLwY7tbhaLct0dpojRVz4y-dHlLMaFv0n8A @6 - Enhanced Schema with Departments and Father Name
+- AKfycbyMCyjLtnntgDjHXD97bEBzND_y3O7_D_AF-WlSOxWOjW3lpbbZWL2MqgG-CUK1shooDQ @5 - Fixed Spreadsheet ID
+- AKfycbzrfd96zLRlnQvkP_cLnB0L6nIUsx1C-c1yIRi2r4nIAIdIneinlpg6ti7w4y10IytIPw @7 - Template Master and HR expanded fields

@@ -6,7 +6,7 @@ import SwapFacultyModal from '../components/scheduler/SwapModal';
 import ScheduleGrid from '../components/scheduler/ScheduleGrid';
 import AssignmentDetailsModal from '../components/scheduler/AssignmentDetailsModal'; // Added Import
 import { db } from '../lib/firebase';
-import { collection, addDoc, query, where, deleteDoc, doc, updateDoc, getDocs, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, query, where, deleteDoc, doc, updateDoc, getDocs, getDoc, writeBatch, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
 import { useScheduleData } from '../hooks/useScheduleData';
@@ -436,8 +436,10 @@ const Scheduler = () => {
             // Query only relevant slots to minimize read costs while ensuring integrity
             const checkQ = query(
                 collection(db, 'schedule'),
-                where('academicYear', '==', activeAcademicYear),
-                where('day', '==', finalData.day)
+                and(
+                    where('academicYear', '==', activeAcademicYear),
+                    where('day', '==', finalData.day)
+                )
                 // We fetch the WHOLE day to catch:
                 // 1. Partial time overlaps
                 // 2. Faculty daily load counts

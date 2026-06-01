@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, updateDoc, doc, onSnapshot, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, updateDoc, doc, onSnapshot, serverTimestamp, getDoc, setDoc, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useScheduleContext } from '../contexts/ScheduleContext';
 import {
@@ -94,9 +94,11 @@ const SubstitutionManager = () => {
                 // 2. Find linked 'approved' request (matches date & scheduleId)
                 const q = query(
                     collection(db, 'substitution_requests'),
-                    where('date', '==', adjData.date),
-                    where('originalScheduleId', '==', adjData.originalScheduleId),
-                    where('status', '==', 'approved')
+                    and(
+                        where('date', '==', adjData.date),
+                        where('originalScheduleId', '==', adjData.originalScheduleId),
+                        where('status', '==', 'approved')
+                    )
                 );
 
                 const reqSnap = await getDocs(q);
@@ -338,21 +340,9 @@ const SubstitutionManager = () => {
                     empIds: [subEmpId],
                     title: "New Substitution Assigned",
                     body: `You have been assigned to cover ${itemDetails.subject} for ${selectedAbsentee} on ${selectedDate} at ${itemDetails.time}.`,
+                    type: 'substitution_request',
                     data: { type: 'substitution', date: selectedDate }
                 });
-            }
-
-            // WhatsApp Notification
-            if (subPhone && substituteUser?.whatsappEnabled !== false) {
-                const msgContent = `🔔 *LAMS SUBSTITUTION ALERT* 🔔
-You have been assigned to cover a substitution class.
-📅 *Date:* ${selectedDate}
-⏰ *Period:* ${itemDetails.time}
-🏫 *Role:* ${itemDetails.subject} (Subbing for ${selectedAbsentee})
-
-_Please check your LAMS portal for more details._`;
-                
-                sendWhatsAppNotification(subPhone, msgContent);
             }
 
             toast.success("Substitute Assigned");
@@ -386,9 +376,11 @@ _Please check your LAMS portal for more details._`;
             if (adjData.originalScheduleId && adjData.date) {
                 const q = query(
                     collection(db, 'substitution_requests'),
-                    where('originalScheduleId', '==', adjData.originalScheduleId),
-                    where('date', '==', adjData.date),
-                    where('status', '==', 'approved')
+                    and(
+                        where('originalScheduleId', '==', adjData.originalScheduleId),
+                        where('date', '==', adjData.date),
+                        where('status', '==', 'approved')
+                    )
                 );
 
                 const reqSnaps = await getDocs(q);
@@ -454,22 +446,9 @@ _Please check your LAMS portal for more details._`;
                         empIds: [reqData.targetFacultyId],
                         title: "Substitution Confirmed",
                         body: `You are confirmed to cover ${reqData.requesterName}'s class on ${reqData.date} at ${details.time}.`,
+                        type: 'substitution_approved',
                         data: { type: 'substitution', date: reqData.date }
                     });
-                    
-                    // WhatsApp Notification
-                    const targetFaculty = faculty.find(f => f.empId === reqData.targetFacultyId);
-                    const subPhone = targetFaculty?.phone;
-                    if (subPhone && targetFaculty?.whatsappEnabled !== false) {
-                        const msgContent = `✅ *Substitution Confirmed* ✅
-You have been confirmed to cover a class.
-📅 *Date:* ${reqData.date}
-⏰ *Period:* ${details.time}
-🏫 *Role:* ${details.subject} (Subbing for ${reqData.requesterName})
-
-_Please check your LAMS portal for more details._`;
-                        sendWhatsAppNotification(subPhone, msgContent);
-                    }
                 }
 
                 toast.success("Request Approved");
@@ -482,6 +461,7 @@ _Please check your LAMS portal for more details._`;
                         empIds: [reqData.requesterId],
                         title: "Substitution Rejected",
                         body: `Your request for ${reqData.targetFacultyName} to cover your class on ${reqData.date} was REJECTED by Admin.`,
+                        type: 'substitution_rejected',
                         data: { type: 'request_update', status: 'rejected' }
                     });
                 }

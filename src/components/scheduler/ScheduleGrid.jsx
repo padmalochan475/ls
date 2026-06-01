@@ -102,7 +102,8 @@ const ScheduleGrid = ({
                                         letterSpacing: '0.02em',
                                         display: 'flex',
                                         justifyContent: 'space-between',
-                                        alignItems: 'start'
+                                        alignItems: 'start',
+                                        paddingRight: isAdmin ? '50px' : '0'
                                     }}>
                                         {getSubjectShortCode(assignment.subject)}
                                     </div>
@@ -129,15 +130,15 @@ const ScheduleGrid = ({
                                     </div>
 
                                     <div style={{
-                                        position: 'absolute',
-                                        bottom: '4px',
-                                        right: '6px',
+                                        display: 'flex',
+                                        justifyContent: 'flex-end',
+                                        marginTop: '6px',
                                         fontSize: '0.65rem',
                                         color: 'rgba(255,255,255,0.4)',
                                         fontWeight: 500,
                                         letterSpacing: '0.02em'
                                     }}>
-                                        {assignment.sem}
+                                        {assignment.sem?.replace(/Semester/i, 'Sem')}
                                     </div>
 
                                     {isAdmin && (

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, getDoc, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
 import { useScheduleData } from '../hooks/useScheduleData';
@@ -435,8 +435,10 @@ const Assignments = () => {
 
             const checkQ = query(
                 collection(db, 'schedule'),
-                where('academicYear', '==', activeAcademicYear),
-                where('day', '==', selectedDay)
+                and(
+                    where('academicYear', '==', activeAcademicYear),
+                    where('day', '==', selectedDay)
+                )
             );
             const serverSnap = await getDocs(checkQ);
             const serverSchedule = serverSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));

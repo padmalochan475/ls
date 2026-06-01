@@ -17,6 +17,7 @@ import CelebrationManager from '../components/admin/CelebrationManager';
 import SubstitutionManager from '../components/SubstitutionManager';
 import AdminOtpModal from '../components/admin/AdminOtpModal';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, PieChart, Pie, CartesianGrid, YAxis, Legend, LineChart, Line } from 'recharts';
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const AdminPanel = () => {
@@ -225,7 +226,7 @@ const AdminPanel = () => {
             // Send WhatsApp Notification if approved
             if (newStatus === 'approved') {
                 const targetUser = users.find(u => u.id === userId);
-                if (targetUser && targetUser.mobile) {
+                if (targetUser && targetUser.mobile && targetUser.whatsappEnabled !== false) {
                     const approveMsg = `✅ *Account Approved* ✅\n\nHi ${targetUser.name},\nYour LAMS account has been verified and approved by the Administrator.\n\nYou can now log in and access the portal.`;
                     sendWhatsAppNotification(targetUser.mobile, approveMsg);
                 }
@@ -406,7 +407,8 @@ const AdminPanel = () => {
             name: user.name || '',
             empId: user.empId || '',
             dob: user.dob || '', // YYYY-MM-DD
-            joiningDate: user.joiningDate || '' // YYYY-MM-DD
+            joiningDate: user.joiningDate || '', // YYYY-MM-DD
+            whatsappEnabled: user.whatsappEnabled !== false // Default to true
         });
     };
 
@@ -421,14 +423,43 @@ const AdminPanel = () => {
                 name: editForm.name,
                 empId: editForm.empId,
                 dob: editForm.dob,
-                joiningDate: editForm.joiningDate
+                joiningDate: editForm.joiningDate,
+                whatsappEnabled: editForm.whatsappEnabled
             });
 
-            // 2. Sync Security & Faculty (If EmpID Changed)
-            if (editingUser.empId !== editForm.empId) {
+            // 2. Sync to Faculty Record
+            const q = query(collection(db, 'faculty'), where('uid', '==', editingUser.id));
+            const facSnap = await getDocs(q);
+            if (!facSnap.empty) {
                 const batch = writeBatch(db);
-
-                // A. Update Secure Lookup
+                facSnap.forEach((d) => {
+                    batch.update(d.ref, { 
+                        name: editForm.name,
+                        empId: editForm.empId,
+                        whatsappEnabled: editForm.whatsappEnabled
+                    });
+                });
+                
+                // 3. Sync Security (If EmpID Changed)
+                if (editingUser.empId !== editForm.empId) {
+                    // Update Secure Lookup
+                    if (editForm.empId) {
+                        batch.set(doc(db, 'emp_lookups', editForm.empId), {
+                            uid: editingUser.id,
+                            email: editingUser.email,
+                            syncedAt: new Date().toISOString(),
+                            source: 'admin-panel-edit'
+                        });
+                    }
+                    // Remove old lookup if it existed
+                    if (editingUser.empId) {
+                        batch.delete(doc(db, 'emp_lookups', editingUser.empId));
+                    }
+                }
+                await batch.commit();
+            } else if (editingUser.empId !== editForm.empId) {
+                // If no faculty record yet, but ID changed, still update lookups
+                const batch = writeBatch(db);
                 if (editForm.empId) {
                     batch.set(doc(db, 'emp_lookups', editForm.empId), {
                         uid: editingUser.id,
@@ -437,33 +468,10 @@ const AdminPanel = () => {
                         source: 'admin-panel-edit'
                     });
                 }
-                // Remove old lookup if it existed
                 if (editingUser.empId) {
                     batch.delete(doc(db, 'emp_lookups', editingUser.empId));
                 }
-
-                // B. Update Faculty Record (find by UID)
-                const q = query(collection(db, 'faculty'), where('uid', '==', editingUser.id));
-                const facSnap = await getDocs(q);
-                facSnap.forEach((doc) => {
-                    batch.update(doc.ref, {
-                        empId: editForm.empId,
-                        name: editForm.name // sync name too
-                    });
-                });
-
                 await batch.commit();
-            } else if (editingUser.name !== editForm.name) {
-                // Sync Name only if ID didn't change (ID change handles name sync above)
-                const q = query(collection(db, 'faculty'), where('uid', '==', editingUser.id));
-                const facSnap = await getDocs(q);
-                if (!facSnap.empty) {
-                    const batch = writeBatch(db);
-                    facSnap.forEach((doc) => {
-                        batch.update(doc.ref, { name: editForm.name });
-                    });
-                    await batch.commit();
-                }
             }
             toast.success("User updated successfully!");
             setEditingUser(null);
@@ -493,6 +501,11 @@ const AdminPanel = () => {
                     0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
                     70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
                     100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+                }
+                @keyframes pulse {
+                    0% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.5; transform: scale(0.85); }
+                    100% { opacity: 1; transform: scale(1); }
                 }
                 .pulse-card { animation: pulse-ring 2s infinite; }
 
@@ -538,8 +551,12 @@ const AdminPanel = () => {
                         letterSpacing: '-1px'
                     }}>
                         Admin Control Center
+                        <div style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '12px', verticalAlign: 'middle' }}>
+                            <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', boxShadow: '0 0 10px #10b981', animation: 'pulse 2s infinite' }}></div>
+                        </div>
                     </h2>
-                    <p style={{ color: 'var(--color-text-muted)', fontSize: '1.1rem', marginTop: '0.5rem' }}>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '1.1rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '4px', letterSpacing: '1px' }}>SYSTEM LIVE</span> 
                         Manage users, permissions, and system health
                     </p>
                 </div>
@@ -1071,6 +1088,12 @@ const AdminPanel = () => {
                                     {selectedUser.status.toUpperCase()}
                                 </div>
                             </div>
+                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', borderLeft: (selectedUser.whatsappEnabled !== false) ? '3px solid #10b981' : '3px solid #ef4444' }}>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>WHATSAPP NOTIFICATIONS</label>
+                                <div style={{ fontSize: '1.1rem', color: (selectedUser.whatsappEnabled !== false) ? '#6ee7b7' : '#fca5a5', fontWeight: 600 }}>
+                                    {(selectedUser.whatsappEnabled !== false) ? 'ENABLED' : 'DISABLED'}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>,
@@ -1159,6 +1182,18 @@ const AdminPanel = () => {
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', colorScheme: 'dark' }}
                                     />
                                 </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: 'white', marginTop: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <label style={{ fontSize: '0.9rem', color: '#94a3b8', flex: 1 }}>WhatsApp Notifications</label>
+                                <label className="switch">
+                                    <input
+                                        type="checkbox"
+                                        checked={editForm.whatsappEnabled}
+                                        onChange={e => setEditForm({ ...editForm, whatsappEnabled: e.target.checked })}
+                                    />
+                                    <span className="slider"></span>
+                                </label>
                             </div>
                         </div>
 
