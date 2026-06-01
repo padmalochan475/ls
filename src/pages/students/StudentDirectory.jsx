@@ -802,7 +802,8 @@ function ImportModal({ onClose, onImported }) {
 // Main Component
 // ─────────────────────────────────────────────
 export default function StudentDirectory() {
-  const { isAdmin } = useAuth();
+  const { userProfile } = useAuth();
+  const isAdmin = userProfile?.role === 'admin';
   const { groups = [], semesters = [] } = useMasterData();
 
   // Stats

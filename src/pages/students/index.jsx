@@ -267,9 +267,10 @@ function TabContent({ activeTab }) {
 }
 
 export default function StudentsPage() {
-  const { user, isAdmin, academicYear } = useAuth();
+  const { currentUser, userProfile, activeAcademicYear } = useAuth();
   const [activeTab, setActiveTab] = useState('directory');
 
+  const isAdmin = userProfile?.role === 'admin';
   const visibleNav = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
   
   useEffect(() => {
@@ -293,7 +294,7 @@ export default function StudentsPage() {
         }}>
           <GraduationCap size={16} color={COLORS.accentCyan} />
           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: COLORS.textSecondary }}>
-            AY {academicYear?.name || '2023-24'}
+            AY {activeAcademicYear || '2023-24'}
           </span>
         </div>
       </header>
