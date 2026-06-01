@@ -176,6 +176,7 @@ Answer the user's questions clearly, concisely, and naturally based on this data
                 throw new Error(`Cloud API Error ${response.status}: ${errData?.error?.message || 'Unknown error'}`);
             }
 
+            const data = await response.json();
             const messageObj = data.choices?.[0]?.message;
             if (messageObj?.tool_calls && messageObj.tool_calls.length > 0) {
                 const toolCall = messageObj.tool_calls[0];
