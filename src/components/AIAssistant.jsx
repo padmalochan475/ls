@@ -1,29 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, X, Sparkles, Send, Loader2, Cloud, Settings, Key, CheckCircle, RefreshCw } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 
 const AIAssistant = ({ isOpen, onClose, contextData }) => {
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: 'Hello! I am LAMS-AI, powered by Llama 3 via Groq. Please configure your API key in settings to begin.' }
+        { role: 'assistant', content: 'Hello! I am LAMS-AI, powered by Llama 3 via Groq.' }
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
-    const [apiKey, setApiKey] = useState(localStorage.getItem('groq_api_key') || '');
+    const [apiKey, setApiKey] = useState('');
     const messagesEndRef = useRef(null);
+
+    useEffect(() => {
+        const fetchApiKey = async () => {
+            try {
+                const snap = await getDoc(doc(db, 'settings', 'global'));
+                if (snap.exists()) {
+                    setApiKey(snap.data().groqApiKey || '');
+                }
+            } catch (err) {
+                console.error('Failed to load API key', err);
+            }
+        };
+        if (isOpen) {
+            fetchApiKey();
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
     const [isSaving, setIsSaving] = useState(false);
-
-    const saveApiKey = (key) => {
-        setApiKey(key);
-        localStorage.setItem('groq_api_key', key);
-        setShowSettings(false);
-    };
 
     const handleApproveSave = async (args, messageIndex) => {
         if (!contextData.activeAcademicYear) {
@@ -72,7 +81,7 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
         if (!input.trim()) return;
         
         if (!apiKey) {
-            setMessages(prev => [...prev, { role: 'user', content: input }, { role: 'assistant', content: "Please configure your Free Groq API Key in settings (gear icon) to enable the cloud LLM." }]);
+            setMessages(prev => [...prev, { role: 'user', content: input }, { role: 'assistant', content: "The Groq API Key has not been configured globally. Please ask an administrator to set it up in the Admin Panel." }]);
             setInput('');
             return;
         }
@@ -275,29 +284,11 @@ Answer the user's questions clearly, concisely, and naturally based on this data
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => setShowSettings(!showSettings)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                            <Settings size={20} />
-                        </button>
                         <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                             <X size={20} />
                         </button>
                     </div>
                 </div>
-
-                {/* Settings Panel */}
-                {showSettings && (
-                    <div style={{ padding: '16px', background: 'rgba(0,0,0,0.4)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.9rem', marginBottom: '8px' }}>Groq API Key</label>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <div style={{ position: 'relative', flex: 1 }}>
-                                <Key size={16} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '10px' }} />
-                                <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="gsk_..." style={{ width: '100%', padding: '8px 12px 8px 36px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', outline: 'none' }} />
-                            </div>
-                            <button onClick={() => saveApiKey(apiKey)} style={{ background: '#3b82f6', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}>Save</button>
-                        </div>
-                        <p style={{ margin: '8px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>Get a key at <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>console.groq.com</a></p>
-                    </div>
-                )}
 
                 {/* Chat Area */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>

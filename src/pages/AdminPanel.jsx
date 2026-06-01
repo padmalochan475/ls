@@ -16,6 +16,7 @@ import NotificationManager from '../components/admin/NotificationManager';
 import CelebrationManager from '../components/admin/CelebrationManager';
 import SubstitutionManager from '../components/SubstitutionManager';
 import AdminOtpModal from '../components/admin/AdminOtpModal';
+import SystemSettings from '../components/admin/SystemSettings';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const AdminPanel = () => {
@@ -610,12 +611,31 @@ const AdminPanel = () => {
                     >
                         <UserPlus size={18} /> Substitutions
                     </button>
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        style={{
+                            padding: '10px 16px',
+                            background: activeTab === 'settings' ? 'var(--color-accent)' : 'transparent',
+                            color: activeTab === 'settings' ? 'white' : 'var(--color-text-muted)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            transition: 'all 0.2s ease',
+                            borderLeft: '1px solid rgba(255,255,255,0.1)'
+                        }}
+                    >
+                        <Settings size={18} /> Settings
+                    </button>
                 </div>
             </div>
 
             { }
             {activeTab === 'substitutions' ? (
                 <SubstitutionManager />
+            ) : activeTab === 'settings' ? (
+                <SystemSettings />
             ) : activeTab === 'suggestions' ? ( // eslint-disable-line sonarjs/no-nested-conditional
                 /* Suggestions View */
                 <div className="glass-panel" style={{ padding: '2rem' }}>
