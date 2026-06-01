@@ -59,71 +59,73 @@ const Login = () => {
     }
   };
 
-  // eslint-disable-next-line sonarjs/cognitive-complexity
+  const handleLoginSubmit = async () => {
+    setIsLoading(true);
+    try {
+      await login(formData.empId, formData.password);
+    } catch (err) {
+      console.error(err);
+      handleAuthError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignupStep1 = async () => {
+    const empIdRegex = /^[a-zA-Z0-9]+$/;
+    if (!empIdRegex.test(formData.empId)) {
+      setError('Employee ID must contain only letters and numbers (no special characters).');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password should be at least 6 characters.');
+      return;
+    }
+
+    setIsLoading(true);
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString(); // eslint-disable-line sonarjs/pseudo-random
+    setGeneratedSignupOtp(newOtp);
+
+    const result = await sendEmailOtp(formData.recoveryEmail, formData.name, newOtp);
+
+    if (result.success) {
+      setStatusMessage(`OTP sent to ${formData.recoveryEmail}`);
+      setSignupStep(2);
+    } else {
+      const errorMsg = result.error?.text || result.error?.message || "Unknown error";
+      setError(`Failed to send OTP: ${errorMsg}`);
+    }
+    setIsLoading(false);
+  };
+
+  const handleSignupStep2 = async () => {
+    if (signupOtp !== generatedSignupOtp) {
+      setError('Invalid OTP. Please try again.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await signup(formData.empId, formData.password, formData.name, formData.recoveryEmail, formData.mobileNumber);
+    } catch (err) {
+      console.error(err);
+      handleAuthError(err);
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setStatusMessage('');
 
     if (isLogin) {
-      setIsLoading(true);
-      try {
-        await login(formData.empId, formData.password);
-      } catch (err) {
-        console.error(err);
-        handleAuthError(err);
-      } finally {
-        setIsLoading(false);
-      }
+      await handleLoginSubmit();
+    } else if (signupStep === 1) {
+      await handleSignupStep1();
     } else {
-      // Signup Flow
-      if (signupStep === 1) {
-        // Step 1: Validate and Send OTP
-        const empIdRegex = /^[a-zA-Z0-9]+$/;
-        if (!empIdRegex.test(formData.empId)) {
-          setError('Employee ID must contain only letters and numbers (no special characters).');
-          return;
-        }
-
-        if (formData.password.length < 6) {
-          setError('Password should be at least 6 characters.');
-          return;
-        }
-
-        setIsLoading(true);
-
-        // Generate OTP
-        const newOtp = Math.floor(100000 + Math.random() * 900000).toString(); // eslint-disable-line sonarjs/pseudo-random
-        setGeneratedSignupOtp(newOtp);
-
-        // Send Real Email
-        const result = await sendEmailOtp(formData.recoveryEmail, formData.name, newOtp);
-
-        if (result.success) {
-          setStatusMessage(`OTP sent to ${formData.recoveryEmail}`);
-          setSignupStep(2);
-        } else {
-          const errorMsg = result.error?.text || result.error?.message || "Unknown error";
-          setError(`Failed to send OTP: ${errorMsg}`);
-        }
-        setIsLoading(false);
-      } else {
-        // Step 2: Verify OTP and Create Account
-        if (signupOtp !== generatedSignupOtp) {
-          setError('Invalid OTP. Please try again.');
-          return;
-        }
-
-        setIsLoading(true);
-        try {
-          await signup(formData.empId, formData.password, formData.name, formData.recoveryEmail, formData.mobileNumber);
-          // Auto-redirect will happen via useEffect
-        } catch (err) {
-          console.error(err);
-          handleAuthError(err);
-          setIsLoading(false);
-        }
-      }
+      await handleSignupStep2();
     }
   };
 
@@ -211,50 +213,29 @@ const Login = () => {
 
   return (
     <div style={{
-      height: '100vh',
-      width: '100vw',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#030712', // Deepest dark
-      backgroundImage: `
-        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.1) 0px, transparent 50%), 
-        radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.1) 0px, transparent 50%),
-        radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%)
-      `,
-      position: 'relative',
-      overflow: 'hidden',
-      padding: '0',
-      boxSizing: 'border-box'
+      height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      backgroundColor: '#050505',
+      fontFamily: "'Outfit', sans-serif",
+      position: 'relative', overflow: 'hidden', padding: '0', boxSizing: 'border-box', color: '#f8fafc'
     }}>
-      {/* Dynamic Background Orbs */}
-      <div style={{ position: 'absolute', width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none' }}>
-        <div style={{ position: 'absolute', top: '10%', left: '15%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'float 10s infinite ease-in-out' }}></div>
-        <div style={{ position: 'absolute', bottom: '10%', right: '15%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'float 14s infinite ease-in-out reverse' }}></div>
-      </div>
+      {/* Dynamic Background */}
+      <div style={{ position: 'absolute', top: '-20%', left: '-10%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)', filter: 'blur(80px)', animation: 'float 20s infinite alternate' }}></div>
+      <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(236,72,153,0.15) 0%, transparent 70%)', filter: 'blur(80px)', animation: 'float 15s infinite alternate-reverse' }}></div>
+
+      <style>{`
+          @keyframes float { 0% { transform: translate(0, 0); } 100% { transform: translate(50px, 50px); } }
+          @keyframes crystallize { 0% { opacity: 0; transform: scale(0.95) translateY(20px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+      `}</style>
 
       {/* Login Card */}
       <div style={{
-        padding: '2.5rem 2rem',
-        width: '90%',
-        maxWidth: '420px',
-        textAlign: 'center',
-        background: 'rgba(17, 25, 40, 0.7)', // Darker tint for contrast
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.2)', // Top highlight
-        boxShadow: '0 20px 50px -12px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05)', // Inner ring + Deep shadow
-        backdropFilter: 'blur(20px) saturate(180%)',
-        maxHeight: 'calc(100vh - 80px)',
-        overflowY: 'auto',
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
-        zIndex: 10,
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        borderRadius: '24px', // Softer feel
-        animation: 'crystallize 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards'
+          padding: '3rem', width: '90%', maxWidth: '450px', textAlign: 'center',
+          background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
+          border: '1px solid rgba(255,255,255,0.05)', borderRadius: '30px',
+          boxShadow: '0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1)',
+          maxHeight: 'calc(100vh - 40px)', overflowY: 'auto',
+          zIndex: 10, position: 'relative', display: 'flex', flexDirection: 'column',
+          animation: 'crystallize 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards'
       }}>
         <style>{`.glass-panel::-webkit-scrollbar { display: none; }`}</style>
 

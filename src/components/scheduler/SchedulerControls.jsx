@@ -3,6 +3,19 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search } from 'lucide-react';
 
+// Helper to calculate dropdown coordinates
+const getDropdownCoords = (dropdownRef) => {
+    if (dropdownRef.current) {
+        const rect = dropdownRef.current.getBoundingClientRect();
+        return {
+            top: rect.bottom + 6,
+            left: rect.left,
+            width: rect.width
+        };
+    }
+    return { top: 0, left: 0, width: 0 };
+};
+
 // Helper to handle Tab navigation when Portal is open (preventing focus loss)
 const handlePortalTab = (e, setIsOpen, dropdownRef) => {
     e.preventDefault();
@@ -71,14 +84,7 @@ export const MultiSelectDropdown = ({ id, options = [], selected = [], onChange,
     // Position and Scroll
     useEffect(() => {
         const updateCoords = () => {
-            if (dropdownRef.current) {
-                const rect = dropdownRef.current.getBoundingClientRect();
-                setCoords({
-                    top: rect.bottom + 6,
-                    left: rect.left,
-                    width: rect.width
-                });
-            }
+            setCoords(getDropdownCoords(dropdownRef));
         };
 
         if (isOpen) {
@@ -389,14 +395,7 @@ export const Select = ({ id, options = [], value, onChange, placeholder, icon: I
      
     useEffect(() => {
         const updateCoords = () => {
-            if (dropdownRef.current) {
-                const rect = dropdownRef.current.getBoundingClientRect();
-                setCoords({
-                    top: rect.bottom + 6,
-                    left: rect.left,
-                    width: rect.width
-                });
-            }
+            setCoords(getDropdownCoords(dropdownRef));
         };
 
         if (isOpen) {

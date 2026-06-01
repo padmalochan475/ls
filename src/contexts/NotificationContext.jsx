@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import OneSignal from 'react-onesignal';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
@@ -9,6 +9,42 @@ const NotificationContext = createContext();
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useNotifications = () => useContext(NotificationContext);
+
+const ForegroundToast = ({ notification, t }) => {
+    const data = notification.additionalData;
+    const primaryUrl = data?.url || notification.launchURL;
+
+    return (
+        <div
+            onClick={() => {
+                if (primaryUrl) window.location.href = primaryUrl;
+                toast.dismiss(t.id);
+            }}
+            className="glass-panel"
+            style={{
+                background: 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(12px)',
+                padding: '16px',
+                borderRadius: '12px',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                color: 'white',
+                maxWidth: '380px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+                display: 'flex',
+                gap: '16px',
+                cursor: 'pointer'
+            }}
+        >
+            <div style={{ fontSize: '24px' }}>
+                {data?.type === 'urgent' ? '🚨' : '🔔'}
+            </div>
+            <div>
+                <div style={{ fontWeight: '700', color: '#60a5fa' }}>{notification.title}</div>
+                <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>{notification.body}</div>
+            </div>
+        </div>
+    );
+};
 
 export const NotificationProvider = ({ children }) => {
     const { currentUser } = useAuth();
@@ -64,47 +100,15 @@ export const NotificationProvider = ({ children }) => {
             try {
                 OneSignal.Notifications?.addEventListener('foregroundWillDisplay', (event) => {
                     event.preventDefault();
-                    const data = event.notification.additionalData;
-                    const primaryUrl = data?.url || event.notification.launchURL;
-
-                    toast.custom((t) => (
-                        <div
-                            onClick={() => {
-                                if (primaryUrl) window.location.href = primaryUrl;
-                                toast.dismiss(t.id);
-                            }}
-                            className="glass-panel"
-                            style={{
-                                background: 'rgba(15, 23, 42, 0.95)',
-                                backdropFilter: 'blur(12px)',
-                                padding: '16px',
-                                borderRadius: '12px',
-                                border: '1px solid rgba(59, 130, 246, 0.4)',
-                                color: 'white',
-                                maxWidth: '380px',
-                                boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-                                display: 'flex',
-                                gap: '16px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <div style={{ fontSize: '24px' }}>
-                                {data?.type === 'urgent' ? '🚨' : '🔔'}
-                            </div>
-                            <div>
-                                <div style={{ fontWeight: '700', color: '#60a5fa' }}>{event.notification.title}</div>
-                                <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>{event.notification.body}</div>
-                            </div>
-                        </div>
-                    ), { duration: 8000, position: 'top-right' });
+                    toast.custom((t) => <ForegroundToast notification={event.notification} t={t} />, { duration: 8000, position: 'top-right' });
                 });
-            } catch (e) { /* silent */ }
+            } catch (e) { console.warn("OneSignal foreground event error:", e); }
 
         } else if (lastLoginUid.current) {
             try {
                 OneSignal.logout();
                 lastLoginUid.current = null;
-            } catch (e) { /* silent */ }
+            } catch (e) { console.warn("OneSignal logout error:", e); }
         }
     }, [currentUser, initialized]);
 
@@ -158,7 +162,7 @@ export const NotificationProvider = ({ children }) => {
                         await OneSignal.User.PushSubscription.optOut();
                         setTimeout(() => OneSignal.User.PushSubscription.optIn(), 1000);
                     }
-                } catch (e) { /* silent */ }
+                } catch (e) { console.warn("OneSignal auto-healer error:", e); }
             }
         };
 
@@ -166,7 +170,7 @@ export const NotificationProvider = ({ children }) => {
         return () => clearTimeout(timer);
     }, [initialized, currentUser]);
 
-    const registerForPush = async () => {
+    const registerForPush = useCallback(async () => {
         if (Notification.permission === 'denied') {
             alert("Blocked. Enable in browser settings.");
             return;
@@ -181,10 +185,12 @@ export const NotificationProvider = ({ children }) => {
                 if (id) toast.success("Active!");
             }, 2000);
         } catch (e) { console.error(e); }
-    };
+    }, []);
+
+    const value = useMemo(() => ({ registerForPush, permission, oneSignalId, initialized }), [registerForPush, permission, oneSignalId, initialized]);
 
     return (
-        <NotificationContext.Provider value={{ registerForPush, permission, oneSignalId, initialized }}>
+        <NotificationContext.Provider value={value}>
             {children}
         </NotificationContext.Provider>
     );

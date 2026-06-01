@@ -210,7 +210,7 @@ const Scheduler = () => {
                 const d = new Date(val);
                 if (isNaN(d.getTime())) return t; // Fallback
 
-                return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\u202F/g, ' ');
                 // eslint-disable-next-line sonarjs/no-ignored-exceptions, no-unused-vars
             } catch (e) { return t; }
         };

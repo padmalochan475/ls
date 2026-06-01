@@ -8,6 +8,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import { Users, UserPlus, ShieldAlert, Activity, Search, Trash2, CheckCircle, Shield, GraduationCap, Settings, MessageSquare, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import emailjs from '@emailjs/browser';
+import { ResponsiveContainer, AreaChart, Tooltip, Area, PieChart, Pie, Cell, Legend } from 'recharts';
 import '../styles/design-system.css';
 import { normalizeStr } from '../utils/timeUtils';
 import { useWritePermission } from '../hooks/useWritePermission';

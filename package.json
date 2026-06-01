@@ -11,7 +11,8 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "deploy:firebase": "firebase deploy --only hosting",
-    "push": "git add . && git commit -m \"Update from local\" && git push"
+    "push": "git add . && git commit -m \"Update from local\" && git push",
+    "prepare": "husky"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
@@ -47,7 +48,6 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
-    "baseline-browser-mapping": "^2.10.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
@@ -55,6 +55,7 @@
     "firebase-tools": "^14.27.0",
     "gh-pages": "^6.3.0",
     "globals": "^16.5.0",
+    "husky": "^9.1.7",
     "vite": "^7.2.6",
     "vite-plugin-pwa": "^1.2.0"
   }

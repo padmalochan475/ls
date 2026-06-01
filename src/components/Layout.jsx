@@ -24,7 +24,8 @@ import {
     AlertCircle,
     Library,
     BookOpen,
-    Search
+    Search,
+    Bot
 } from 'lucide-react';
 import AcademicYearSelector from './AcademicYearSelector';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -32,6 +33,9 @@ import '../styles/design-system.css';
 import OneSignal from 'react-onesignal';
 import Logo from './Logo';
 import GlobalSearchCommandPalette from './GlobalSearchCommandPalette';
+import AIAssistant from './AIAssistant';
+import { useMasterData } from '../contexts/MasterDataContext';
+import { useScheduleContext } from '../contexts/ScheduleContext';
 
 // Layout Component wrapping the application
 
@@ -42,9 +46,14 @@ const Layout = ({ children }) => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-    const { userProfile, currentUser, logout, isSystemSyncing } = useAuth();
+    const { userProfile, currentUser, logout, isSystemSyncing, activeAcademicYear } = useAuth();
     const { permission, registerForPush } = useNotifications();
+    
+    // For AI Context
+    const { faculty, days, timeSlots, rooms, subjects, departments, semesters } = useMasterData();
+    const { schedule } = useScheduleContext();
 
     // useEffect removed to prevent toast spam on refresh. NotificationContext handles sync automatically.
 
@@ -708,6 +717,41 @@ const Layout = ({ children }) => {
                     isOpen={isSearchOpen}
                     onClose={() => setIsSearchOpen(false)}
                 />
+
+                <AIAssistant 
+                    isOpen={isAIAssistantOpen} 
+                    onClose={() => setIsAIAssistantOpen(false)} 
+                    contextData={{ schedule, faculty, userProfile, days, timeSlots, rooms, subjects, departments, semesters, activeAcademicYear }}
+                />
+
+                {/* Floating AI Button */}
+                <button 
+                    onClick={() => setIsAIAssistantOpen(true)}
+                    className="animate-float no-print"
+                    style={{
+                        position: 'fixed',
+                        bottom: '2rem',
+                        right: '2rem',
+                        width: '60px',
+                        height: '60px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        boxShadow: '0 10px 30px rgba(99, 102, 241, 0.5), inset 0 2px 10px rgba(255,255,255,0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        cursor: 'pointer',
+                        zIndex: 9999,
+                        transition: 'transform 0.2s, box-shadow 0.2s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 15px 40px rgba(99, 102, 241, 0.7)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(99, 102, 241, 0.5)'; }}
+                    title="LAMS Intelligence"
+                >
+                    <Bot size={28} />
+                </button>
 
                 <div>
                     {children}

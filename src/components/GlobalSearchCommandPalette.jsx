@@ -1,11 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Command, X, File, Users, Settings, BookOpen, MapPin, User, ArrowRight, Loader2, Calendar } from 'lucide-react';
+import { Search, Command, X, File, Users, Settings, BookOpen, User, ArrowRight, Loader2, Calendar } from 'lucide-react';
 import { useMasterData } from '../contexts/MasterDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useScheduleData } from '../hooks/useScheduleData';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, startAt, endAt, limit, getDocs } from 'firebase/firestore';
+
+const getTypeColor = (type) => {
+    switch (type) {
+        case 'Student': return '#10b981';
+        case 'Class': return '#f59e0b';
+        default: return 'rgba(255,255,255,0.4)';
+    }
+};
 
 const GlobalSearchCommandPalette = ({ isOpen, onClose }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,7 +25,7 @@ const GlobalSearchCommandPalette = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
     const inputRef = useRef(null);
 
-    const { faculty, subjects, rooms, departments } = useMasterData();
+    const { faculty, subjects } = useMasterData();
     const { schedule } = useScheduleData();
     const { userProfile } = useAuth();
     const isAdmin = userProfile?.role === 'admin';
@@ -319,7 +327,7 @@ const GlobalSearchCommandPalette = ({ isOpen, onClose }) => {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{
                                             fontSize: '0.75rem', fontWeight: 600,
-                                            color: item.type === 'Student' ? '#10b981' : item.type === 'Class' ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+                                            color: getTypeColor(item.type),
                                             padding: '2px 8px', background: 'rgba(255,255,255,0.05)',
                                             border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px'
                                         }}>

@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# pre-push hook to prevent pushing sensitive Firebase keys to master
+
+echo "Running security check..."
+
+if [ -f "src/lib/firebaseConfig.js" ]; then
+    # Count how many AIza lines there are
+    aiza_count=$(grep -o "AIza[A-Za-z0-9_\-]*" src/lib/firebaseConfig.js | wc -l)
+    
+    # Count how many of those are the dummy key
+    dummy_count=$(grep -o "AIzaSyDwGYhgu3Hx_Fdycq3-6tfKNTPYXVZV5ck" src/lib/firebaseConfig.js | wc -l)
+    
+    if [ "$aiza_count" -ne "$dummy_count" ]; then
+        echo "================================================================"
+        echo "🚨 ERROR: SENSITIVE DATA DETECTED 🚨"
+        echo "You are attempting to push a hardcoded Firebase API Key."
+        echo "Please remove the real key from src/lib/firebaseConfig.js"
+        echo "and use the .env file instead."
+        echo "================================================================"
+        exit 1
+    fi
+fi
+
+exit 0

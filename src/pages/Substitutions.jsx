@@ -1684,7 +1684,7 @@ const Substitutions = () => {
 };
 
 // Helper Components
-const RequestSectionHeader = ({ icon: Icon, title, count, color, gradient, isMobile }) => (
+const RequestSectionHeader = ({ icon: IconComponent, title, count, color, gradient, isMobile }) => (
     count > 0 && (
         <div style={{
             display: 'flex',
@@ -1711,7 +1711,7 @@ const RequestSectionHeader = ({ icon: Icon, title, count, color, gradient, isMob
                     justifyContent: 'center',
                     color: 'white'
                 }}>
-                    <Icon size={isMobile ? 16 : 18} />
+                    <IconComponent size={isMobile ? 16 : 18} />
                 </div>
                 <div>
                     <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: '800', color: 'white', letterSpacing: '0.5px' }}>
@@ -1749,13 +1749,12 @@ const RequestCard = ({ req, type, isMobile, onAction, onCancel, fullSchedule, fa
     const isPending = !req.targetResponse && req.status === 'pending';
 
     const m = fullSchedule?.find(i => i.id === req.originalScheduleId) || {};
-    const reqName = (isSent ? (req.targetFacultyName || "") : (req.requesterName || "")).toLowerCase().trim();
     const f1 = (m.faculty || "").toLowerCase().trim();
     const f2 = (m.faculty2 || "").toLowerCase().trim();
 
     let coFaculty = null;
     if (m.faculty && m.faculty2) {
-        const checkName = (isSent ? (req.requesterName || "") : (req.requesterName || "")).toLowerCase().trim();
+        const checkName = (isSent ? (req.requesterName || "") : (req.targetFacultyName || "")).toLowerCase().trim();
         const checkId = req.requesterId;
 
         if (checkId === m.facultyEmpId || f1.includes(checkName) || checkName.includes(f1)) {
@@ -1767,24 +1766,19 @@ const RequestCard = ({ req, type, isMobile, onAction, onCancel, fullSchedule, fa
 
     let borderColor = 'rgba(245, 158, 11, 0.4)';
     let statusLabel = isSent ? "AWAITING RESPONSE" : "ACTION REQUIRED";
-    let statusColor = "#f59e0b";
 
     if (req.isAdminAssigned) {
         borderColor = 'rgba(16, 185, 129, 0.4)';
         statusLabel = "OFFICIAL ASSIGNMENT";
-        statusColor = "#4ade80";
     } else if (isAccepted) {
         borderColor = 'rgba(34, 197, 94, 0.5)';
         statusLabel = "CONFIRMED";
-        statusColor = "#4ade80";
     } else if (isDeclined) {
         borderColor = 'rgba(239, 68, 68, 0.5)';
         statusLabel = "DECLINED";
-        statusColor = "#f87171";
     } else if (isCancelled) {
         borderColor = 'rgba(255, 255, 255, 0.2)';
         statusLabel = "CANCELLED";
-        statusColor = "#94a3b8";
     }
 
     return (

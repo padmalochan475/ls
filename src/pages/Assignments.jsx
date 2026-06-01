@@ -566,6 +566,24 @@ const Assignments = () => {
     };
 
 
+    const matchFaculty = useCallback((s, search) => {
+        const f1 = normalizeStr(s.faculty);
+        const f2 = normalizeStr(s.faculty2);
+        if (f1.includes(search) || f2.includes(search)) return true;
+
+        const facObj = faculty.find(f => normalizeStr(f.name) === search);
+        if (facObj?.empId) {
+            if (s.facultyEmpId === facObj.empId || s.faculty2EmpId === facObj.empId) return true;
+        }
+        return false;
+    }, [faculty]);
+
+    const getDayIndex = useCallback((dName) => {
+        if (!days) return -1;
+        const target = normalizeStr(dName);
+        return days.findIndex(d => normalizeStr(d.name) === target);
+    }, [days]);
+
     const filteredAssignments = useMemo(() => {
         return fullSchedule.filter(s => {
             const search = normalizeStr(searchTerm);
@@ -584,19 +602,7 @@ const Assignments = () => {
 
             // 5. Filter by Faculty (Robust Matching)
             if (filterFaculty.length > 0) {
-                const matches = filterFaculty.some(facName => {
-                    const search = normalizeStr(facName);
-                    const f1 = normalizeStr(s.faculty);
-                    const f2 = normalizeStr(s.faculty2);
-
-                    if (f1.includes(search) || f2.includes(search)) return true;
-
-                    const facObj = faculty.find(f => f.name === facName);
-                    if (facObj?.empId) {
-                        if (s.facultyEmpId === facObj.empId || s.faculty2EmpId === facObj.empId) return true;
-                    }
-                    return false;
-                });
+                const matches = filterFaculty.some(facName => matchFaculty(s, normalizeStr(facName)));
                 if (!matches) return false;
             }
 
@@ -613,13 +619,6 @@ const Assignments = () => {
                 normalizeTime(s.time).includes(search)
             );
         }).sort((a, b) => {
-
-            const getDayIndex = (dName) => {
-                if (!days) return -1;
-                const target = normalizeStr(dName);
-                return days.findIndex(d => normalizeStr(d.name) === target);
-            };
-
             const ia = getDayIndex(a.day);
             const ib = getDayIndex(b.day);
             if (ia !== ib) return ia - ib;

@@ -15,7 +15,7 @@ import Profile from './pages/Profile';
 import Assignments from './pages/Assignments';
 import Suggestions from './pages/Suggestions';
 import Substitutions from './pages/Substitutions';
-import Students from './pages/Students';
+import Students from './pages/students/index';
 import Resources from './pages/Resources';
 import Syllabus from './pages/Syllabus';
 import ErrorBoundary from './components/ErrorBoundary';

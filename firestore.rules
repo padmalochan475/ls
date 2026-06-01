@@ -60,7 +60,9 @@ service cloud.firestore {
       // They cannot read other people's messages, only write new ones.
       match /notifications/{notifId} {
         allow read: if isAuth() && request.auth.uid == userId;
-        allow create: if isAuth(); // Anyone can send a message
+        allow create: if isAuth() && 
+                      request.resource.data.title is string && request.resource.data.title.size() < 150 &&
+                      request.resource.data.body is string && request.resource.data.body.size() < 1000;
         allow update: if isAuth() && request.auth.uid == userId; // User can mark as read
         allow delete: if isAuth() && request.auth.uid == userId; // User can delete
       }

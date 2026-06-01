@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
 import { collection, getDocs, getDoc, addDoc, setDoc, deleteDoc, doc, updateDoc, query, where, writeBatch, onSnapshot, FieldPath } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import { useMasterData } from '../contexts/MasterDataContext';
 import ConfirmModal from '../components/ConfirmModal';
+import YearTransitionModal from '../components/YearTransitionModal';
 import '../styles/design-system.css';
 import { Settings, Plus, Search, Edit2, Trash2, Check, ChevronDown, RefreshCw, ShieldAlert, Users, Layers, BookOpen, MapPin, Box, Calendar, Clock, Hash, CalendarOff, Eye } from 'lucide-react';
 import QuantumLoader from '../components/QuantumLoader';
@@ -86,6 +88,7 @@ const GroupFields = ({ formData, setFormData }) => {
 
 const MasterData = ({ initialTab }) => {
     const { userProfile } = useAuth();
+    const masterData = useMasterData();
     const { checkWritePermission } = useWritePermission();
     const [activeTab, setActiveTab] = useState(initialTab || 'faculty');
     const tabsRef = useRef(null);
@@ -215,18 +218,13 @@ const MasterData = ({ initialTab }) => {
     const [formData, setFormData] = useState({});
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [newYearInput, setNewYearInput] = useState('');
-    const [newYearType, setNewYearType] = useState('ODD'); // New State
+    const [transitionModal, setTransitionModal] = useState({ isOpen: false, fromYear: null, toYear: null });
 
-    const handleAddYear = async () => {
+    const handleAddYear = async (combinedYear) => {
         // STRICT PERMISSION CHECK
         if (!checkWritePermission()) return;
 
-        if (!newYearInput.trim()) return;
-
-        // Combine Input + Type
-        // Using Parentheses (ODD) instead of brackets [ODD] for cleaner UI and safer DB handling
-        const combinedYear = `${newYearInput.trim()} (${newYearType})`;
+        if (!combinedYear) return;
 
         try {
             const configRef = doc(db, 'settings', 'config');
@@ -251,8 +249,7 @@ const MasterData = ({ initialTab }) => {
                     [yearKey]: { maxFacultyLoad: 18 }
                 }
             }, { merge: true });
-
-            setNewYearInput('');
+            toast.success('Academic Year added successfully');
             // fetchData(); // Removed: Handled by listener
         } catch (e) {
             console.error("Error adding year:", e);
@@ -289,100 +286,48 @@ const MasterData = ({ initialTab }) => {
         setSearchTerm('');
     }, [activeTab]);
 
-    // Real-Time Data Listener
+    // Real-Time Data Listener - Optimised to consume global context
     useEffect(() => {
         if (!activeCollection || !userProfile) return;
-        setData([]); // Clear previous data to prevent ghosting
         setLoading(true);
 
-        let unsubscribe = () => { };
-
-        try {
-            if (activeTab === 'settings') {
-                const docRef = doc(db, 'settings', 'config');
-                unsubscribe = onSnapshot(docRef,
-                    (docSnap) => {
-                        if (docSnap.exists()) {
-                            setData([{ id: 'config', ...docSnap.data() }]);
-                        }
-                        setLoading(false);
-                    },
-                    (err) => {
-                        console.error("Config listener error:", err);
-                        toast.error(`Sync error: ${err.code}`);
-                        setLoading(false);
+        if (activeTab === 'settings') {
+            const docRef = doc(db, 'settings', 'config');
+            const unsubscribe = onSnapshot(docRef,
+                (docSnap) => {
+                    if (docSnap.exists()) {
+                        setData([{ id: 'config', ...docSnap.data() }]);
                     }
-                );
-            } else if (activeTab === 'holidays') {
-                const q = query(collection(db, 'settings'), where('type', '==', 'holiday'));
-                unsubscribe = onSnapshot(q,
-                    (snapshot) => {
-                        const items = [];
-                        snapshot.forEach((doc) => {
-                            items.push({ id: doc.id, ...doc.data() });
-                        });
-                        items.sort((a, b) => new Date(a.date) - new Date(b.date));
-                        setData(items);
-                        setLoading(false);
-                    },
-                    (err) => {
-                        console.error("Holidays listener error:", err);
-                        toast.error(`Sync error: ${err.code}`);
-                        setLoading(false);
-                    }
-                );
-            } else {
-                unsubscribe = onSnapshot(collection(db, activeCollection), (snapshot) => {
-                    const items = [];
-                    snapshot.forEach((doc) => {
-                        items.push({ id: doc.id, ...doc.data() });
-                    });
-
-                    // Sort items logic (Client-side sort for now, cheap for Master Data)
-                    if (activeCollection === 'days') {
-                        items.sort((a, b) => a.order - b.order);
-                    } else if (activeCollection === 'timeslots') {
-                        items.sort((a, b) => {
-                            const t1 = parseTimeToDate(a.startTime).getTime();
-                            const t2 = parseTimeToDate(b.startTime).getTime();
-                            return t1 - t2;
-                        });
-                        const naturalSort = (a, b) => {
-                            // eslint-disable-next-line sonarjs/no-nested-functions
-                            const splitAlphaNum = (str) => {
-                                // eslint-disable-next-line sonarjs/slow-regex
-                                const match = String(str).match(/^(\D*)(\d+)(.*)$/);
-                                if (!match) return [String(str), 0, ''];
-                                return [match[1], parseInt(match[2] || 0, 10), match[3]];
-                            };
-                            const [aPre, aNum, aSuf] = splitAlphaNum(a);
-                            const [bPre, bNum, bSuf] = splitAlphaNum(b);
-                            const preCmp = aPre.localeCompare(bPre);
-                            if (preCmp !== 0) return preCmp;
-                            if (aNum !== bNum) return aNum - bNum;
-                            return aSuf.localeCompare(bSuf);
-                        };
-                        items.sort((a, b) => naturalSort(a.name || '', b.name || ''));
-                    }
-
-                    setData(items);
                     setLoading(false);
-                    if (activeCollection === 'faculty') {
-                        toast.success(`Debug: Found ${items.length} faculty entries in DB`);
-                    }
-                }, (error) => {
-                    console.error("Error fetching data:", error);
-                    toast.error(`Sync error: ${error.code}`);
+                },
+                (err) => {
+                    console.error("Config listener error:", err);
+                    toast.error(`Sync error: ${err.code}`);
                     setLoading(false);
-                });
-            }
-        } catch (err) {
-            console.error("Listener setup error:", err);
+                }
+            );
+            return () => unsubscribe();
+        } else {
+            // Map activeTab to MasterDataContext arrays
+            const contextMap = {
+                faculty: masterData.faculty,
+                departments: masterData.departments,
+                subjects: masterData.subjects,
+                rooms: masterData.rooms,
+                groups: masterData.groups,
+                days: masterData.days,
+                timeslots: masterData.timeSlots,
+                semesters: masterData.semesters,
+                holidays: masterData.holidays,
+            };
+
+            const contextData = contextMap[activeTab] || [];
+            
+            // Context already handles parsing and natural sorting efficiently
+            setData([...contextData]);
             setLoading(false);
         }
-
-        return () => unsubscribe();
-    }, [activeTab, activeCollection, userProfile]);
+    }, [activeTab, activeCollection, userProfile, masterData]);
 
     const fetchDependencies = async () => {
         try {
@@ -651,7 +596,7 @@ const MasterData = ({ initialTab }) => {
             // Updated Check: Robust Time Parsing
             const formatTimeRobust = (t) => {
                 const d = parseTimeToDate(t);
-                return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\u202F/g, ' ');
             };
             const start = formatTimeRobust(item.startTime);
             const end = formatTimeRobust(item.endTime);
@@ -761,7 +706,7 @@ const MasterData = ({ initialTab }) => {
     const formatTimeForSchedule = (time) => {
         if (!time) return '';
         const d = parseTimeToDate(time);
-        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\u202F/g, ' ');
     };
 
     // --- Cascade Update Helpers ---
@@ -1650,12 +1595,13 @@ const MasterData = ({ initialTab }) => {
                                             fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-accent)'
                                         }}
                                         value={data[0]?.activeAcademicYear || ''}
-                                        onChange={async (e) => {
-                                            try {
-                                                await updateDoc(doc(db, 'settings', 'config'), { activeAcademicYear: e.target.value });
-                                            } catch (err) {
-                                                console.error(err);
-                                                alert('Failed to update active year');
+                                        onChange={(e) => {
+                                            if (e.target.value !== data[0]?.activeAcademicYear) {
+                                                setTransitionModal({
+                                                    isOpen: true,
+                                                    fromYear: data[0]?.activeAcademicYear,
+                                                    toYear: e.target.value
+                                                });
                                             }
                                         }}
                                     >
@@ -1693,61 +1639,63 @@ const MasterData = ({ initialTab }) => {
                                 </div>
 
                                 <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
-                                    Add a new academic year to the system.
+                                    The system automatically calculates the next logical Academic Years to prevent typos.
                                 </p>
 
-                                <div className="create-year-grid" style={{ display: 'grid', gap: '0.75rem', alignItems: 'center' }}>
-                                    <div style={{ position: 'relative' }}>
-                                        <Calendar size={16} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. 2025-2026"
-                                            className="glass-input"
-                                            value={newYearInput}
-                                            onChange={(e) => setNewYearInput(e.target.value)}
-                                            style={{ paddingLeft: '2.5rem', width: '100%' }}
-                                        />
-                                    </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    {(() => {
+                                        const currentYears = data[0]?.academicYears || [];
+                                        if (currentYears.length === 0) {
+                                            const y = new Date().getFullYear();
+                                            const target = `${y}-${y + 1} (ODD)`;
+                                            return (
+                                                <button onClick={() => handleAddYear(target)} className="btn" style={{ background: 'linear-gradient(135deg, #3b82f6, #06b6d4)' }}>
+                                                    <Plus size={16} /> Add First Year: {target}
+                                                </button>
+                                            );
+                                        }
 
-                                    <div style={{ position: 'relative' }}>
-                                        <select
-                                            className="glass-input"
-                                            value={newYearType}
-                                            onChange={(e) => setNewYearType(e.target.value)}
-                                            style={{
-                                                width: '100%',
-                                                fontWeight: '600',
-                                                color: { ODD: '#60a5fa', EVEN: '#f472b6', FULL: '#a78bfa' }[newYearType] || '#a78bfa',
-                                                cursor: 'pointer',
-                                                appearance: 'none',
-                                                paddingRight: '2rem'
-                                            }}
-                                        >
-                                            <option value="ODD" style={{ background: '#0f172a' }}>ODD SEM</option>
-                                            <option value="EVEN" style={{ background: '#0f172a' }}>EVEN SEM</option>
-                                            <option value="FULL" style={{ background: '#0f172a' }}>FULL YEAR</option>
-                                        </select>
-                                        <ChevronDown size={14} color="rgba(255,255,255,0.5)" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                                    </div>
+                                        let highest = null;
+                                        for (const yStr of currentYears) {
+                                            const match = yStr.match(/^(\d{4})-(\d{4})\s*\((ODD|EVEN|FULL)\)$/i);
+                                            if (match) {
+                                                const parsed = { start: parseInt(match[1]), end: parseInt(match[2]), type: match[3].toUpperCase() };
+                                                if (!highest) highest = parsed;
+                                                else {
+                                                    if (parsed.start > highest.start) highest = parsed;
+                                                    else if (parsed.start === highest.start && parsed.type === 'EVEN' && highest.type === 'ODD') highest = parsed;
+                                                }
+                                            }
+                                        }
 
-                                    <button
-                                        onClick={handleAddYear}
-                                        style={{
-                                            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                                            padding: '0 1.5rem',
-                                            height: '42px',
-                                            fontSize: '0.95rem', fontWeight: 600,
-                                            borderRadius: '8px', border: 'none', color: 'white', cursor: 'pointer',
-                                            boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
-                                            transition: 'transform 0.2s',
-                                            display: 'flex', alignItems: 'center', gap: '0.5rem'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                                    >
-                                        <Plus size={18} />
-                                        Add
-                                    </button>
+                                        if (!highest) return null;
+
+                                        let opt1, opt2;
+                                        if (highest.type === 'ODD') {
+                                            opt1 = `${highest.start}-${highest.end} (EVEN)`;
+                                            opt2 = `${highest.start + 1}-${highest.end + 1} (ODD)`;
+                                        } else {
+                                            opt1 = `${highest.start + 1}-${highest.end + 1} (ODD)`;
+                                            opt2 = `${highest.start + 1}-${highest.end + 1} (EVEN)`;
+                                        }
+
+                                        return (
+                                            <>
+                                                {!currentYears.includes(opt1) && (
+                                                    <button onClick={() => handleAddYear(opt1)} className="btn" style={{ background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', justifyContent: 'space-between' }}>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Plus size={16} /> Add Next Semester</span>
+                                                        <span style={{ fontWeight: 800 }}>{opt1}</span>
+                                                    </button>
+                                                )}
+                                                {!currentYears.includes(opt2) && (
+                                                    <button onClick={() => handleAddYear(opt2)} className="btn" style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', justifyContent: 'space-between' }}>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Plus size={16} /> Add Next Year</span>
+                                                        <span style={{ fontWeight: 800 }}>{opt2}</span>
+                                                    </button>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -1938,6 +1886,15 @@ const MasterData = ({ initialTab }) => {
                     )
                 }
             </div >
+
+            {/* Modals */}
+            <YearTransitionModal
+                isOpen={transitionModal.isOpen}
+                fromYear={transitionModal.fromYear}
+                toYear={transitionModal.toYear}
+                onClose={() => setTransitionModal({ isOpen: false, fromYear: null, toYear: null })}
+                onComplete={() => setTransitionModal({ isOpen: false, fromYear: null, toYear: null })}
+            />
 
             {/* Modal */}
             {

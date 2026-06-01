@@ -1,0 +1,94 @@
+﻿9b8c340 feat: add pulsing live status indicators and light-on visual feedback to admin panel
+04eefc8 feat: implement high-performance caching for certificates with live-sync toggle UI
+374c112 feat: implement 4-year BTech session logic and dynamic template engine
+617e008 feat: implement template master and expanded HR fields
+20b2c0a feat: enhance certificate schema with departments and father name tracking
+509c28f fix: update with correct Spreadsheet ID and New Deployment
+7615ab9 fix: correct untruncated Apps Script URL
+04de030 fix: import toast in certificateApi
+321bd5a chore: update certificate system bridge and manifest
+7083498 fix: standardized phone sanitization across admin and profile
+2a061f2 fix: suffix-resilient bot recognition and sanitized phone sync
+26bce64 fix: total synchronization with self-linking and email-fallback
+8107ba2 fix: total synchronization and deep-scanned logic resilience
+3a2a88b fix: unified phone/mobile sync and resilient faculty lookup
+8c9aaa8 fix: fail-safe faculty lookup (scans by name if ID fails)
+b3b1fd6 fix: enhanced faculty data merging for better notification targeting
+43060a1 security: final deep scrub of all secrets
+6f855d1 feat: integrated auto-wake for whatsapp bot
+1d08607 chore: final security audit and code cleanup
+b8aa33c security: remove hardcoded firebase fallbacks to stop github alerts
+1aa923c security: remove hardcoded OneSignal and LAMS secrets
+ed98d82 fix: restore missing scheduleSnap fetch
+01789a4 perf: final database-read optimization for check-classes
+ea31637 perf: optimized check-classes and fixed syntax
+971272d chore: adjust cron for hobby plan limits
+734842c feat: automated greetings, security enhancements, and master data sync logic
+58d399a commit
+08a89d8 Update LAMS: Admin Auth, Chatbot, Bug Fixes
+745743b feat: add dual faculty notification support and admin notification manager
+4b7363b Update from local
+9ac232f Update from local
+8571673 Update from local
+8690049 Update from local
+6efcbb6 Update from local
+7bd8a40 Update from local
+0989555 Update from local
+68b8764 Update from local
+e8f5c68 Update from local
+bf1fccb Update from local
+91b8774 Update from local
+b9a6f2c Update from local
+1cd06fc Update from local
+e6a981a Update from local
+248f005 Update from local
+acbd838 Update from local
+b037873 Update from local
+583d886 Update from local
+5ad05c1 Update from local
+f801712 Update from local
+f72e79e Update from local
+7cb6082 feat: implement vercel serverless api and firebase messaging for free tier
+ba66e6f Revert recent changes to restore stable application state
+b82550d Fixed Forgot Password logic and secure lookup
+c49952a Fix: Remove undefined fetchData call in MasterData to prevent error on year change
+2076398 Fix: Display Faculty Name in conflict errors & Automate Security Sync
+bfc34ac feat: add credits and fix dashboard connectivity issues
+86222bb feat: complete real-time sync overhaul and offline protection
+0b9d4f2 Update Weekly Planner cards to show Dept-Section-Group info inline
+565b242 Enhance Scheduler print layout, generic UI improvements, and Dashboard Daily Schedule upgrades
+ca9700d Update Assignments page header for non-admin users
+4490bed Refactor analytics layout and general updates
+ed533dc Fix: Switch to Base64 Firestore storage for profile pictures to bypass CORS
+5b120fc Fix: Dynamic header title and subtitle based on route
+f0f71b9 Debug: Bypass Cropper and upload file directly
+53fb0b8 Fix: Optimize cropped image size (max 500px) and compression
+9e6d359 Fix: Correct message styling and processing state
+725abe8 Fix: Correct Firebase Storage Bucket URL
+5472c25 Fix: Improve image cropping blob generation
+d0f3395 Debug: Add logging to profile upload
+8fb678d Fix: Improved profile image upload error handling
+1f71fa9 Fix: Mobile menu overlay blur and visibility issues
+01b91de Feature: Enhanced Admin Panel with Role Dropdown and User Details Modal
+c859e1e Fix: ProtectedRoute waits for User Profile to load before rendering
+b131ffc Fix: Emergency Admin Override for main admin email
+c8a4cd0 Fix: Revert fonts to system stack
+aabc838 UI Overhaul: Premium Design System, Fonts, and Responsive Fixes
+97dc464 Feature: Add show/hide password toggle to signup form
+1a5b702 Fix: Correctly close JSX brackets in Login form
+be214a0 Feature: Dual Login (Email/EmpID) and Real Email Signup
+10a311d Fix: Restore keys and fix logout crash
+7904a52 Fix: Remove blocking alert from AuthContext to prevent blank screen
+5ceea31 Security: Force logout if user profile is deleted
+67c86ac Debug: Show detailed password reset error
+3abd56f Secure API keys using environment variables
+4c77562 Trigger deployment with new secret
+0f5cf1e Fix invalid package.json (duplicate key)
+08faef0 Remove homepage field to prevent path issues
+a37da25 Fix deployment config and add real password reset
+660a852 Fix base path for Firebase Hosting
+6c8db29 Setup Firebase Hosting and GitHub Actions
+dbc5b02 Feature: UI Polish, Academic Year, User Dashboard
+d5cf856 Security: Remove .env from git tracking
+c9b46da Update: Added Smart Conflict Detection and Admin Panel
+517d2d1 Initial commit

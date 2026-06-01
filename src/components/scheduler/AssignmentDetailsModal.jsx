@@ -11,7 +11,37 @@ import { X, Clock, MapPin, User, BookOpen, Users, Layers, Calendar, FlaskConical
  *   subjectDetails: array of master subject objects (optional, for enrichment)
  *   facultyList: array of master faculty objects (optional, for enrichment)
  */
-const AssignmentDetailsModal = ({ isOpen, onClose, assignment, subjectDetails = [], facultyList = [] }) => {
+const InfoRow = ({ icon, label, value, color = '#94a3b8' }) => {
+    if (!value) return null;
+    return (
+        <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '1rem',
+            padding: '0.875rem 0',
+            borderBottom: '1px solid rgba(255,255,255,0.05)'
+        }}>
+            <div style={{
+                width: '36px', height: '36px',
+                borderRadius: '8px',
+                background: `rgba(${hexToRgb(color)}, 0.1)`,
+                border: `1px solid rgba(${hexToRgb(color)}, 0.2)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, color
+            }}>
+                {icon}
+            </div>
+            <div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>
+                    {label}
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 500, color: 'white' }}>{value}</div>
+            </div>
+        </div>
+    );
+};
+
+const AssignmentDetailsModal = ({ isOpen, onClose, assignment, subjectDetails = [] }) => {
     if (!isOpen || !assignment) return null;
 
     // Enrich with master data if available
@@ -19,36 +49,6 @@ const AssignmentDetailsModal = ({ isOpen, onClose, assignment, subjectDetails = 
     const isLab = subjectData?.type === 'lab' ||
         assignment.subject?.toLowerCase().includes('lab') ||
         assignment.room?.toLowerCase().includes('lab');
-
-    const InfoRow = ({ icon, label, value, color = '#94a3b8' }) => {
-        if (!value) return null;
-        return (
-            <div style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '1rem',
-                padding: '0.875rem 0',
-                borderBottom: '1px solid rgba(255,255,255,0.05)'
-            }}>
-                <div style={{
-                    width: '36px', height: '36px',
-                    borderRadius: '8px',
-                    background: `rgba(${hexToRgb(color)}, 0.1)`,
-                    border: `1px solid rgba(${hexToRgb(color)}, 0.2)`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0, color
-                }}>
-                    {icon}
-                </div>
-                <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>
-                        {label}
-                    </div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 500, color: 'white' }}>{value}</div>
-                </div>
-            </div>
-        );
-    };
 
     return (
         <>
@@ -149,7 +149,7 @@ const AssignmentDetailsModal = ({ isOpen, onClose, assignment, subjectDetails = 
                     <InfoRow
                         icon={<Users size={18} />}
                         label="Group"
-                        value={`${assignment.dept || ''} — ${assignment.section || ''}${assignment.group && assignment.group !== 'All' ? ` / ${assignment.group}` : ''}`}
+                        value={assignment.dept + ' — ' + (assignment.section || '') + (assignment.group && assignment.group !== 'All' ? ' / ' + assignment.group : '')}
                         color="#fbbf24"
                     />
                     <InfoRow icon={<Layers size={18} />} label="Semester" value={assignment.sem} color="#fb923c" />

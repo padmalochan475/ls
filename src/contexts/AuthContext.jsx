@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react';
 import { auth, db } from '../lib/firebase';
 import {
     signInWithEmailAndPassword,
@@ -337,7 +337,7 @@ export const AuthProvider = ({ children }) => {
         return () => unsubscribeProfile();
     }, [currentUser]);
 
-    const value = {
+    const value = useMemo(() => ({
         currentUser,
         userProfile,
         activeAcademicYear: selectedAcademicYear || systemAcademicYear, // Fallback to system if null
@@ -352,7 +352,17 @@ export const AuthProvider = ({ children }) => {
         loading,
         isSystemSyncing,
         allowUserYearChange // Expose the new setting
-    };
+    }), [
+        currentUser,
+        userProfile,
+        selectedAcademicYear,
+        systemAcademicYear,
+        academicYears,
+        maxFacultyLoad,
+        loading,
+        isSystemSyncing,
+        allowUserYearChange
+    ]);
 
     return (
         <AuthContext.Provider value={value}>

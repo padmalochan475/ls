@@ -63,21 +63,16 @@ export const validateBooking = (newBooking, schedule, options = {}) => {
         // 3. Faculty Conflict
         // Helper: Check if two records represent the same person
         const isSamePerson = (name1, id1, name2, id2) => {  
-            if (!name1 || !name2) return false;
-            const n1 = normalizeStr(name1);
-            const n2 = normalizeStr(name2);
-
-            // If names differ, they are different people
-            if (n1 !== n2) return false;
-
-            // If names are identical, check IDs if BOTH exist
+            // 1. If BOTH IDs exist, rely strictly on IDs for absolute precision
             if (id1 && id2) {
-                // Different IDs = Different People (even if same name)
                 return id1 === id2;
             }
 
-            // If IDs are missing, assume same person (Cautionary Conflict)
-            return true;
+            // 2. Fallback to fuzzy Name match if IDs are missing
+            if (!name1 || !name2) return false;
+            const n1 = normalizeStr(name1);
+            const n2 = normalizeStr(name2);
+            return n1 === n2;
         };
 
         // Check if Input Faculty 1 collides with Schedule Item's Faculty 1 or 2

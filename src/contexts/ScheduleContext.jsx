@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
@@ -83,7 +83,7 @@ export const ScheduleProvider = ({ children }) => {
         // console.debug("Schedule is live-synced. Manual refresh ignored.");
     };
 
-    const value = { schedule, loading, error, refreshSchedule };
+    const value = useMemo(() => ({ schedule, loading, error, refreshSchedule }), [schedule, loading, error]);
 
     return (
         <ScheduleContext.Provider value={value}>

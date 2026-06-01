@@ -39,13 +39,13 @@
   --color-danger: #ff453a;
   /* Apple Red */
 
-  /* Glassmorphism 3.0 (Ultra Depth) */
-  --glass-bg: rgba(22, 22, 24, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-highlight: rgba(255, 255, 255, 0.05);
-  --glass-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-  --glass-blur: 24px;
-  --glass-saturation: 180%;
+  /* Glassmorphism 3.0 (Ultra Depth - New Era) */
+  --glass-bg: rgba(15, 23, 42, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-highlight: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --glass-blur: 30px;
+  --glass-saturation: 200%;
 
   /* Typography - Modern Stack */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -128,25 +128,26 @@ body::after {
 }
 
 body::before {
-  top: -200px;
-  left: -200px;
-  background: radial-gradient(circle, rgba(121, 40, 202, 0.4) 0%, rgba(0, 0, 0, 0) 70%);
-  animation: float-shape-1 20s ease-in-out infinite;
+  top: -20%;
+  left: -10%;
+  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+  animation: float-shape-1 20s infinite alternate;
 }
 
 body::after {
-  bottom: -200px;
-  right: -100px;
-  background: radial-gradient(circle, rgba(0, 112, 243, 0.3) 0%, rgba(0, 0, 0, 0) 70%);
-  animation: float-shape-2 25s ease-in-out infinite;
+  bottom: -20%;
+  right: -10%;
+  background: radial-gradient(circle, rgba(236,72,153,0.15) 0%, transparent 70%);
+  animation: float-shape-2 15s infinite alternate-reverse;
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
 
-  /* Deep dark gradient (midnight blue -> dark purple -> navy) */
-  background: linear-gradient(135deg, #09090b 0%, #1e1b4b 50%, #0f172a 100%);
+  /* World-Class Pitch Black Space */
+  background-color: #050505;
+  background-image: none;
   background-attachment: fixed;
   color: var(--color-text-main);
   -webkit-font-smoothing: antialiased;
@@ -282,10 +283,9 @@ select.glass-input option {
 }
 
 .btn-primary {
-  background: var(--color-accent);
-  background: var(--color-accent-gradient);
+  background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
   color: white;
-  box-shadow: 0 4px 20px var(--color-accent-glow);
+  box-shadow: 0 10px 25px rgba(236, 72, 153, 0.4);
 }
 
 /* Shimmer Effect on Hover */
@@ -302,7 +302,7 @@ select.glass-input option {
 }
 
 .btn-primary:hover {
-  box-shadow: 0 8px 30px var(--color-accent-glow);
+  box-shadow: 0 15px 35px rgba(236, 72, 153, 0.6);
   transform: translateY(-2px);
 }
 
@@ -474,6 +474,98 @@ select.glass-input option {
 .glass-input::placeholder {
   color: rgba(255, 255, 255, 0.3);
 }
+
+/* Premium Select Dropdown */
+.glass-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: rgba(15, 23, 42, 0.6) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+  padding: 12px 40px 12px 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 14px !important;
+  color: white !important;
+  font-size: 0.95rem;
+  font-family: var(--font-sans);
+  outline: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  width: 100%;
+}
+
+.glass-select:hover {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background-color: rgba(15, 23, 42, 0.8) !important;
+}
+
+.glass-select:focus {
+  border-color: #3b82f6 !important;
+  background-color: rgba(15, 23, 42, 0.8) !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.glass-select option {
+  background-color: #0f172a;
+  color: white;
+  padding: 10px;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  animation: modalScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes modalScaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Form Label Text */
+.label-text {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+/* Lateral Entry Badge */
+.badge-lateral {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
 
 /* Premium Animations for Credit Box */
 @keyframes rotate {

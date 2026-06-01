@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
@@ -204,7 +204,7 @@ export const MasterDataProvider = ({ children }) => {
         setRefreshTrigger(prev => prev + 1);
     };
 
-    const value = {
+    const value = useMemo(() => ({
         departments,
         semesters,
         subjects,
@@ -216,7 +216,18 @@ export const MasterDataProvider = ({ children }) => {
         holidays,
         loading,
         refreshMasterData
-    };
+    }), [
+        departments,
+        semesters,
+        subjects,
+        faculty,
+        rooms,
+        days,
+        timeSlots,
+        groups,
+        holidays,
+        loading
+    ]);
 
     return (
         <MasterDataContext.Provider value={value}>
