@@ -1,107 +1,42 @@
-import React, { useState } from 'react';
-import { BookOpen, ExternalLink, FileText, GraduationCap } from 'lucide-react';
-
-const syllabusData = {
-    CSE: [
-        {
-            title: "B.Tech First Year",
-            items: [
-                { name: "1st Year Syllabus (All Branches)", link: "https://tat.ac.in/wp-content/uploads/2024/05/Course-Structure-and-Detailed-Syllabus-for-1st-Year-B.Tech-Admission-Batch-2023-24.pdf" }
-            ]
-        },
-        {
-            title: "B.Tech Second Year",
-            items: [
-                { name: "3rd Semester Syllabus", link: "https://drive.google.com/file/d/1b7pTzhkUwzI4QDGJhWf27AYi78BAgBvK/view?usp=sharing" },
-                { name: "4th Semester Syllabus", link: "https://drive.google.com/file/d/1pdGs3qTX7fWgt00nAi2i89uFUVl8tMGJ/view?usp=sharing" }
-            ]
-        },
-        {
-            title: "B.Tech Third Year",
-            items: [
-                { name: "5th Semester Syllabus", link: "https://drive.google.com/file/d/1Y1zmChGWs2-F0Ed22BsaLPV5KUMb9zPQ/view?usp=sharing" },
-                { name: "6th Semester Syllabus", link: "https://drive.google.com/file/d/1n0qoTt45DeRzKpPswrOdlG1M5rAnhT20/view?usp=sharing" }
-            ]
-        },
-        {
-            title: "B.Tech Fourth Year",
-            items: [
-                { name: "4th Year Syllabus", link: "https://tat.ac.in/wp-content/uploads/2023/05/Syllabus-B.Tech-4TH-year-CSE-CST-2018-19-Admission-Batch.pdf" }
-            ]
-        },
-        {
-            title: "M.Tech",
-            items: [
-                { name: "M.Tech Syllabus", link: "https://drive.google.com/file/d/1ekG7MrlIt2Ldon2CBeaG30dZ1mDBvSiS/view?usp=sharing" }
-            ]
-        }
-    ],
-    CSAIML: [
-        {
-            title: "B.Tech First Year",
-            items: [
-                { name: "1st Year Syllabus (All Branches)", link: "https://tat.ac.in/wp-content/uploads/2024/05/Course-Structure-and-Detailed-Syllabus-for-1st-Year-B.Tech-Admission-Batch-2023-24.pdf" }
-            ]
-        },
-        {
-            title: "B.Tech Second Year",
-            items: [
-                { name: "3rd Semester Syllabus", link: "https://drive.google.com/file/d/1oxAkDXsFK31cYUrgV6XxhFXng_nDOO7p/view?usp=sharing" },
-                { name: "4th Semester Syllabus", link: "https://drive.google.com/file/d/14600goH8pZT3cXNCfFuEZm6aKUT0YH_0/view?usp=sharing" }
-            ]
-        },
-        {
-            title: "B.Tech Third Year",
-            items: [
-                { name: "5th Semester Syllabus", link: "https://drive.google.com/file/d/1cGJNa6c53AVltdjSPurO_9iK5OTWEUYx/view?usp=sharing" },
-                { name: "6th Semester Syllabus", link: "https://drive.google.com/file/d/1CATgGuw4i81ETjmOUmgoI_FEq664sF8w/view?usp=sharing" }
-            ]
-        },
-        {
-            title: "B.Tech Fourth Year",
-            items: [
-                { name: "4th Year Syllabus", link: "https://tat.ac.in/wp-content/uploads/2023/05/Syllabus-B.Tech-4TH-year-CSE-CST-2018-19-Admission-Batch.pdf" }
-            ]
-        },
-        {
-            title: "M.Tech",
-            items: [
-                { name: "M.Tech Syllabus", link: "https://drive.google.com/file/d/135k3EwY3glj8WI9677K74xUzCH7augsM/view?usp=sharing" }
-            ]
-        }
-    ],
-    CSDS: [
-        {
-            title: "B.Tech First Year",
-            items: [
-                { name: "1st Year Syllabus (All Branches)", link: "https://tat.ac.in/wp-content/uploads/2024/05/Course-Structure-and-Detailed-Syllabus-for-1st-Year-B.Tech-Admission-Batch-2023-24.pdf" }
-            ]
-        },
-        {
-            title: "B.Tech Second Year",
-            items: [
-                { name: "3rd Semester Syllabus", link: "https://drive.google.com/file/d/1nwVhGARTim7sYuyDbsM41H1xe2Loy51z/view?usp=sharing" },
-                { name: "4th Semester Syllabus", link: "https://drive.google.com/file/d/1gRqVgMrYtwnHifdU01B4lDm9vSXmT-sE/view?usp=sharing" }
-            ]
-        },
-        {
-            title: "B.Tech Third Year",
-            items: [
-                { name: "5th Semester Syllabus", link: "https://drive.google.com/file/d/1cGZnQ-FaNvR7V6wkneaisssn2t6p5YUS/view?usp=sharing" },
-                { name: "6th Semester Syllabus", link: "https://drive.google.com/file/d/1Xp5gGByuVxJjMic9TS1PvVjr6OXZvEiS/view?usp=sharing" }
-            ]
-        },
-        {
-            title: "M.Tech",
-            items: [
-                { name: "M.Tech Syllabus", link: "https://drive.google.com/file/d/16Hw2Hfbkut2eOLO_mTbZOTX6FbaFgBDE/view?usp=sharing" }
-            ]
-        }
-    ]
-};
+import React, { useState, useEffect } from 'react';
+import { BookOpen, ExternalLink, FileText, GraduationCap, Loader2 } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 const Syllabus = () => {
-    const [activeTab, setActiveTab] = useState('CSE');
+    const [activeTab, setActiveTab] = useState('');
+    const [syllabusData, setSyllabusData] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const unsubscribe = onSnapshot(collection(db, 'syllabi'), (snap) => {
+            if (!snap.empty) {
+                const depts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.order - b.order);
+                setSyllabusData(depts);
+                if (depts.length > 0) {
+                    setActiveTab(depts[0].id);
+                }
+            } else {
+                setSyllabusData([]);
+            }
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching syllabi:", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    if (loading) {
+        return <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}><Loader2 className="animate-spin" color="#3b82f6" size={32} /></div>;
+    }
+
+    if (syllabusData.length === 0) {
+        return <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>No syllabus data available.</div>;
+    }
+
+    const activeDepartment = syllabusData.find(d => d.id === activeTab);
 
     return (
         <div style={{ padding: '2rem 1.5rem', maxWidth: '1200px', margin: '0 auto' }} className="animate-fade-in">
@@ -116,16 +51,16 @@ const Syllabus = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', overflowX: 'auto' }}>
-                {Object.keys(syllabusData).map((dept) => (
+                {syllabusData.map((dept) => (
                     <button
-                        key={dept}
-                        onClick={() => setActiveTab(dept)}
+                        key={dept.id}
+                        onClick={() => setActiveTab(dept.id)}
                         style={{
                             padding: '0.75rem 1.5rem',
-                            background: activeTab === dept ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                            color: activeTab === dept ? '#60a5fa' : 'var(--color-text-muted)',
+                            background: activeTab === dept.id ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                            color: activeTab === dept.id ? '#60a5fa' : 'var(--color-text-muted)',
                             border: '1px solid',
-                            borderColor: activeTab === dept ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
+                            borderColor: activeTab === dept.id ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
                             borderRadius: '8px',
                             fontWeight: 600,
                             cursor: 'pointer',
@@ -133,13 +68,13 @@ const Syllabus = () => {
                             whiteSpace: 'nowrap'
                         }}
                     >
-                        {dept}
+                        {dept.departmentName}
                     </button>
                 ))}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                {syllabusData[activeTab].map((section, idx) => (
+                {activeDepartment && activeDepartment.sections && activeDepartment.sections.map((section, idx) => (
                     <div key={idx} className="glass-panel" style={{ padding: '1.5rem' }}>
                         <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f8fafc', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <GraduationCap size={18} color="#a855f7" />

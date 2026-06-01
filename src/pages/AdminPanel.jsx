@@ -5,7 +5,7 @@ import { collection, doc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where
 // EmailAuthProvider removed (unused)
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
-import { Users, UserPlus, ShieldAlert, Activity, Search, Trash2, CheckCircle, Shield, GraduationCap, Settings, MessageSquare, User } from 'lucide-react';
+import { Users, UserPlus, ShieldAlert, Activity, Search, Trash2, CheckCircle, Shield, GraduationCap, Settings, MessageSquare, User, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import emailjs from '@emailjs/browser';
 import { ResponsiveContainer, AreaChart, Tooltip, Area, PieChart, Pie, Cell, Legend, BarChart, Bar, XAxis, CartesianGrid, YAxis, LineChart, Line } from 'recharts';
@@ -17,6 +17,7 @@ import CelebrationManager from '../components/admin/CelebrationManager';
 import SubstitutionManager from '../components/SubstitutionManager';
 import AdminOtpModal from '../components/admin/AdminOtpModal';
 import SystemSettings from '../components/admin/SystemSettings';
+import SyllabusManager from '../components/admin/SyllabusManager';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const AdminPanel = () => {
@@ -628,6 +629,23 @@ const AdminPanel = () => {
                     >
                         <Settings size={18} /> Settings
                     </button>
+                    <button
+                        onClick={() => setActiveTab('syllabus')}
+                        style={{
+                            padding: '10px 16px',
+                            background: activeTab === 'syllabus' ? 'var(--color-accent)' : 'transparent',
+                            color: activeTab === 'syllabus' ? 'white' : 'var(--color-text-muted)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            transition: 'all 0.2s ease',
+                            borderLeft: '1px solid rgba(255,255,255,0.1)'
+                        }}
+                    >
+                        <BookOpen size={18} /> Syllabus Links
+                    </button>
                 </div>
             </div>
 
@@ -636,6 +654,8 @@ const AdminPanel = () => {
                 <SubstitutionManager />
             ) : activeTab === 'settings' ? (
                 <SystemSettings />
+            ) : activeTab === 'syllabus' ? (
+                <SyllabusManager />
             ) : activeTab === 'suggestions' ? ( // eslint-disable-line sonarjs/no-nested-conditional
                 /* Suggestions View */
                 <div className="glass-panel" style={{ padding: '2rem' }}>
