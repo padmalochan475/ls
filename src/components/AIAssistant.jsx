@@ -16,11 +16,14 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
         const fetchApiKey = async () => {
             try {
                 const snap = await getDoc(doc(db, 'settings', 'global'));
-                if (snap.exists()) {
-                    setApiKey(snap.data().groqApiKey || '');
+                if (snap.exists() && snap.data().groqApiKey) {
+                    setApiKey(snap.data().groqApiKey);
+                } else {
+                    setApiKey(import.meta.env.VITE_GROQ_API_KEY || '');
                 }
             } catch (err) {
                 console.error('Failed to load API key', err);
+                setApiKey(import.meta.env.VITE_GROQ_API_KEY || '');
             }
         };
         if (isOpen) {
