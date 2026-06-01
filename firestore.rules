@@ -22,6 +22,7 @@ service cloud.firestore {
     // Everyone (Auth) can READ to populate dropdowns.
     // Only ADMIN can WRITE (Add/Edit/Delete).
     match /departments/{docId} { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /syllabi/{docId}     { allow read: if isAuth(); allow write: if isAdmin(); }
     match /semesters/{docId}   { allow read: if isAuth(); allow write: if isAdmin(); }
     match /subjects/{docId}    { allow read: if isAuth(); allow write: if isAdmin(); }
     match /faculty/{docId}     { 
