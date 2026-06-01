@@ -114,9 +114,19 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
 
             const validTimes = (contextData?.timeSlots || []).map(s => `${formatTimeForSchedule(s.startTime)} - ${formatTimeForSchedule(s.endTime)}`).join(', ');
             const validDays = (contextData?.days || []).map(d => d.name).join(', ');
+            const rooms = (contextData?.rooms || []).map(r => r.name || r.id).join(', ');
+            const subjects = (contextData?.subjects || []).map(s => s.name || s.id).join(', ');
+            const depts = (contextData?.departments || []).map(d => d.name || d.id).join(', ');
+            const sems = (contextData?.semesters || []).map(s => s.name || s.id).join(', ');
             
             let systemPrompt = `You are LAMS-AI, an intelligent assistant for the Lab Assignment Management System.
-Current Database State: There are ${facultyCount} active faculty members (${facultyNames}) and ${classesCount} scheduled lab classes.
+Current Database State: 
+- Faculty Members: ${facultyCount} active (${facultyNames})
+- Total Scheduled Classes: ${classesCount}
+- Departments: ${depts}
+- Semesters: ${sems}
+- Rooms Available: ${rooms}
+- Subjects Taught: ${subjects}
 
 DYNAMIC VALIDATION LOGIC:
 You must cross-reference the ACTIVE SCHEDULE with the MASTER DATA. 
@@ -125,6 +135,8 @@ You must cross-reference the ACTIVE SCHEDULE with the MASTER DATA.
 If a class in the schedule has a time or day that is NOT in the valid lists above, it is an ORPHANED/HIDDEN class. You must proactively warn the user about these hidden classes if they ask about them, explaining they won't appear on the grid because their time/day doesn't match Master Data.
 
 CRITICAL INSTRUCTION: You are an internal system assistant. Do NOT attempt to use 'brave_search' or any web search tools under any circumstances. You only have access to the data provided in this prompt. If you don't know the answer, simply state that you don't have that information.
+
+OUTER BOUNDARY POLICY: If the user asks a question that is completely unrelated to LAMS (Lab Assignment Management System), timetables, scheduling, faculty, subjects, or education, politely decline and state: "I can only answer questions related to the Lab Assignment Management System (LAMS) and its data."
 
 Answer the user's questions clearly, concisely, and naturally based on this data.`;
 
