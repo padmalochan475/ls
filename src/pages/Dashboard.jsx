@@ -48,14 +48,14 @@ const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
     return f1.includes(search) || f2.includes(search);
 };
 
-const calculateTodaySchedule = (selectedFaculty, allData, currentDayName, adjustments, currentDate, isPersonalView, userProfile, myAbsences, activeSubstitutions) => {
+const calculateTodaySchedule = (selectedFaculty, allData = [], currentDayName, adjustments = [], currentDate, isPersonalView, userProfile, myAbsences = [], activeSubstitutions = []) => {
     const targetDateStr = formatDateLocal(currentDate);
     const targetDayNorm = normalizeStr(currentDayName);
     let dailyFiltered = [];
 
     if (selectedFaculty === 'All Assignments') {
-        dailyFiltered = allData.filter(item => normalizeStr(item.day) === targetDayNorm).map(item => {
-            const adj = adjustments.find(a => a.originalScheduleId === item.id && a.date === targetDateStr);
+        dailyFiltered = (allData || []).filter(item => normalizeStr(item.day) === targetDayNorm).map(item => {
+            const adj = (adjustments || []).find(a => a.originalScheduleId === item.id && a.date === targetDateStr);
             if (adj) {
                 return { ...item, isSubstituted: true, substituteName: adj.substituteName };
             }
@@ -63,14 +63,14 @@ const calculateTodaySchedule = (selectedFaculty, allData, currentDayName, adjust
         });
     } else if (selectedFaculty) {
         // A. Base Schedule
-        dailyFiltered = allData.filter(item =>
+        dailyFiltered = (allData || []).filter(item =>
             normalizeStr(item.day) === targetDayNorm &&
             isMyAssignment(item, selectedFaculty, userProfile, isPersonalView) &&
-            !myAbsences.some(a => a.originalScheduleId === item.id && a.date === targetDateStr)
+            !(myAbsences || []).some(a => a.originalScheduleId === item.id && a.date === targetDateStr)
         );
 
         // B. Add Today's Substitutions
-        const todaysSubs = activeSubstitutions.filter(s => s.date === targetDateStr);
+        const todaysSubs = (activeSubstitutions || []).filter(s => s.date === targetDateStr);
         dailyFiltered = [...dailyFiltered, ...todaysSubs];
     }
     return dailyFiltered
@@ -78,28 +78,28 @@ const calculateTodaySchedule = (selectedFaculty, allData, currentDayName, adjust
         .sort((a, b) => (Number(a.sortVal) || 0) - (Number(b.sortVal) || 0));
 };
 
-const calculateWeeklySchedule = (selectedFaculty, allData, weekDates, isPersonalView, userProfile, myAbsences, activeSubstitutions) => {
-    let facultyData = allData;
+const calculateWeeklySchedule = (selectedFaculty, allData = [], weekDates = [], isPersonalView, userProfile, myAbsences = [], activeSubstitutions = []) => {
+    let facultyData = allData || [];
     if (selectedFaculty !== 'All Assignments' && selectedFaculty) {
         // Filter out absences that occur THIS WEEK
-        facultyData = allData.filter(item => {
+        facultyData = (allData || []).filter(item => {
             if (!isMyAssignment(item, selectedFaculty, userProfile, isPersonalView)) return false;
 
             // Fuzzy Find Day
             const itemDayNorm = normalizeStr(item.day);
-            const dayInfo = weekDates.find(d => normalizeStr(d.dayName) === itemDayNorm);
+            const dayInfo = (weekDates || []).find(d => normalizeStr(d.dayName) === itemDayNorm);
 
             if (!dayInfo) return true; // Keep if we can't map it (safety)
 
             const itemDateStr = formatDateLocal(dayInfo.fullDate);
-            if (myAbsences.some(a => a.originalScheduleId === item.id && a.date === itemDateStr)) return false;
+            if ((myAbsences || []).some(a => a.originalScheduleId === item.id && a.date === itemDateStr)) return false;
             return true;
         });
 
         // Add Substitutions that occur THIS WEEK
-        const weeksSubs = activeSubstitutions.filter(s => {
+        const weeksSubs = (activeSubstitutions || []).filter(s => {
             const sDayNorm = normalizeStr(s.day);
-            const dayInfo = weekDates.find(d => normalizeStr(d.dayName) === sDayNorm);
+            const dayInfo = (weekDates || []).find(d => normalizeStr(d.dayName) === sDayNorm);
             if (!dayInfo) return false;
             return s.date === formatDateLocal(dayInfo.fullDate);
         });
@@ -109,7 +109,7 @@ const calculateWeeklySchedule = (selectedFaculty, allData, weekDates, isPersonal
         facultyData = [];
     }
 
-    const grouped = weekDates.reduce((acc, { dayName }) => {
+    const grouped = (weekDates || []).reduce((acc, { dayName }) => {
         if (selectedFaculty !== 'All Assignments' && selectedFaculty) {
             const targetDayNorm = normalizeStr(dayName);
             const dayClasses = facultyData
@@ -135,7 +135,7 @@ const calculateDerivedSchedules = ({
     selectedFaculty,
     currentDayName
 }) => {
-    if (!activeAcademicYear || weekDates.length === 0) {
+    if (!activeAcademicYear || (weekDates || []).length === 0) {
         return { todaySchedule: [], weeklySchedule: {} };
     }
 
@@ -147,10 +147,10 @@ const calculateDerivedSchedules = ({
         return normalizeStr(val) === normalizeStr(selectedFaculty);
     };
 
-    const myAbsences = adjustments.filter(a => matchesTarget(a.originalFaculty));
-    const mySubstitutions = adjustments.filter(a => matchesTarget(a.substituteName));
+    const myAbsences = (adjustments || []).filter(a => matchesTarget(a.originalFaculty));
+    const mySubstitutions = (adjustments || []).filter(a => matchesTarget(a.substituteName));
 
-    const activeSubstitutions = mySubstitutions.map(adj => ({
+    const activeSubstitutions = (mySubstitutions || []).map(adj => ({
         id: `adj_${adj.id}`,
         originalId: adj.originalScheduleId,
         day: getDayName(adj.date),
@@ -182,7 +182,7 @@ const Dashboard = () => {
     const { userProfile, activeAcademicYear } = useAuth();
     // Schedules derived via useMemo
     const [roomCount, setRoomCount] = useState(0);
-    const { schedule: allData } = useScheduleData();
+    const { schedule: allData = [] } = useScheduleData() || {};
     const totalClasses = allData ? allData.length : 0; // Derived instead
     const [facultyList, setFacultyList] = useState([]);
     const [selectedFaculty, setSelectedFaculty] = useState('');
@@ -243,7 +243,7 @@ const Dashboard = () => {
     const currentDayName = getDayName(currentDate);
 
     // Check if current date is a holiday
-    const isHoliday = holidays.find(h => h.date === formatDateLocal(currentDate));
+    const isHoliday = (holidays || []).find(h => h.date === formatDateLocal(currentDate));
 
     // Helper to change date
     const changeDate = (days) => {
@@ -278,13 +278,13 @@ const Dashboard = () => {
     const { loading: scheduleLoading, refreshSchedule } = useScheduleData();
     // Use Real-Time Master Data Context instead of manual fetch
     const {
-        faculty: masterFaculty,
-        rooms: masterRooms,
-        days: masterDays,
-        holidays: masterHolidays,
-        subjects: masterSubjects,
+        faculty: masterFaculty = [],
+        rooms: masterRooms = [],
+        days: masterDays = [],
+        holidays: masterHolidays = [],
+        subjects: masterSubjects = [],
         loading: masterLoading
-    } = useMasterData();
+    } = useMasterData() || {};
 
     // Auto-Refresh Schedule Data on Mount is no longer needed since it's live-synced
     useEffect(() => {
@@ -313,7 +313,7 @@ const Dashboard = () => {
         if (!masterDays || masterDays.length === 0) return;
 
         // Process Days for Week View
-        const daysData = [...masterDays].filter(d => d.isVisible !== false).sort((a, b) => a.order - b.order);
+        const daysData = [...(masterDays || [])].filter(d => d.isVisible !== false).sort((a, b) => a.order - b.order);
 
         // Use 'currentDate' instead of 'new Date()' to allow navigation between weeks
         const curr = new Date(currentDate);
@@ -1082,6 +1082,11 @@ const Dashboard = () => {
                                             if (!e.target.value) return;
                                             const d = new Date(e.target.value);
                                             if (!isNaN(d.getTime())) setCurrentDate(d);
+                                        }}
+                                        onClick={(e) => {
+                                            try {
+                                                if (e.target.showPicker) e.target.showPicker();
+                                            } catch (err) {}
                                         }}
                                         style={{
                                             position: 'absolute',

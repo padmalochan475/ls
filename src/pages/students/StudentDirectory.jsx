@@ -472,8 +472,8 @@ function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
             <label style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Section / Batch</label>
             <select style={{ ...fieldStyle(false), appearance: 'none' }} value={form.section} onChange={e => set('section', e.target.value)}>
               <option value="">Select Batch</option>
-              {(groups || []).map(g => (
-                <option key={g.id || g.name || g} value={g.name || g.value || g.id || g}>{g.name || g.label || g.value || g}</option>
+              {availableBatches.map(b => (
+                <option key={b} value={b}>{b}</option>
               ))}
             </select>
           </div>
@@ -847,6 +847,21 @@ export default function StudentDirectory() {
   const [showImport, setShowImport] = useState(false);
   const [statusPopover, setStatusPopover] = useState(null);
 
+  // ── Derive Batches from Master Data Groups & SubGroups ──
+  const availableBatches = useMemo(() => {
+    if (!groups) return [];
+    let batches = [];
+    groups.forEach(g => {
+      const gName = g.name || g.label || g.value || g;
+      if (g.subGroups && Array.isArray(g.subGroups) && g.subGroups.length > 0) {
+        g.subGroups.forEach(sg => batches.push(`${gName}-${sg}`));
+      } else {
+        batches.push(gName);
+      }
+    });
+    return batches;
+  }, [groups]);
+
   // ── Fetch stats on mount ──
   useEffect(() => {
     const fetchStats = async () => {
@@ -903,7 +918,7 @@ export default function StudentDirectory() {
 
   // ── Filtered list ──
   const filteredStudents = useMemo(() => {
-    let list = students;
+    let list = students || [];
     if (filterStatus !== 'all') list = list.filter(s => s.status === filterStatus);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -1028,7 +1043,7 @@ export default function StudentDirectory() {
         <ControlInput icon={Search} placeholder="Search name or reg no…" value={search} onChange={setSearch} style={{ flex: '1 1 240px', minWidth: 200 }} />
         <ControlSelect value={filterBatch} onChange={setFilterBatch} style={{ flex: '1 1 160px', minWidth: 140 }}>
           <option value="">All Batches</option>
-          {groups.map(g => <option key={g.id || g.name || g} value={g.value || g.name || g.id || g}>{g.name || g.label || g}</option>)}
+          {availableBatches.map(b => <option key={b} value={b}>{b}</option>)}
         </ControlSelect>
         <ControlSelect value={filterSemester} onChange={setFilterSemester} style={{ flex: '1 1 160px', minWidth: 140 }}>
           <option value="">All Semesters</option>
