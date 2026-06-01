@@ -151,7 +151,8 @@ OUTER BOUNDARY POLICY: If the user asks a question that is completely unrelated 
 Answer the user's questions clearly, concisely, and naturally based on this data.`;
 
             if (userProfile) {
-                systemPrompt += `\n\nUSER PROFILE:\nYou are talking to: ${userProfile.name} (${userProfile.email}). Their role is: ${userProfile.role}.`;
+                const userName = userProfile.name || userProfile.displayName || 'Unknown User';
+                systemPrompt += `\n\nUSER PROFILE:\nYou are currently talking to ${userName} (Email: ${userProfile.email}). Their role is: ${userProfile.role}. \nCRITICAL INSTRUCTION: If the user asks 'what is my name' or 'who am I', you MUST respond with their name (${userName}).`;
             }
             if (denseSchedule) {
                 systemPrompt += `\n\nACTIVE SCHEDULE:\n${denseSchedule}`;
