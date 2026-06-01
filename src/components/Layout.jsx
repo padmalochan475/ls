@@ -48,6 +48,7 @@ const Layout = ({ children }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
+    const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const profileDropdownRef = useRef(null);
 
     useEffect(() => {
@@ -67,7 +68,7 @@ const Layout = ({ children }) => {
             document.removeEventListener('touchstart', handleClickOutside);
         };
     }, [isProfileDropdownOpen]);
-    const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+
     const { userProfile, currentUser, logout, isSystemSyncing, activeAcademicYear } = useAuth();
     const { permission, registerForPush } = useNotifications();
     
