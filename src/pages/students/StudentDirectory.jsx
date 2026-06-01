@@ -606,13 +606,19 @@ function ImportModal({ onClose, onImported }) {
     } else {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const wb = XLSX.read(e.target.result, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        const hdrs = data.length ? Object.keys(data[0]) : [];
-        setHeaders(hdrs); setRows(data); setPreview(data.slice(0, 5));
-        autoMap(hdrs);
-        setStep('map');
+        try {
+          const buffer = new Uint8Array(e.target.result);
+          const wb = XLSX.read(buffer, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          const hdrs = data.length ? Object.keys(data[0]) : [];
+          setHeaders(hdrs); setRows(data); setPreview(data.slice(0, 5));
+          autoMap(hdrs);
+          setStep('map');
+        } catch (err) {
+          console.error("Excel parse error:", err);
+          toast.error("Failed to read Excel file. Ensure it is a valid .xlsx or .xls file.");
+        }
       };
       reader.readAsArrayBuffer(f);
     }
@@ -654,16 +660,25 @@ function ImportModal({ onClose, onImported }) {
       let done = 0;
       for (const chunk of chunks) {
         const batch = writeBatch(db);
-        for (const student of chunk) {
-          const docId = student.regNo.toLowerCase().replace(/\s+/g, '_');
-          const ref = doc(db, 'students', docId);
-          if (conflict === 'overwrite') {
+        
+        if (conflict === 'overwrite') {
+          for (const student of chunk) {
+            const docId = student.regNo.toLowerCase().replace(/\s+/g, '_');
+            const ref = doc(db, 'students', docId);
             batch.set(ref, student);
-          } else {
-            const existing = await getDoc(ref);
-            if (!existing.exists()) batch.set(ref, student);
           }
+        } else {
+          // Fetch concurrently to avoid UI freeze on large imports
+          await Promise.all(chunk.map(async (student) => {
+            const docId = student.regNo.toLowerCase().replace(/\s+/g, '_');
+            const ref = doc(db, 'students', docId);
+            const existing = await getDoc(ref);
+            if (!existing.exists()) {
+              batch.set(ref, student);
+            }
+          }));
         }
+
         await batch.commit();
         done += chunk.length;
         setProgress(Math.round((done / mapped.length) * 100));
