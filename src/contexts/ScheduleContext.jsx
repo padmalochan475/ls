@@ -90,7 +90,7 @@ export const ScheduleProvider = ({ children }) => {
             unsubscribe();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [activeAcademicYear, currentUser, userProfile]);
+    }, [activeAcademicYear, currentUser, userProfile?.role, userProfile?.empId]);
 
     // Manual refresh is no longer needed with real-time listeners, 
     // but kept as a stub to prevent breaking components that call it.

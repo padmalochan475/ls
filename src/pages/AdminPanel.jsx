@@ -146,7 +146,7 @@ const AdminPanel = () => {
 
     // Real-Time Users Listener
     useEffect(() => {
-        if (!userProfile) return;
+        if (!userProfile || userProfile.role !== 'admin') return;
         setTimeout(() => setLoading(true), 0);
         const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
             const usersList = [];
@@ -161,11 +161,11 @@ const AdminPanel = () => {
         });
 
         return () => unsubscribe();
-    }, [userProfile]);
+    }, [userProfile?.role]);
 
     // Suggestions Listener (Always Active for Instant Switching)
     useEffect(() => {
-        if (!userProfile) return;
+        if (!userProfile || userProfile.role !== 'admin') return;
         setSuggestionsLoading(true);
         const q = collection(db, 'suggestions');
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -180,7 +180,7 @@ const AdminPanel = () => {
             setSuggestionsLoading(false);
         });
         return () => unsubscribe();
-    }, [userProfile]);
+    }, [userProfile?.role]);
 
     const updateSuggestionStatus = async (id, status) => {
         // STRICT PERMISSION CHECK

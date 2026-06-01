@@ -509,7 +509,7 @@ const Analytics = () => {
             }
             hasInitializedRef.current = true;
         }
-    }, [userProfile, stats.facultyList, loading]);
+    }, [userProfile?.name, stats.facultyList, loading]);
 
     const selectedFacultyStats = useMemo(() => {
         if (!selectedFaculty) return null;

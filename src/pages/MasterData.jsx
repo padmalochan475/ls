@@ -362,7 +362,7 @@ const MasterData = ({ initialTab }) => {
 
     // Real-Time Data Listener - Optimised to consume global context
     useEffect(() => {
-        if (!activeCollection || !userProfile) return;
+        if (!activeCollection || !userProfile || userProfile.role !== 'admin') return;
         setLoading(true);
 
         if (activeTab === 'settings') {
@@ -401,7 +401,7 @@ const MasterData = ({ initialTab }) => {
             setData([...contextData]);
             setLoading(false);
         }
-    }, [activeTab, activeCollection, userProfile, masterData]);
+    }, [activeTab, activeCollection, userProfile?.role, masterData]);
 
     const fetchDependencies = async () => {
         try {
@@ -1538,7 +1538,7 @@ const MasterData = ({ initialTab }) => {
         }
     };
 
-    if (loading) return <QuantumLoader />;
+    // Loading is handled by ProtectedRoute in App.jsx
 
     if (userProfile && userProfile.role !== 'admin') {
         return (

@@ -286,15 +286,9 @@ const Dashboard = () => {
         loading: masterLoading
     } = useMasterData();
 
-    const [hasRefreshed, setHasRefreshed] = useState(false);
-
-    // Auto-Refresh Schedule Data on Mount
+    // Auto-Refresh Schedule Data on Mount is no longer needed since it's live-synced
     useEffect(() => {
-        const init = async () => {
-            await refreshSchedule();
-            setHasRefreshed(true);
-        };
-        init();
+        refreshSchedule();
     }, [refreshSchedule]);
 
     const loading = scheduleLoading || masterLoading; // Unified loading state
@@ -443,7 +437,7 @@ const Dashboard = () => {
         { title: 'Academic Year', value: activeAcademicYear || 'N/A', icon: <GraduationCap size={24} />, gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' },
     ];
 
-    if (loading || !hasRefreshed) return <QuantumLoader />;
+    // loading is handled by ProtectedRoute in App.jsx
 
     const getGreeting = () => {
         const hour = liveTime.getHours();

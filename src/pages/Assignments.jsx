@@ -174,19 +174,6 @@ const Assignments = () => {
         loading: masterLoading
     } = useMasterData();
 
-    // Auto-Refresh Data on Mount
-    // Auto-Refresh Logic Removed: Data is strictly live-synced via Contexts.
-    // useEffect(() => {
-    //     const init = async () => {
-    //         await Promise.all([refreshMasterData(), refreshSchedule()]);
-    //         setHasRefreshed(true);
-    //     };
-    //     init();
-    // }, [refreshMasterData, refreshSchedule]);
-
-    // Just set loaded immediately since context handles loading state
-    const [hasRefreshed] = useState(true);
-
     useEffect(() => {
         if (!rawDepartments || !rawSemesters) return;
 
@@ -638,7 +625,7 @@ const Assignments = () => {
     }, [rawGroups, selectedMainGroup]);
 
 
-    if (scheduleLoading || masterLoading || !hasRefreshed) return <QuantumLoader />;
+    // Loading is handled by ProtectedRoute in App.jsx
 
     return (
         <div className="assignments-container animate-fade-in">

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { getMessaging } from "firebase/messaging";
@@ -11,15 +11,9 @@ import firebaseConfig from './firebaseConfig';
 // which cause Firestore WebSocket assertion failures (ID: b815 / ca9).
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-const db = getFirestore(app);
-
-// Enable offline caching and multi-tab persistence to save Firebase Free Tier reads
-enableMultiTabIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-        console.warn('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
-    } else if (err.code === 'unimplemented') {
-        console.warn('The current browser does not support all of the features required to enable persistence');
-    }
+// Enable offline caching and multi-tab persistence to save Firebase Free Tier reads using modern API
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
 });
 const auth = getAuth(app);
 const storage = getStorage(app);
