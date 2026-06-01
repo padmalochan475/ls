@@ -275,8 +275,8 @@ const StudentAttendance = () => {
                                 <span style={{ color: '#a855f7', fontSize: '1.2rem' }}>•</span> SEMESTER
                             </label>
                             <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.95rem', outline: 'none' }} value={config.semester} onChange={e => setConfig({ ...config, semester: e.target.value })}>
-                                <option value="">— Select Semester —</option>
-                                {semesters.map(s => <option key={s.id} value={s.number}>Sem {s.number}</option>)}
+                                <option value="" style={{ background: '#0f172a' }}>— Select Semester —</option>
+                                {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>Sem {s.number}</option>)}
                             </select>
                         </div>
                         <div>
@@ -289,8 +289,8 @@ const StudentAttendance = () => {
                                 onChange={e => setConfig({ ...config, group: e.target.value })}
                                 disabled={!config.semester || loadingSem}
                             >
-                                <option value="">{loadingSem ? 'Loading batches...' : '— Select Batch —'}</option>
-                                {dynamicGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                                <option value="" style={{ background: '#0f172a' }}>{loadingSem ? 'Loading batches...' : '— Select Batch —'}</option>
+                                {dynamicGroups.map(g => <option key={g} value={g} style={{ background: '#0f172a' }}>{g}</option>)}
                             </select>
                         </div>
                         <div>
@@ -298,8 +298,8 @@ const StudentAttendance = () => {
                                 <span style={{ color: '#eab308', fontSize: '1.2rem' }}>•</span> SUBJECT
                             </label>
                             <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.95rem', outline: 'none' }} value={config.subject} onChange={e => setConfig({ ...config, subject: e.target.value })}>
-                                <option value="">— Select Subject —</option>
-                                {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                <option value="" style={{ background: '#0f172a' }}>— Select Subject —</option>
+                                {subjects.map(s => <option key={s.id} value={s.name} style={{ background: '#0f172a' }}>{s.name}</option>)}
                             </select>
                         </div>
                     </div>

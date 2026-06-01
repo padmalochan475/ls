@@ -952,7 +952,7 @@
     .card-header-mobile {
         border-right: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        padding-right: 0;
+        padding-right: 80px;
         padding-bottom: 0.75rem;
         width: 100%;
         flex-direction: row;
