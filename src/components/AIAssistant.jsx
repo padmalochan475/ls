@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, X, Sparkles, Send, Loader2, Cloud, Settings, Key, CheckCircle, RefreshCw } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 
 const AIAssistant = ({ isOpen, onClose, contextData }) => {
     const [messages, setMessages] = useState([
@@ -10,10 +10,11 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [apiKey, setApiKey] = useState('');
+    const [celebrations, setCelebrations] = useState([]);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
-        const fetchApiKey = async () => {
+        const fetchApiKeyAndData = async () => {
             try {
                 const snap = await getDoc(doc(db, 'settings', 'global'));
                 if (snap.exists() && snap.data().groqApiKey) {
@@ -21,13 +22,18 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
                 } else {
                     setApiKey(import.meta.env.VITE_GROQ_API_KEY || '');
                 }
+
+                // Fetch active celebrations
+                const q = query(collection(db, 'celebrations'), where('isActive', '==', true));
+                const celSnap = await getDocs(q);
+                setCelebrations(celSnap.docs.map(d => ({ id: d.id, ...d.data() })));
             } catch (err) {
-                console.error('Failed to load API key', err);
+                console.error('Failed to load AI context data', err);
                 setApiKey(import.meta.env.VITE_GROQ_API_KEY || '');
             }
         };
         if (isOpen) {
-            fetchApiKey();
+            fetchApiKeyAndData();
         }
     }, [isOpen]);
 
@@ -118,6 +124,8 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
             const subjects = (contextData?.subjects || []).map(s => s.name || s.id).join(', ');
             const depts = (contextData?.departments || []).map(d => d.name || d.id).join(', ');
             const sems = (contextData?.semesters || []).map(s => s.name || s.id).join(', ');
+            const hols = (contextData?.holidays || []).map(h => `${h.name} on ${h.date}`).join(', ');
+            const cels = celebrations.map(c => `${c.title} (Type: ${c.type})`).join(', ');
             
             let systemPrompt = `You are LAMS-AI, an intelligent assistant for the Lab Assignment Management System.
 Current Database State: 
@@ -127,6 +135,8 @@ Current Database State:
 - Semesters: ${sems}
 - Rooms Available: ${rooms}
 - Subjects Taught: ${subjects}
+- Upcoming Holidays: ${hols || 'None listed'}
+- Active Celebrations/Events: ${cels || 'None active'}
 
 DYNAMIC VALIDATION LOGIC:
 You must cross-reference the ACTIVE SCHEDULE with the MASTER DATA. 

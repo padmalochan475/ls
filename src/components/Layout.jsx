@@ -73,7 +73,7 @@ const Layout = ({ children }) => {
     const { permission, registerForPush } = useNotifications();
     
     // For AI Context
-    const { faculty, days, timeSlots, rooms, subjects, departments, semesters } = useMasterData();
+    const { faculty, days, timeSlots, rooms, subjects, departments, semesters, holidays } = useMasterData();
     const { schedule } = useScheduleContext();
 
     // useEffect removed to prevent toast spam on refresh. NotificationContext handles sync automatically.
@@ -739,7 +739,7 @@ const Layout = ({ children }) => {
                 <AIAssistant 
                     isOpen={isAIAssistantOpen} 
                     onClose={() => setIsAIAssistantOpen(false)} 
-                    contextData={{ schedule, faculty, userProfile, days, timeSlots, rooms, subjects, departments, semesters, activeAcademicYear }}
+                    contextData={{ schedule, faculty, userProfile, days, timeSlots, rooms, subjects, departments, semesters, activeAcademicYear, holidays }}
                 />
 
                 {/* Floating AI Button */}
