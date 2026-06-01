@@ -463,7 +463,7 @@ function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
             <select style={{ ...fieldStyle(errors.semester), appearance: 'none' }} value={form.semester} onChange={e => set('semester', e.target.value)}>
               <option value="">Select Semester</option>
               {(semesters || []).map(s => (
-                <option key={s.id || s.value || s} value={s.value || s.id || s}>{s.label || s.name || `Semester ${s.value || s}`}</option>
+                <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s}>{s.label || s.name || `Semester ${s.number || s.value || s}`}</option>
               ))}
             </select>
           </div>
@@ -473,7 +473,7 @@ function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
             <select style={{ ...fieldStyle(false), appearance: 'none' }} value={form.section} onChange={e => set('section', e.target.value)}>
               <option value="">Select Batch</option>
               {(groups || []).map(g => (
-                <option key={g.id || g.value || g} value={g.value || g.id || g.name || g}>{g.name || g.label || g.value || g}</option>
+                <option key={g.id || g.name || g} value={g.name || g.value || g.id || g}>{g.name || g.label || g.value || g}</option>
               ))}
             </select>
           </div>
@@ -1017,7 +1017,7 @@ export default function StudentDirectory() {
         </ControlSelect>
         <ControlSelect value={filterSemester} onChange={setFilterSemester} style={{ flex: '1 1 160px', minWidth: 140 }}>
           <option value="">All Semesters</option>
-          {semesters.map(s => <option key={s.id || s.value || s} value={s.value || s.id || s}>{s.label || s.name || `Semester ${s.value || s}`}</option>)}
+          {semesters.map(s => <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s}>{s.label || s.name || `Semester ${s.number || s.value || s}`}</option>)}
         </ControlSelect>
         <ControlSelect value={filterStatus} onChange={setFilterStatus} style={{ flex: '0 0 140px' }}>
           <option value="all">All Status</option>
