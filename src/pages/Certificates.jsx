@@ -47,6 +47,9 @@ const Certificates = () => {
     const [selectedRequestIds, setSelectedRequestIds] = useState([]);
     const [selectedSheet, setSelectedSheet] = useState('Form Responses 1');
     const [diagnostics, setDiagnostics] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [explorerData, setExplorerData] = useState({ headers: [], rows: [] });
 
     const CONSTANTS = {
         FORM: "Form Responses 1",
