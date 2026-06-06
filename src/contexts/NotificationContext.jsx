@@ -57,7 +57,7 @@ export const NotificationProvider = ({ children }) => {
     const lastLoginUid = useRef(null);
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
-    // Helper: Register SW with config params
+    // Helper: Register SW with config params and wait until active
     const registerFCMWorker = async () => {
         if (!('serviceWorker' in navigator)) return null;
         try {
@@ -66,7 +66,10 @@ export const NotificationProvider = ({ children }) => {
                 if (value) params.append(key, value);
             }
             const swUrl = `/firebase-messaging-sw.js?${params.toString()}`;
-            const registration = await navigator.serviceWorker.register(swUrl);
+            await navigator.serviceWorker.register(swUrl);
+            
+            // Wait for the Service Worker to be fully active before returning
+            const registration = await navigator.serviceWorker.ready;
             return registration;
         } catch (error) {
             console.error("SW Registration failed:", error);

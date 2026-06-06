@@ -4,6 +4,15 @@
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
 
+// Force immediate activation to prevent getting stuck in "waiting" state
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(clients.claim());
+});
+
 // Parse Firebase config from the URL query parameters
 const urlParams = new URLSearchParams(self.location.search);
 const firebaseConfig = {
