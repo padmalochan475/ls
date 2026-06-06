@@ -127,11 +127,29 @@ export const sendNotification = async ({
                 })
             });
 
-            if (apiRes.ok) pushStatus = "sent";
-            else console.warn("Push API Warning:", await apiRes.text());
+            if (apiRes.ok) {
+                const responseData = await apiRes.json();
+                if (responseData.success) {
+                    pushStatus = "sent";
+                } else {
+                    console.warn("Push API Warning:", responseData.message || "Failed to send to any tokens.");
+                    pushStatus = "no_devices";
+                }
+            } else {
+                console.warn("Push API Error:", await apiRes.text());
+                pushStatus = "failed";
+            }
         } catch (err) {
             console.error("Push Notification API Error (Non-Fatal):", err);
             pushStatus = "failed";
+        }
+
+        // We use pushStatus to determine the overall success logic for the toast UI
+        if (pushStatus === "no_devices") {
+            return { success: false, count: 0, pushStatus, message: "Target users have no push devices registered." };
+        }
+        if (pushStatus === "failed") {
+            return { success: false, count: 0, pushStatus, message: "Server error while sending push." };
         }
 
         return { success: true, count: targetUids.length, pushStatus };

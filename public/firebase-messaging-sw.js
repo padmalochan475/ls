@@ -33,11 +33,18 @@ if (firebaseConfig.projectId) {
     messaging.onBackgroundMessage((payload) => {
         console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-        // Customize notification here
-        const notificationTitle = payload.notification?.title || payload.data?.title || 'New Notification';
+        // If Firebase already received a 'notification' object, the FCM SDK automatically displays it.
+        // Trying to manually call showNotification here will cause duplicate popups or glitch out on Android/Windows.
+        if (payload.notification) {
+            console.log('FCM handles the display automatically because payload.notification exists.');
+            return;
+        }
+
+        // Only handle data-only messages manually
+        const notificationTitle = payload.data?.title || 'New Notification';
         const notificationOptions = {
-            body: payload.notification?.body || payload.data?.body || '',
-            icon: payload.notification?.icon || payload.data?.icon || 'https://cdn-icons-png.flaticon.com/512/2522/2522055.png',
+            body: payload.data?.body || '',
+            icon: payload.data?.icon || 'https://cdn-icons-png.flaticon.com/512/2522/2522055.png',
             data: payload.data || {},
         };
 
