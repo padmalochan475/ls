@@ -58,9 +58,18 @@ export const NotificationProvider = ({ children }) => {
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
     // Helper: Register SW with config params and wait until active
-    const registerFCMWorker = async () => {
+    const registerFCMWorker = async (forceReinstall = false) => {
         if (!('serviceWorker' in navigator)) return null;
         try {
+            if (forceReinstall) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const reg of regs) {
+                    await reg.unregister();
+                }
+                // Small delay to allow browser to clean up SW thread
+                await new Promise(res => setTimeout(res, 500));
+            }
+
             const params = new URLSearchParams();
             for (const [key, value] of Object.entries(firebaseConfig)) {
                 if (value) params.append(key, value);
@@ -100,19 +109,40 @@ export const NotificationProvider = ({ children }) => {
 
                 // Auto-Heal: If permission is already granted, silently get token
                 if ('Notification' in window && Notification.permission === 'granted' && messaging && vapidKey) {
+                    let swReg;
+                    let token;
+                    
                     try {
-                        const swReg = await registerFCMWorker();
-                        const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
-                        if (token) {
-                            setFcmToken(token);
-                            await updateDoc(doc(db, 'users', currentUser.uid), {
-                                fcmTokens: arrayUnion(token),
-                                webPushActive: true,
-                                lastSeen: new Date()
-                            });
-                        }
+                        swReg = await registerFCMWorker();
+                        token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
                     } catch (e) {
-                        console.error("Auto-sync FCM Error:", e);
+                        console.warn("FCM initial sync failed, attempting self-heal...", e);
+                        // Deep Self-Heal Protocol
+                        try {
+                            // Wipe the corrupted token from browser DB if possible
+                            await deleteToken(messaging).catch(() => null);
+                            // Violently purge all service workers
+                            swReg = await registerFCMWorker(true);
+                            // Attempt fresh token generation
+                            token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
+                            console.log("FCM Self-heal successful. New token generated.");
+                        } catch (healError) {
+                            console.error("FCM Self-Heal completely failed:", healError);
+                        }
+                    }
+
+                    if (token) {
+                        setFcmToken(token);
+                        let deviceId = localStorage.getItem('lams_device_id');
+                        const updateData = {
+                            fcmTokens: arrayUnion(token),
+                            webPushActive: true,
+                            lastSeen: new Date()
+                        };
+                        if (deviceId) {
+                            updateData[`fcmDeviceTokens.${deviceId}`] = token;
+                        }
+                        await updateDoc(doc(db, 'users', currentUser.uid), updateData);
                     }
                 }
             } else if (lastLoginUid.current) {
@@ -120,9 +150,18 @@ export const NotificationProvider = ({ children }) => {
                 try {
                     if (messaging && fcmToken) {
                         await deleteToken(messaging);
-                        await updateDoc(doc(db, 'users', lastLoginUid.current), {
+                        
+                        const removeData = {
                             fcmTokens: arrayRemove(fcmToken)
-                        });
+                        };
+                        let deviceId = localStorage.getItem('lams_device_id');
+                        if (deviceId) {
+                            // Delete the specific device token field via FieldValue.delete()
+                            const { deleteField } = await import('firebase/firestore');
+                            removeData[`fcmDeviceTokens.${deviceId}`] = deleteField();
+                        }
+
+                        await updateDoc(doc(db, 'users', lastLoginUid.current), removeData);
                         setFcmToken(null);
                     }
                 } catch (e) {
@@ -152,16 +191,37 @@ export const NotificationProvider = ({ children }) => {
             
             if (permissionResult === 'granted') {
                 toast.loading("Generating Secure Key...", { id: 'push-register' });
-                const swReg = await registerFCMWorker();
-                const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
+                
+                let swReg;
+                let token;
+                
+                try {
+                    swReg = await registerFCMWorker();
+                    token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
+                } catch (e) {
+                    console.warn("Manual push registration failed, self-healing...", e);
+                    try {
+                        await deleteToken(messaging).catch(() => null);
+                        swReg = await registerFCMWorker(true);
+                        token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
+                    } catch (healError) {
+                        console.error("Manual push self-heal failed:", healError);
+                        throw healError; // bubble to outer catch
+                    }
+                }
                 
                 if (token) {
                     setFcmToken(token);
                     if (currentUser?.uid) {
-                        await updateDoc(doc(db, 'users', currentUser.uid), {
+                        let deviceId = localStorage.getItem('lams_device_id');
+                        const updateData = {
                             fcmTokens: arrayUnion(token),
                             webPushActive: true
-                        });
+                        };
+                        if (deviceId) {
+                            updateData[`fcmDeviceTokens.${deviceId}`] = token;
+                        }
+                        await updateDoc(doc(db, 'users', currentUser.uid), updateData);
                     }
                     toast.success("Notifications Enabled!", { id: 'push-register' });
                 }
