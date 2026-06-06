@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { db, messaging } from '../lib/firebase';
 import firebaseConfig from '../lib/firebaseConfig';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { getToken, onMessage, deleteToken } from 'firebase/messaging';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
@@ -156,8 +156,6 @@ export const NotificationProvider = ({ children }) => {
                         };
                         let deviceId = localStorage.getItem('lams_device_id');
                         if (deviceId) {
-                            // Delete the specific device token field via FieldValue.delete()
-                            const { deleteField } = await import('firebase/firestore');
                             removeData[`fcmDeviceTokens.${deviceId}`] = deleteField();
                         }
 

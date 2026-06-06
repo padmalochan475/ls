@@ -77,6 +77,9 @@ export default async function handler(req, res) {
             const usersSnap = await admin.firestore().collection('users').get();
             usersSnap.forEach(doc => {
                 const userData = doc.data();
+                if (userData.fcmDeviceTokens) {
+                    tokens.push(...Object.values(userData.fcmDeviceTokens));
+                }
                 if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
                     tokens.push(...userData.fcmTokens);
                 } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
@@ -95,6 +98,9 @@ export default async function handler(req, res) {
                     userDocs.forEach(userDoc => {
                         if (userDoc.exists) {
                             const userData = userDoc.data();
+                            if (userData.fcmDeviceTokens) {
+                                tokens.push(...Object.values(userData.fcmDeviceTokens));
+                            }
                             if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
                                 tokens.push(...userData.fcmTokens);
                             } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
