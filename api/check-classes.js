@@ -43,15 +43,24 @@ async function sendFCM(target, title, body, data, targetType = 'external_id', op
             });
         } else {
             const uids = Array.isArray(target) ? target : [target];
-            for (const uid of uids) {
-                const userDoc = await db.collection('users').doc(uid).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
-                        tokens.push(...userData.fcmTokens);
-                    } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
-                        tokens.push(userData.fcmToken);
-                    }
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < uids.length; i += CHUNK_SIZE) {
+                const chunkUids = uids.slice(i, i + CHUNK_SIZE);
+                const refs = chunkUids.map(uid => db.collection('users').doc(uid));
+                try {
+                    const userDocs = await db.getAll(...refs);
+                    userDocs.forEach(userDoc => {
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                                tokens.push(...userData.fcmTokens);
+                            } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
+                                tokens.push(userData.fcmToken);
+                            }
+                        }
+                    });
+                } catch (err) {
+                    console.error("Batch fetch error for tokens:", err);
                 }
             }
         }

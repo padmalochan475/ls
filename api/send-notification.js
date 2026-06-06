@@ -84,16 +84,26 @@ export default async function handler(req, res) {
                 }
             });
         } else {
-            // Find by uids
-            for (const uid of targetUids) {
-                const userDoc = await admin.firestore().collection('users').doc(uid).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
-                        tokens.push(...userData.fcmTokens);
-                    } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
-                        tokens.push(userData.fcmToken);
-                    }
+            // Find by uids using batched getAll for extreme speed and to avoid Vercel 10s timeouts
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < targetUids.length; i += CHUNK_SIZE) {
+                const chunkUids = targetUids.slice(i, i + CHUNK_SIZE);
+                const refs = chunkUids.map(uid => admin.firestore().collection('users').doc(uid));
+                
+                try {
+                    const userDocs = await admin.firestore().getAll(...refs);
+                    userDocs.forEach(userDoc => {
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                                tokens.push(...userData.fcmTokens);
+                            } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
+                                tokens.push(userData.fcmToken);
+                            }
+                        }
+                    });
+                } catch (err) {
+                    console.error("Batch fetch error for tokens:", err);
                 }
             }
         }

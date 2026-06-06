@@ -44,18 +44,34 @@ export const sendNotification = async ({
             return { success: false, message: 'No valid users found' };
         }
 
-        // 2. Add to In-App Notification History (Firestore)
-        const historyPromises = targetUids.map(uid =>
-            addDoc(collection(db, 'users', uid, 'notifications'), {
+        // 2. Add to In-App Notification History (Firestore) using Batches for scalability
+        const { writeBatch } = await import('firebase/firestore');
+        const batchArray = [];
+        let currentBatch = writeBatch(db);
+        let operationCounter = 0;
+
+        for (const uid of targetUids) {
+            const notifRef = doc(collection(db, 'users', uid, 'notifications'));
+            currentBatch.set(notifRef, {
                 title,
                 body,
                 type,
                 read: false,
                 createdAt: serverTimestamp(),
                 ...data
-            })
-        );
-        await Promise.all(historyPromises);
+            });
+            operationCounter++;
+
+            if (operationCounter === 450) {
+                batchArray.push(currentBatch.commit());
+                currentBatch = writeBatch(db);
+                operationCounter = 0;
+            }
+        }
+        if (operationCounter > 0) {
+            batchArray.push(currentBatch.commit());
+        }
+        await Promise.all(batchArray);
 
         // 3. WHATSAPP INTEGRATION (Dynamic Template Engine)
         const getWhatsAppTemplate = (profile) => {
@@ -90,23 +106,27 @@ export const sendNotification = async ({
             }
         };
 
-        const whatsappPromises = targetUids.map(async (uid) => {
-            try {
-                const userSnap = await getDoc(doc(db, 'users', uid));
-                if (userSnap.exists()) {
-                    const profile = userSnap.data();
-                    if (profile.mobile && profile.whatsappEnabled !== false) {
-                        const waMessage = getWhatsAppTemplate(profile);
-                        return sendWhatsAppNotification(profile.mobile, waMessage);
+        // SAFETY LOCK: Prevent browser freeze and WhatsApp Bot DDOS on massive broadcasts
+        if (targetUids.length <= 25) {
+            const whatsappPromises = targetUids.map(async (uid) => {
+                try {
+                    const userSnap = await getDoc(doc(db, 'users', uid));
+                    if (userSnap.exists()) {
+                        const profile = userSnap.data();
+                        if (profile.mobile && profile.whatsappEnabled !== false) {
+                            const waMessage = getWhatsAppTemplate(profile);
+                            return sendWhatsAppNotification(profile.mobile, waMessage);
+                        }
                     }
+                } catch (err) {
+                    console.warn(`WhatsApp skip for ${uid}:`, err.message);
                 }
-            } catch (err) {
-                console.warn(`WhatsApp skip for ${uid}:`, err.message);
-            }
-            return null;
-        });
-        // We don't await all WhatsApp calls to block the flow, but we initiate them
-        Promise.all(whatsappPromises).catch(err => console.error("WhatsApp Bulk Error:", err));
+                return null;
+            });
+            Promise.all(whatsappPromises).catch(err => console.error("WhatsApp Bulk Error:", err));
+        } else {
+            console.log(`Skipping WhatsApp to protect bot from rate limits. Target size: ${targetUids.length}`);
+        }
 
         // 4. Send Push Notification via Serverless API
         let pushStatus = "skipped";
