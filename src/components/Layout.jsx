@@ -31,7 +31,6 @@ import {
 import AcademicYearSelector from './AcademicYearSelector';
 import { useNotifications } from '../contexts/NotificationContext';
 import '../styles/design-system.css';
-import OneSignal from 'react-onesignal';
 import Logo from './Logo';
 import GlobalSearchCommandPalette from './GlobalSearchCommandPalette';
 import AIAssistant from './AIAssistant';
@@ -70,7 +69,7 @@ const Layout = ({ children }) => {
     }, [isProfileDropdownOpen]);
 
     const { userProfile, currentUser, logout, isSystemSyncing, activeAcademicYear } = useAuth();
-    const { permission, registerForPush } = useNotifications();
+    const { permission, registerForPush, fcmToken } = useNotifications();
     
     // For AI Context
     const { faculty, days, timeSlots, rooms, subjects, departments, semesters, holidays } = useMasterData();
@@ -438,26 +437,15 @@ const Layout = ({ children }) => {
 
                     {permission === 'granted' ? (
                         <button
-                            onClick={async () => {
-                                try {
-                                    const eid = OneSignal.User.externalId;
-                                    const currentUid = currentUser?.uid;
-
-                                    if (eid === currentUid) {
-                                        toast.success("Notifications Active & Linked! ✅", {
-                                            icon: '🔔',
-                                            style: { background: '#10b981', color: 'white' }
-                                        });
-                                    } else {
-                                        if (confirm("⚠️ Connection Issue Detected.\n\nYour device is not fully linked to your account.\n\nClick OK to Fix.")) {
-                                            await OneSignal.logout();
-                                            await OneSignal.login(currentUid);
-                                            toast.success("Connection Repaired! 🚀");
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.error(e);
-                                    toast.error("Could not verify status");
+                            onClick={() => {
+                                if (fcmToken) {
+                                    toast.success("Notifications Active & Linked! ✅", {
+                                        icon: '🔔',
+                                        style: { background: '#10b981', color: 'white' }
+                                    });
+                                } else {
+                                    toast.loading("Generating key...", { id: 'push-status' });
+                                    registerForPush().then(() => toast.dismiss('push-status'));
                                 }
                             }}
                             style={{

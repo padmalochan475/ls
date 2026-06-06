@@ -931,6 +931,7 @@ const AdminPanel = () => {
                         <div className="glass-panel-static" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', maxWidth: '300px' }}>
                             <Search size={18} color="var(--color-text-muted)" />
                             <input
+                                id="admin-search-users"
                                 type="text"
                                 placeholder="Search users by name, email, ID..."
                                 value={searchTerm}
@@ -1172,6 +1173,7 @@ const AdminPanel = () => {
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>Full Name {editingUser.empId ? '(Locked)' : ''}</label>
                                 <input
+                                    id="edit-user-name"
                                     type="text"
                                     value={editForm.name}
                                     onChange={e => setEditForm({ ...editForm, name: e.target.value })}
@@ -1188,6 +1190,7 @@ const AdminPanel = () => {
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>Employee ID {editingUser.empId ? '(Locked)' : ''}</label>
                                 <input
+                                    id="edit-user-empid"
                                     type="text"
                                     value={editForm.empId}
                                     onChange={e => setEditForm({ ...editForm, empId: e.target.value })}
@@ -1205,6 +1208,7 @@ const AdminPanel = () => {
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>Date of Birth</label>
                                     <input
+                                        id="edit-user-dob"
                                         type="date"
                                         value={editForm.dob}
                                         onChange={e => setEditForm({ ...editForm, dob: e.target.value })}
@@ -1214,6 +1218,7 @@ const AdminPanel = () => {
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>Joining Date</label>
                                     <input
+                                        id="edit-user-joiningdate"
                                         type="date"
                                         value={editForm.joiningDate}
                                         onChange={e => setEditForm({ ...editForm, joiningDate: e.target.value })}
@@ -1226,6 +1231,7 @@ const AdminPanel = () => {
                                 <label style={{ fontSize: '0.9rem', color: '#94a3b8', flex: 1 }}>WhatsApp Notifications</label>
                                 <label className="switch">
                                     <input
+                                        id="edit-user-whatsapp"
                                         type="checkbox"
                                         checked={editForm.whatsappEnabled}
                                         onChange={e => setEditForm({ ...editForm, whatsappEnabled: e.target.checked })}

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import OneSignal from 'react-onesignal';
-import { db } from '../lib/firebase';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db, messaging } from '../lib/firebase';
+import firebaseConfig from '../lib/firebaseConfig';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { getToken, onMessage, deleteToken } from 'firebase/messaging';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
@@ -11,8 +12,10 @@ const NotificationContext = createContext();
 export const useNotifications = () => useContext(NotificationContext);
 
 const ForegroundToast = ({ notification, t }) => {
-    const data = notification.additionalData;
-    const primaryUrl = data?.url || notification.launchURL;
+    const data = notification.data || {};
+    const primaryUrl = data?.url || '/';
+    const title = notification.notification?.title || data?.title || 'Notification';
+    const body = notification.notification?.body || data?.body || '';
 
     return (
         <div
@@ -39,8 +42,8 @@ const ForegroundToast = ({ notification, t }) => {
                 {data?.type === 'urgent' ? '🚨' : '🔔'}
             </div>
             <div>
-                <div style={{ fontWeight: '700', color: '#60a5fa' }}>{notification.title}</div>
-                <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>{notification.body}</div>
+                <div style={{ fontWeight: '700', color: '#60a5fa' }}>{title}</div>
+                <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>{body}</div>
             </div>
         </div>
     );
@@ -50,144 +53,127 @@ export const NotificationProvider = ({ children }) => {
     const { currentUser } = useAuth();
     const [initialized, setInitialized] = useState(false);
     const [permission, setPermission] = useState(Notification.permission);
-    const [oneSignalId, setOneSignalId] = useState(null);
+    const [fcmToken, setFcmToken] = useState(null);
     const lastLoginUid = useRef(null);
+    const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
-    // 1. Initialize OneSignal (Run Once)
+    // Helper: Register SW with config params
+    const registerFCMWorker = async () => {
+        if (!('serviceWorker' in navigator)) return null;
+        try {
+            const params = new URLSearchParams(firebaseConfig).toString();
+            const swUrl = `/firebase-messaging-sw.js?${params}`;
+            const registration = await navigator.serviceWorker.register(swUrl);
+            return registration;
+        } catch (error) {
+            console.error("SW Registration failed:", error);
+            return null;
+        }
+    };
+
+    // 1. Initial Setup & Foreground Listener
     useEffect(() => {
-        const runInit = async () => {
+        setInitialized(true);
+
+        if (messaging) {
             try {
-                if (window.OneSignalInitialized) return;
-                window.OneSignalInitialized = true;
-
-                await OneSignal.init({
-                    appId: import.meta.env.VITE_ONESIGNAL_APP_ID || "6764f541-4220-4ffd-85d2-6660b86d5a48",
-                    allowLocalhostAsSecureOrigin: true,
-                    notifyButton: { enable: false },
+                onMessage(messaging, (payload) => {
+                    toast.custom((t) => <ForegroundToast notification={payload} t={t} />, { duration: 8000, position: 'top-right' });
                 });
-
-                setInitialized(true);
-            } catch (error) {
-                if (error.message?.includes("Can only be used on") && window.location.hostname === 'localhost') {
-                    console.warn("OneSignal: Testing only on Production. Normal.");
-                } else {
-                    console.error("OneSignal Init Error:", error);
-                }
-            }
-        };
-
-        runInit();
+            } catch (e) { console.warn("FCM onMessage error:", e); }
+        }
     }, []);
 
-    // 2. Handle User Identity (Login/Logout)
+    // 2. Handle User Identity (Sync & Auto-Healing)
     useEffect(() => {
         if (!initialized) return;
 
-        if (currentUser?.uid) {
-            try {
-                if (typeof currentUser.uid === 'string' && currentUser.uid.trim() !== '') {
-                    if (lastLoginUid.current !== currentUser.uid) {
-                        OneSignal.login(currentUser.uid);
-                        lastLoginUid.current = currentUser.uid;
-                        toast.success("Device Linked to User!", { id: 'os-sync', icon: '🔗' });
-                    }
-                }
-            } catch (e) {
-                console.warn("OneSignal Login Failed", e);
-            }
-
-            // Foreground Listener
-            try {
-                OneSignal.Notifications?.addEventListener('foregroundWillDisplay', (event) => {
-                    event.preventDefault();
-                    toast.custom((t) => <ForegroundToast notification={event.notification} t={t} />, { duration: 8000, position: 'top-right' });
-                });
-            } catch (e) { console.warn("OneSignal foreground event error:", e); }
-
-        } else if (lastLoginUid.current) {
-            try {
-                OneSignal.logout();
-                lastLoginUid.current = null;
-            } catch (e) { console.warn("OneSignal logout error:", e); }
-        }
-    }, [currentUser, initialized]);
-
-    // 3. Sync Subscription to Firestore
-    useEffect(() => {
-        if (!initialized || !currentUser) return;
-
         const syncUser = async () => {
-            try {
-                let id = OneSignal.User?.PushSubscription?.id;
-                let optedIn = OneSignal.User?.PushSubscription?.optedIn;
+            if (currentUser?.uid) {
+                lastLoginUid.current = currentUser.uid;
 
-                if (Notification.permission === 'granted' && !id) {
-                    for (let i = 0; i < 5; i++) {
-                        await new Promise(r => setTimeout(r, 1000));
-                        id = OneSignal.User?.PushSubscription?.id;
-                        optedIn = OneSignal.User?.PushSubscription?.optedIn;
-                        if (id) break;
+                // Auto-Heal: If permission is already granted, silently get token
+                if (Notification.permission === 'granted' && messaging && vapidKey) {
+                    try {
+                        const swReg = await registerFCMWorker();
+                        const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
+                        if (token) {
+                            setFcmToken(token);
+                            await updateDoc(doc(db, 'users', currentUser.uid), {
+                                fcmTokens: arrayUnion(token),
+                                webPushActive: true,
+                                lastSeen: new Date()
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Auto-sync FCM Error:", e);
                     }
                 }
-
-                if (optedIn && id) {
-                    setOneSignalId(id);
-                    await updateDoc(doc(db, 'users', currentUser.uid), {
-                        oneSignalId: id,
-                        oneSignalIds: arrayUnion(id),
-                        webPushActive: true,
-                        lastSeen: new Date()
-                    });
+            } else if (lastLoginUid.current) {
+                // Logout logic: Delete the token locally and remotely
+                try {
+                    if (messaging && fcmToken) {
+                        await deleteToken(messaging);
+                        await updateDoc(doc(db, 'users', lastLoginUid.current), {
+                            fcmTokens: arrayRemove(fcmToken)
+                        });
+                        setFcmToken(null);
+                    }
+                } catch (e) {
+                    console.warn("FCM Logout Cleanup Error:", e);
+                } finally {
+                    lastLoginUid.current = null;
                 }
-            } catch (e) { console.error("Sync Error", e); }
+            }
         };
 
         syncUser();
-
-        // 🛡️ Auto-Healer 🛡️
-        const runHealer = async () => {
-            if (!initialized || !currentUser || Notification.permission !== 'granted') return;
-
-            const sw = await navigator.serviceWorker.getRegistration();
-            const osId = OneSignal.User?.PushSubscription?.id;
-
-            if (!sw || !osId) {
-                const attempts = parseInt(sessionStorage.getItem('ah_attempts') || '0');
-                if (attempts > 2) return;
-                sessionStorage.setItem('ah_attempts', (attempts + 1).toString());
-
-                try {
-                    if (!sw) await navigator.serviceWorker.register('/OneSignalSDKWorker.js');
-                    if (!osId) {
-                        await OneSignal.User.PushSubscription.optOut();
-                        setTimeout(() => OneSignal.User.PushSubscription.optIn(), 1000);
-                    }
-                } catch (e) { console.warn("OneSignal auto-healer error:", e); }
-            }
-        };
-
-        const timer = setTimeout(runHealer, 10000);
-        return () => clearTimeout(timer);
-    }, [initialized, currentUser]);
+    }, [currentUser, initialized, fcmToken, vapidKey]);
 
     const registerForPush = useCallback(async () => {
-        if (Notification.permission === 'denied') {
-            alert("Blocked. Enable in browser settings.");
+        if (!messaging) {
+            toast.error("Push messaging not supported in this browser.");
             return;
         }
+        if (!vapidKey) {
+            toast.error("VAPID Key missing. Admin must configure VITE_FIREBASE_VAPID_KEY.");
+            return;
+        }
+        
         try {
-            await OneSignal.Slidedown?.promptPush();
-            OneSignal.User?.PushSubscription?.optIn();
+            const permissionResult = await Notification.requestPermission();
+            setPermission(permissionResult);
+            
+            if (permissionResult === 'granted') {
+                toast.loading("Generating Secure Key...", { id: 'push-register' });
+                const swReg = await registerFCMWorker();
+                const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
+                
+                if (token) {
+                    setFcmToken(token);
+                    if (currentUser?.uid) {
+                        await updateDoc(doc(db, 'users', currentUser.uid), {
+                            fcmTokens: arrayUnion(token),
+                            webPushActive: true
+                        });
+                    }
+                    toast.success("Notifications Enabled!", { id: 'push-register' });
+                }
+            } else {
+                toast.error("Permission Denied. Please unblock in browser settings.");
+            }
+        } catch (e) { 
+            console.error(e);
+            toast.error("Failed to enable notifications.", { id: 'push-register' });
+        }
+    }, [currentUser, vapidKey]);
 
-            setTimeout(() => {
-                setPermission(Notification.permission);
-                const id = OneSignal.User?.PushSubscription?.id;
-                if (id) toast.success("Active!");
-            }, 2000);
-        } catch (e) { console.error(e); }
-    }, []);
-
-    const value = useMemo(() => ({ registerForPush, permission, oneSignalId, initialized }), [registerForPush, permission, oneSignalId, initialized]);
+    const value = useMemo(() => ({ 
+        registerForPush, 
+        permission, 
+        fcmToken, 
+        initialized 
+    }), [registerForPush, permission, fcmToken, initialized]);
 
     return (
         <NotificationContext.Provider value={value}>

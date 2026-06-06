@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .env
 production.env
+.env.vercel
+lint_results.txt
+
 
 service-account.json
 

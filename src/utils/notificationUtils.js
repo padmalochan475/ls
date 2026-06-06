@@ -111,32 +111,27 @@ export const sendNotification = async ({
         // 4. Send Push Notification via Serverless API
         let pushStatus = "skipped";
 
-        if (import.meta.env.DEV) {
-            console.log(`[DEV] Mocking Push Notification: "${title}" to ${targetUids.length} users.`);
-            pushStatus = "dev_mock_success";
-        } else {
-            try {
-                const apiRes = await fetch('/api/send-notification', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-secret-key': import.meta.env.VITE_LAMS_SECRET || 'lams_secure_notification_v1'
-                    },
-                    body: JSON.stringify({
-                        targetUids,
-                        targetType: 'external_id',
-                        title,
-                        body,
-                        data: { ...data, type }
-                    })
-                });
+        try {
+            const apiRes = await fetch('/api/send-notification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-secret-key': import.meta.env.VITE_LAMS_SECRET || 'lams_secure_notification_v1'
+                },
+                body: JSON.stringify({
+                    targetUids,
+                    targetType: 'external_id',
+                    title,
+                    body,
+                    data: { ...data, type }
+                })
+            });
 
-                if (apiRes.ok) pushStatus = "sent";
-                else console.warn("Push API Warning:", await apiRes.text());
-            } catch (err) {
-                console.error("Push Notification API Error (Non-Fatal):", err);
-                pushStatus = "failed";
-            }
+            if (apiRes.ok) pushStatus = "sent";
+            else console.warn("Push API Warning:", await apiRes.text());
+        } catch (err) {
+            console.error("Push Notification API Error (Non-Fatal):", err);
+            pushStatus = "failed";
         }
 
         return { success: true, count: targetUids.length, pushStatus };

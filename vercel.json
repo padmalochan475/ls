@@ -8,20 +8,7 @@
     "trailingSlash": false,
     "headers": [
         {
-            "source": "/OneSignalSDK.sw.js",
-            "headers": [
-                {
-                    "key": "Content-Type",
-                    "value": "application/javascript"
-                },
-                {
-                    "key": "Service-Worker-Allowed",
-                    "value": "/"
-                }
-            ]
-        },
-        {
-            "source": "/OneSignalSDKWorker.js",
+            "source": "/firebase-messaging-sw.js",
             "headers": [
                 {
                     "key": "Content-Type",
@@ -45,12 +32,8 @@
     ],
     "rewrites": [
         {
-            "source": "/OneSignalSDK.sw.js",
-            "destination": "/OneSignalSDK.sw.js"
-        },
-        {
-            "source": "/OneSignalSDKWorker.js",
-            "destination": "/OneSignalSDKWorker.js"
+            "source": "/firebase-messaging-sw.js",
+            "destination": "/firebase-messaging-sw.js"
         },
         {
             "source": "/manifest.json",
@@ -61,7 +44,7 @@
             "destination": "/api/:path*"
         },
         {
-            "source": "/((?!api/|OneSignalSDK.sw.js|OneSignalSDKWorker.js|manifest.json|logo.svg|vite.svg).*)",
+            "source": "/((?!api/|firebase-messaging-sw.js|manifest.json|logo.svg|vite.svg).*)",
             "destination": "/index.html"
         }
     ],

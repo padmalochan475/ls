@@ -253,6 +253,7 @@ const GlobalSearchCommandPalette = ({ isOpen, onClose }) => {
                 <div style={{ display: 'flex', alignItems: 'center', padding: '1.25rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     <Search size={20} color="rgba(255,255,255,0.5)" />
                     <input
+                        id="global-search-input"
                         ref={inputRef}
                         type="text"
                         placeholder="Search assignments, faculty, pages..."

@@ -1,5 +1,47 @@
 /* eslint-env node */
-import axios from 'axios';
+import admin from 'firebase-admin';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+// Singleton Initialization
+if (!admin.apps.length) {
+    try {
+        const pathsToCheck = [
+            join(process.cwd(), 'service-account.json'),
+            join(process.cwd(), 'api', 'service-account.json'),
+            '/var/task/service-account.json'
+        ];
+
+        let serviceAccount;
+        for (const p of pathsToCheck) {
+            try {
+                serviceAccount = JSON.parse(readFileSync(p, 'utf8'));
+                console.log(`Loaded service account from: ${p}`);
+                break;
+            } catch {
+                // Continue
+            }
+        }
+
+        if (!serviceAccount) {
+            if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+                console.log("Loading service account from ENV");
+                serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            } else {
+                console.error("Searched paths:", pathsToCheck);
+                throw new Error("Service Account credentials not found (File or Env)");
+            }
+        }
+
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+        console.log("Firebase Admin Initialized Successfully");
+
+    } catch (error) {
+        console.error("Firebase Admin Init Failed:", error);
+    }
+}
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -7,7 +49,7 @@ export default async function handler(req, res) {
     }
 
     // 🔒 SECURITY: Shared Secret Check
-    const SECURITY_KEY = process.env.LAMS_SECRET;
+    const SECURITY_KEY = process.env.LAMS_SECRET || process.env.VITE_LAMS_SECRET || 'lams_secure_notification_v1';
 
     if (req.headers['x-secret-key'] !== SECURITY_KEY) {
         console.warn("Unauthorized API Access Attempt");
@@ -15,76 +57,100 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log("API: send-notification (OneSignal) called.");
+        console.log("API: send-notification (FCM) called.");
         const { targetUids, title, body, data, targetType } = req.body;
 
-        // Configuration (Dynamic from Env)
-        const ONE_SIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
-        const ONE_SIGNAL_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
+        if (!admin.apps.length) {
+            throw new Error("Firebase Admin not initialized");
+        }
 
         if (targetUids !== 'ALL' && (!targetUids || !Array.isArray(targetUids) || targetUids.length === 0)) {
             console.log("No targets provided.");
             return res.status(200).json({ success: false, successCount: 0, failureCount: 0 });
         }
 
-        console.log(`Sending OneSignal Push to ${targetUids === 'ALL' ? 'ALL USERS' : targetUids.length + ' IDs'} (${targetType || 'auto'})`);
+        console.log(`Sending FCM Push to ${targetUids === 'ALL' ? 'ALL USERS' : targetUids.length + ' IDs'} (${targetType || 'auto'})`);
 
-        let payload = {
-            app_id: ONE_SIGNAL_APP_ID,
-            target_channel: "push",
-            contents: { en: body },
-            chrome_web_icon: data?.icon || "https://cdn-icons-png.flaticon.com/512/2522/2522055.png",
-            headings: { en: title },
-            data: data || {},
-            url: data?.url || req.body.url || "https://lams.vercel.app",
-            priority: 10,
-            android_visibility: 1, // Public on lock screen
-            renotify: true, // Play sound/vibrate 
-            android_group: "lams_manual",
-            android_group_message: { en: "$[notif_count] New Updates" },
-            buttons: req.body.buttons || data?.buttons || [{ id: 'view', text: 'Open App' }]
-        };
-
+        // Fetch tokens for the users
+        let tokens = [];
         if (targetUids === 'ALL') {
-            payload.included_segments = ["Total Subscriptions"];
-        } else if (targetType === 'player_id') {
-            // Direct Targeting (Reliable)
-            payload.include_player_ids = targetUids;
-            // V1 API parameter for player_ids doesn't use channel usually, but safe to keep or remove.
-            // include_player_ids implies push or email based on the ID, but for web push it's standard.
+            const usersSnap = await admin.firestore().collection('users').get();
+            usersSnap.forEach(doc => {
+                const userData = doc.data();
+                if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                    tokens.push(...userData.fcmTokens);
+                } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
+                    tokens.push(userData.fcmToken);
+                }
+            });
         } else {
-            // Default to Alias
-            payload.include_aliases = { "external_id": targetUids };
+            // Find by uids
+            for (const uid of targetUids) {
+                const userDoc = await admin.firestore().collection('users').doc(uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                        tokens.push(...userData.fcmTokens);
+                    } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
+                        tokens.push(userData.fcmToken);
+                    }
+                }
+            }
         }
 
-        // OneSignal API v1
-        const response = await axios.post('https://onesignal.com/api/v1/notifications', payload, {
-            headers: {
-                "Authorization": `Basic ${ONE_SIGNAL_API_KEY}`,
-                "Content-Type": "application/json"
-            }
-        });
+        // Deduplicate tokens
+        tokens = [...new Set(tokens)].filter(t => t && typeof t === 'string');
 
-        console.log("OneSignal Response:", response.data);
+        if (tokens.length === 0) {
+            console.log("No valid FCM tokens found for the targets.");
+            return res.status(200).json({ success: false, successCount: 0, failureCount: 1, message: "No devices registered for push." });
+        }
+
+        const message = {
+            notification: {
+                title: title || 'LAMS Update',
+                body: body || 'You have a new notification.'
+            },
+            data: data || {},
+            tokens: tokens
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(message);
+        
+        console.log(`FCM sendMulticast result: ${response.successCount} successful, ${response.failureCount} failed.`);
+        
+        // Clean up invalid tokens
+        if (response.failureCount > 0) {
+            const failedTokens = [];
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    const error = resp.error;
+                    if (error.code === 'messaging/invalid-registration-token' ||
+                        error.code === 'messaging/registration-token-not-registered') {
+                        failedTokens.push(tokens[idx]);
+                    }
+                }
+            });
+            
+            if (failedTokens.length > 0) {
+                console.log(`Need to clean up ${failedTokens.length} dead tokens (This usually is done via client sync, but could be handled here).`);
+            }
+        }
+
         return res.status(200).json({
             success: true,
-            id: response.data.id,
-            recipients: response.data.recipients,
-            errors: response.data.errors, // Explicitly return errors
-            full_response: response.data
+            successCount: response.successCount,
+            failureCount: response.failureCount,
+            errors: [] // FCM handles its own errors per token
         });
 
     } catch (error) {
-        console.error('OneSignal API Error:', error.response?.data || error.message);
-
-        // Handle "No subscribers" error gracefully
-        if (error.response?.data?.errors?.includes("All included players are not subscribed")) {
-            return res.status(200).json({ success: false, successCount: 0, failureCount: 1, message: "User not subscribed yet" });
-        }
+        console.error('FCM API Error:', error);
 
         return res.status(500).json({
             error: 'Internal Server Error',
-            details: error.response?.data || error.message
+            details: error.message
         });
     }
 }
+

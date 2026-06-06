@@ -23,52 +23,60 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-// OneSignal Config (Dynamic from Env)
-const ONE_SIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
-const ONE_SIGNAL_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
-
-async function sendOneSignal(target, title, body, data, targetType = 'external_id', options = {}) {
+async function sendFCM(target, title, body, data, targetType = 'external_id', options = {}) {
     if (!target) return false;
     if (Array.isArray(target) && target.length === 0) return false;
 
     try {
-        console.log(`Sending OneSignal... Target: ${Array.isArray(target) ? target.length + ' IDs' : target} (${targetType})`);
+        console.log(`Sending FCM... Target: ${Array.isArray(target) ? target.length + ' IDs' : target} (${targetType})`);
 
-        let payload = {
-            app_id: ONE_SIGNAL_APP_ID,
-            target_channel: "push",
-            contents: { en: body },
-            headings: { en: title },
-            data: data || {},
-            priority: 10,
-            url: "https://lams.vercel.app",
-            collapse_id: options.collapse_id,
-            ttl: options.ttl || 1800,
-            android_channel_id: options.android_channel_id || "lams_alerts",
-            android_group: options.group || 'lams_updates',
-            android_group_message: { en: "$[notif_count] New Updates" },
-            android_visibility: 1, // Public on lock screen
-            locked: true,
-            renotify: true
-        };
-
+        let tokens = [];
         if (target === 'ALL') {
-            payload.included_segments = ["Total Subscriptions"];
-        } else if (targetType === 'player_id') {
-            payload.include_player_ids = target;
+            const usersSnap = await db.collection('users').get();
+            usersSnap.forEach(doc => {
+                const userData = doc.data();
+                if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                    tokens.push(...userData.fcmTokens);
+                } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
+                    tokens.push(userData.fcmToken);
+                }
+            });
         } else {
-            payload.include_aliases = { "external_id": target };
+            const uids = Array.isArray(target) ? target : [target];
+            for (const uid of uids) {
+                const userDoc = await db.collection('users').doc(uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                        tokens.push(...userData.fcmTokens);
+                    } else if (userData.fcmToken && typeof userData.fcmToken === 'string') {
+                        tokens.push(userData.fcmToken);
+                    }
+                }
+            }
         }
 
-        await axios.post('https://onesignal.com/api/v1/notifications', payload, {
-            headers: {
-                "Authorization": `Basic ${ONE_SIGNAL_API_KEY}`,
-                "Content-Type": "application/json"
-            }
-        });
-        return true;
+        tokens = [...new Set(tokens)].filter(t => t && typeof t === 'string');
+
+        if (tokens.length === 0) {
+            console.log("No FCM tokens found.");
+            return false;
+        }
+
+        const message = {
+            notification: {
+                title: title,
+                body: body
+            },
+            data: data || {},
+            tokens: tokens
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(message);
+        console.log(`FCM Result: ${response.successCount} successful, ${response.failureCount} failed.`);
+        return response.successCount > 0;
     } catch (e) {
-        console.error("OneSignal Error:", e.response?.data || e.message);
+        console.error("FCM Error:", e.message);
         return false;
     }
 }
@@ -116,10 +124,11 @@ export default async function handler(req, res) {
         axios.get('https://lams-whatsapp-bot.onrender.com/').catch(() => {});
 
         // 2. Parallel Fetch of settings and today's holiday status
-        const [configSnap, notifSnap, holidaySnap] = await Promise.all([
+        const [configSnap, notifSnap, holidaySnap, templateSnap] = await Promise.all([
             db.collection('settings').doc('config').get(),
             db.collection('settings').doc('notifications').get(),
-            db.collection('settings').where('date', '==', todayDateStr).get()
+            db.collection('settings').where('date', '==', todayDateStr).get(),
+            db.collection('settings').doc('templates').get()
         ]);
 
         const activeAcademicYear = configSnap.exists ? configSnap.data().activeAcademicYear : '2024-2025';
@@ -127,6 +136,16 @@ export default async function handler(req, res) {
         const warn1Min = parseInt(notifSettings.firstWarning) || 15;
         const warn2Min = parseInt(notifSettings.secondWarning) || 5;
         const holidayTime = notifSettings.holidayTime || '09:00';
+
+        // 2.5 Template Engine
+        const tplData = templateSnap.exists ? templateSnap.data() : {};
+        const formatMsg = (key, defaultText, vars) => {
+            let str = tplData[key] || defaultText;
+            for (const [vKey, vVal] of Object.entries(vars)) {
+                str = str.replace(new RegExp(`{${vKey}}`, 'g'), vVal);
+            }
+            return str;
+        };
 
         // 3. CHECK HOLIDAYS
         const holidayDoc = holidaySnap.docs.find(d => d.data().type === 'holiday');
@@ -141,15 +160,10 @@ export default async function handler(req, res) {
             const alreadySentHoliday = await db.collection('sent_notifications').doc(notifIdHoliday).get();
 
             if (!alreadySentHoliday.exists && nowIST >= holidayAlertTime) {
-                    const title = '🎉 Holiday Alert';
-                    const body = `Today is ${h.name}. No classes today. Enjoy!`;
+                    const title = formatMsg('holiday_push_title', '🎉 Holiday Alert', { holiday_name: h.name });
+                    const body = formatMsg('holiday_push_body', 'Today is {holiday_name}. No classes today. Enjoy!', { holiday_name: h.name });
                     
-                    const success = await sendOneSignal(
-                        'ALL',
-                        title,
-                        body,
-                        { type: 'holiday', date: todayDateStr }
-                    );
+                    const success = await sendFCM('ALL', title, body, { type: 'holiday', date: todayDateStr });
 
                     // WhatsApp Holiday Broadcast
                     try {
@@ -167,7 +181,7 @@ export default async function handler(req, res) {
                             };
                         }).filter(u => u.mobile && u.whatsappEnabled);
                         
-                        const waMsg = `🎉 *LAMS Holiday Alert* 🎉\n\nToday is *${h.name}*.\nNo classes today. Enjoy!\n\n_System Admin_`;
+                        const waMsg = formatMsg('holiday_wa', '🎉 *LAMS Holiday Alert* 🎉\n\nToday is *{holiday_name}*.\nNo classes today. Enjoy!\n\n_System Admin_', { holiday_name: h.name });
                         
                         await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
                     } catch (waErr) {
@@ -211,7 +225,7 @@ export default async function handler(req, res) {
                         if (fac.dob) {
                             const [bYear, bMonth, bDay] = fac.dob.split('-').map(Number);
                             if (bMonth === todayMonth && bDay === todayDay) {
-                                let bdayMsg = `🎂 *Happy Birthday, ${fac.name}!* 🎂\n\nOn behalf of the entire college, we wish you a fantastic day filled with joy and a year ahead full of success and happiness. Keep inspiring! ✨\n\n_Best Wishes,_\n*LAMS Administration*`;
+                                let bdayMsg = formatMsg('birthday_wa', `🎂 *Happy Birthday, {name}!* 🎂\n\nOn behalf of the entire college, we wish you a fantastic day filled with joy and a year ahead full of success and happiness. Keep inspiring! ✨\n\n_Best Wishes,_\n*LAMS Administration*`, { name: fac.name });
                                 greetingTasks.push(sendWhatsApp(targetNumber, bdayMsg));
                                 console.log(`Birthday greeting triggered for ${fac.name}`);
                             }
@@ -223,7 +237,7 @@ export default async function handler(req, res) {
                             if (jMonth === todayMonth && jDay === todayDay) {
                                 const yearsCompleted = nowIST.getFullYear() - jYear;
                                 if (yearsCompleted > 0) {
-                                    let annMsg = `🎊 *Work Anniversary Celebration* 🎊\n\nCongratulations *${fac.name}* on completing *${yearsCompleted} ${yearsCompleted === 1 ? 'year' : 'years'}* with our institution! 🏫\n\nThank you for your dedication, hard work, and the positive impact you've made. We are proud to have you on our team!\n\n_Warm Regards,_\n*College Management*`;
+                                    let annMsg = formatMsg('anniversary_wa', `🎊 *Work Anniversary Celebration* 🎊\n\nCongratulations *{name}* on completing *{years}* with our institution! 🏫\n\nThank you for your dedication, hard work, and the positive impact you've made. We are proud to have you on our team!\n\n_Warm Regards,_\n*College Management*`, { name: fac.name, years: `${yearsCompleted} ${yearsCompleted === 1 ? 'year' : 'years'}` });
                                     greetingTasks.push(sendWhatsApp(targetNumber, annMsg));
                                     console.log(`Anniversary greeting triggered for ${fac.name} (${yearsCompleted} years)`);
                                 }
@@ -283,7 +297,7 @@ export default async function handler(req, res) {
                         );
 
                         if (mySchedule.length > 0) {
-                            let previewMsg = `🗓️ *Weekly Preview for ${target.name}* 🗓️\n\nPrep for the upcoming week! You have *${mySchedule.length} sessions* scheduled.\n\n`;
+                            let previewMsg = formatMsg('weekly_header', `🗓️ *Weekly Preview for {name}* 🗓️\n\nPrep for the upcoming week! You have *{total_sessions} sessions* scheduled.\n\n`, { name: target.name, total_sessions: mySchedule.length });
                             
                             // Group by day
                             const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -294,7 +308,7 @@ export default async function handler(req, res) {
                                 }
                             });
 
-                            previewMsg += `\n🌐 _Check the portal for full timetable._\nGood luck for the week! 💪`;
+                            previewMsg += formatMsg('weekly_footer', `\n🌐 _Check the portal for full timetable._\nGood luck for the week! 💪`, {});
                             await sendWhatsApp(target.mobile, previewMsg);
                         }
                     }));
@@ -361,8 +375,7 @@ export default async function handler(req, res) {
                                 // Sort by time
                                 targetClasses.sort((a,b) => parseTimeStr(a.time.split(' - ')[0], nowIST) - parseTimeStr(b.time.split(' - ')[0], nowIST));
 
-                                let waMsg = `📅 *Today's Briefing: ${target.name}* 📅\n`;
-                                waMsg += `Day: *${dayName}* | Classes: *${targetClasses.length}*\n\n`;
+                                let waMsg = formatMsg('morning_header', `📅 *Today's Briefing: {name}* 📅\nDay: *{day}* | Classes: *{total_classes}*\n\n`, { name: target.name, day: dayName, total_classes: targetClasses.length });
                                 
                                 targetClasses.forEach((cls, idx) => {
                                     const sub = subsMap.get(cls.id);
@@ -384,7 +397,7 @@ export default async function handler(req, res) {
                                     waMsg += `\n`;
                                 });
 
-                                waMsg += `Have a productive day! ✨\n_LAMS Admin_`;
+                                waMsg += formatMsg('morning_footer', `Have a productive day! ✨\n_LAMS Admin_`, { name: target.name });
                                 await sendWhatsApp(target.mobile, waMsg);
                             }
                         }));
@@ -472,19 +485,18 @@ export default async function handler(req, res) {
                 const targetPayload = finalUsers.map(u => u.uid).filter(Boolean);
                 if (targetPayload.length === 0) return;
 
-                const getAICopy = (min, sub, grp, room) => {
-                    if (min <= 5) return `🚀 ACTION: Run to Room ${room}! ${sub} (${grp}) is starting NOW!`;
-                    return `🔔 Heads Up: ${sub} (${grp}) starts in ${min} mins at Room ${room}.`;
-                };
-
                 // Triggers
                 if (minutesLeft > warn2Min && minutesLeft <= (warn1Min + 5)) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_first`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
-                        const msg = getAICopy(minutesLeft, cls.subject, groupStr, cls.room);
-                        await sendOneSignal(targetPayload, 'Upcoming Class', msg, { type: 'class_reminder', id: cls.id }, 'external_id');
-                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled !== false).map(u => sendWhatsApp(u.mobile, `🔔 *Upcoming* 🔔\n\n${msg}`)));
+                        const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft };
+                        const pushTitle = formatMsg('warn1_push_title', 'Upcoming Class', vars);
+                        const pushBody = formatMsg('warn1_push_body', '🔔 Heads Up: {subject} ({group}) starts in {mins} mins at Room {room}.', vars);
+                        const waMsg = formatMsg('warn1_wa', '🔔 *Upcoming* 🔔\n\n🔔 Heads Up: {subject} ({group}) starts in {mins} mins at Room {room}.', vars);
+
+                        await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
+                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled !== false).map(u => sendWhatsApp(u.mobile, waMsg)));
                         await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning' });
                         sentCount++;
                     }
@@ -494,9 +506,13 @@ export default async function handler(req, res) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_second`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
-                        const msg = getAICopy(minutesLeft, cls.subject, groupStr, cls.room);
-                        await sendOneSignal(targetPayload, 'Class Starting!', msg, { type: 'class_reminder', id: cls.id }, 'external_id');
-                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled !== false).map(u => sendWhatsApp(u.mobile, `🚀 *Now* 🚀\n\n${msg}`)));
+                        const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft };
+                        const pushTitle = formatMsg('warn2_push_title', 'Class Starting!', vars);
+                        const pushBody = formatMsg('warn2_push_body', '🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!', vars);
+                        const waMsg = formatMsg('warn2_wa', '🚀 *Now* 🚀\n\n🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!', vars);
+
+                        await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
+                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled !== false).map(u => sendWhatsApp(u.mobile, waMsg)));
                         await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning' });
                         sentCount++;
                     }
@@ -558,7 +574,7 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                 if (userMatch || facMatch) {
                     discoveredUsers.push({
                         uid: userMatch?.uid || facMatch?.uid || facMatch?.id,
-                        oneSignalId: userMatch?.oneSignalId || null,
+                        fcmTokens: userMatch?.fcmTokens || null,
                         name: userMatch?.name || facMatch?.name,
                         empId: userMatch?.empId || facMatch?.empId,
                         mobile: userMatch?.mobile || facMatch?.mobile || facMatch?.phone || null,
@@ -586,7 +602,7 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                     if (facMatch) {
                         final_name_match = {
                             uid: facMatch.uid || facMatch.id,
-                            oneSignalId: null,
+                            fcmTokens: null,
                             name: facMatch.name,
                             empId: facMatch.empId,
                             mobile: facMatch.mobile || facMatch.phone || null,
@@ -596,7 +612,7 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                 } else {
                     final_name_match = {
                         uid: nameMatch.uid,
-                        oneSignalId: nameMatch.oneSignalId || null,
+                        fcmTokens: nameMatch.fcmTokens || null,
                         name: nameMatch.name,
                         empId: nameMatch.empId,
                         mobile: nameMatch.mobile || nameMatch.phone || null,

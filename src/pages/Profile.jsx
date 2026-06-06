@@ -18,7 +18,7 @@ import { normalizeStr } from '../utils/timeUtils';
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const Profile = () => {
     const { userProfile, currentUser, activeAcademicYear } = useAuth();
-    const { registerForPush, permission, oneSignalId } = useNotifications();
+    const { registerForPush, permission, fcmToken } = useNotifications();
     const { checkWritePermission } = useWritePermission();
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -1051,8 +1051,8 @@ const Profile = () => {
                                 <button
                                     className="btn btn-secondary w-full"
                                     onClick={async () => {
-                                        const actualId = oneSignalId || window.OneSignal?.User?.PushSubscription?.id;
-                                        if (!actualId) return toast.error("No ID found. Click Enable again or Refresh.");
+                                        const actualId = fcmToken;
+                                        if (!actualId) return toast.error("No FCM token found. Click Enable again or Refresh.");
 
                                         toast.promise(
                                             sendNotification({

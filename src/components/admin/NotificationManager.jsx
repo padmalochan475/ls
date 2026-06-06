@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
-import OneSignal from 'react-onesignal';
 import toast from 'react-hot-toast';
 import { sendNotification } from '../../utils/notificationUtils';
 import { Settings, Clock, AlertCircle, Calendar, Activity, Save, CheckCircle, XCircle, Bell, Megaphone, User, ChevronDown, Send } from 'lucide-react';
+import TemplateEditor from './TemplateEditor';
 
 const NotificationManager = ({ users }) => {
     const { currentUser } = useAuth();
@@ -72,11 +72,6 @@ const NotificationManager = ({ users }) => {
                 // Try to find by ID (default behavior of select)
                 const found = users.find(u => u.id === targetUser || u.empId === targetUser);
                 if (found && found.id) targetUids = [found.id];
-            }
-
-            if (currentUser && OneSignal) {
-                // Ensure sender is logged in (optional sanity check)
-                OneSignal.login(currentUser.uid);
             }
 
             const result = await sendNotification({
@@ -202,33 +197,6 @@ const NotificationManager = ({ users }) => {
                     <div style={{ flex: 1 }}>
                         <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Send Manual Notification</h3>
                     </div>
-                    <button
-                        onClick={async () => {
-                            try {
-                                const pid = OneSignal.User.PushSubscription.id;
-                                const eid = OneSignal.User.externalId;
-                                const optedIn = OneSignal.User.PushSubscription.optedIn;
-                                const perm = Notification.permission;
-                                const currentUid = currentUser?.uid;
-
-                                let statusMsg = `DIAGNOSTIC INFO:\n\nPermission: ${perm}\nOpted In: ${optedIn}\nPlayer ID: ${pid ? 'Found' : 'MISSING'}\nLinked User ID: ${eid || 'NONE (Anonymous)'}`;
-
-                                if (eid === currentUid) {
-                                    alert(statusMsg + "\n\n✅ EXCELLENT: Device is perfectly linked.");
-                                } else {
-                                    if (confirm(statusMsg + "\n\n❌ ISSUE: Device not linked to User.\n\nClick OK to FORCE REPAIR.")) {
-                                        await OneSignal.logout();
-                                        await OneSignal.login(currentUid);
-                                        toast.success("Repaired Link!");
-                                        alert("Repair command sent. Please check Visual Confirmation.");
-                                    }
-                                }
-                            } catch (e) { alert("OneSignal Error: " + e.message); }
-                        }}
-                        style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#60a5fa', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
-                    >
-                        Check & Fix Connection
-                    </button>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -268,7 +236,7 @@ const NotificationManager = ({ users }) => {
                                     </div>
 
                                     {users.map(u => {
-                                        const deviceCount = (u.oneSignalIds?.length) || (u.oneSignalId ? 1 : 0);
+                                        const deviceCount = (u.fcmTokens?.length) || 0;
                                         return (
                                             <div
                                                 key={u.id}
@@ -332,6 +300,11 @@ const NotificationManager = ({ users }) => {
                         {isSending ? 'Sending...' : 'Broadcast Message'}
                     </button>
                 </div>
+            </div>
+
+            {/* Template Editor Full Width */}
+            <div style={{ gridColumn: '1 / -1' }}>
+                <TemplateEditor />
             </div>
         </div>
     );
