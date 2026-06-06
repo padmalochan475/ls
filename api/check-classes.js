@@ -69,7 +69,36 @@ async function sendFCM(target, title, body, data, targetType = 'external_id', op
                 body: body
             },
             data: data || {},
-            tokens: tokens
+            tokens: tokens,
+            android: {
+                priority: 'high',
+                notification: {
+                    channelId: 'lams_alerts_channel',
+                    priority: 'max',
+                    defaultSound: true,
+                    defaultVibrateTimings: true,
+                    visibility: 'public'
+                }
+            },
+            apns: {
+                headers: {
+                    'apns-priority': '10',
+                    'apns-push-type': 'alert'
+                },
+                payload: {
+                    aps: {
+                        sound: 'default'
+                    }
+                }
+            },
+            webpush: {
+                headers: {
+                    Urgency: 'high'
+                },
+                notification: {
+                    requireInteraction: true
+                }
+            }
         };
 
         const response = await admin.messaging().sendEachForMulticast(message);

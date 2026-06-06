@@ -106,13 +106,50 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: false, successCount: 0, failureCount: 1, message: "No devices registered for push." });
         }
 
+        // Ensure all data values are strings (FCM requirement)
+        const fcmData = {};
+        if (data && typeof data === 'object') {
+            for (const [key, value] of Object.entries(data)) {
+                fcmData[key] = String(value);
+            }
+        }
+
         const message = {
             notification: {
                 title: title || 'LAMS Update',
                 body: body || 'You have a new notification.'
             },
-            data: data || {},
-            tokens: tokens
+            data: fcmData,
+            tokens: tokens,
+            android: {
+                priority: 'high',
+                notification: {
+                    channelId: 'lams_alerts_channel',
+                    priority: 'max',
+                    defaultSound: true,
+                    defaultVibrateTimings: true,
+                    visibility: 'public'
+                }
+            },
+            apns: {
+                headers: {
+                    'apns-priority': '10',
+                    'apns-push-type': 'alert'
+                },
+                payload: {
+                    aps: {
+                        sound: 'default'
+                    }
+                }
+            },
+            webpush: {
+                headers: {
+                    Urgency: 'high'
+                },
+                notification: {
+                    requireInteraction: true
+                }
+            }
         };
 
         const response = await admin.messaging().sendEachForMulticast(message);
