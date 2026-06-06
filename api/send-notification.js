@@ -157,7 +157,13 @@ export default async function handler(req, res) {
                     Urgency: 'high'
                 },
                 notification: {
+                    icon: 'https://lams.vercel.app/logo.svg',
+                    badge: 'https://lams.vercel.app/logo.svg',
+                    vibrate: [200, 100, 200],
                     requireInteraction: true
+                },
+                fcmOptions: {
+                    link: fcmData.url || 'https://lams.vercel.app/'
                 }
             }
         };
