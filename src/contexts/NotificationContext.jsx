@@ -61,8 +61,11 @@ export const NotificationProvider = ({ children }) => {
     const registerFCMWorker = async () => {
         if (!('serviceWorker' in navigator)) return null;
         try {
-            const params = new URLSearchParams(firebaseConfig).toString();
-            const swUrl = `/firebase-messaging-sw.js?${params}`;
+            const params = new URLSearchParams();
+            for (const [key, value] of Object.entries(firebaseConfig)) {
+                if (value) params.append(key, value);
+            }
+            const swUrl = `/firebase-messaging-sw.js?${params.toString()}`;
             const registration = await navigator.serviceWorker.register(swUrl);
             return registration;
         } catch (error) {

@@ -152,32 +152,43 @@ export default async function handler(req, res) {
             }
         };
 
-        const response = await admin.messaging().sendEachForMulticast(message);
+        let successCount = 0;
+        let failureCount = 0;
+        const failedTokens = [];
+        const chunkSize = 500;
+
+        for (let i = 0; i < tokens.length; i += chunkSize) {
+            const chunk = tokens.slice(i, i + chunkSize);
+            const chunkMessage = { ...message, tokens: chunk };
+            const response = await admin.messaging().sendEachForMulticast(chunkMessage);
+            
+            successCount += response.successCount;
+            failureCount += response.failureCount;
+
+            if (response.failureCount > 0) {
+                response.responses.forEach((resp, idx) => {
+                    if (!resp.success) {
+                        const error = resp.error;
+                        if (error.code === 'messaging/invalid-registration-token' ||
+                            error.code === 'messaging/registration-token-not-registered') {
+                            failedTokens.push(chunk[idx]);
+                        }
+                    }
+                });
+            }
+        }
         
-        console.log(`FCM sendMulticast result: ${response.successCount} successful, ${response.failureCount} failed.`);
+        console.log(`FCM sendMulticast result: ${successCount} successful, ${failureCount} failed.`);
         
         // Clean up invalid tokens
-        if (response.failureCount > 0) {
-            const failedTokens = [];
-            response.responses.forEach((resp, idx) => {
-                if (!resp.success) {
-                    const error = resp.error;
-                    if (error.code === 'messaging/invalid-registration-token' ||
-                        error.code === 'messaging/registration-token-not-registered') {
-                        failedTokens.push(tokens[idx]);
-                    }
-                }
-            });
-            
-            if (failedTokens.length > 0) {
-                console.log(`Need to clean up ${failedTokens.length} dead tokens (This usually is done via client sync, but could be handled here).`);
-            }
+        if (failedTokens.length > 0) {
+            console.log(`Need to clean up ${failedTokens.length} dead tokens (This usually is done via client sync, but could be handled here).`);
         }
 
         return res.status(200).json({
             success: true,
-            successCount: response.successCount,
-            failureCount: response.failureCount,
+            successCount: successCount,
+            failureCount: failureCount,
             errors: [] // FCM handles its own errors per token
         });
 

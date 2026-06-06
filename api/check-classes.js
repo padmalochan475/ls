@@ -63,12 +63,20 @@ async function sendFCM(target, title, body, data, targetType = 'external_id', op
             return false;
         }
 
+        // Ensure all data values are strings (FCM strict requirement)
+        const fcmData = {};
+        if (data && typeof data === 'object') {
+            for (const [key, value] of Object.entries(data)) {
+                fcmData[key] = String(value);
+            }
+        }
+
         const message = {
             notification: {
                 title: title,
                 body: body
             },
-            data: data || {},
+            data: fcmData,
             tokens: tokens,
             android: {
                 priority: 'high',
@@ -101,9 +109,20 @@ async function sendFCM(target, title, body, data, targetType = 'external_id', op
             }
         };
 
-        const response = await admin.messaging().sendEachForMulticast(message);
-        console.log(`FCM Result: ${response.successCount} successful, ${response.failureCount} failed.`);
-        return response.successCount > 0;
+        // FCM limits to 500 tokens per multicast
+        let successCount = 0;
+        let failureCount = 0;
+        const chunkSize = 500;
+        for (let i = 0; i < tokens.length; i += chunkSize) {
+            const chunk = tokens.slice(i, i + chunkSize);
+            const chunkMessage = { ...message, tokens: chunk };
+            const response = await admin.messaging().sendEachForMulticast(chunkMessage);
+            successCount += response.successCount;
+            failureCount += response.failureCount;
+        }
+
+        console.log(`FCM Result: ${successCount} successful, ${failureCount} failed.`);
+        return successCount > 0;
     } catch (e) {
         console.error("FCM Error:", e.message);
         return false;
