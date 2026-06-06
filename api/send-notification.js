@@ -157,8 +157,8 @@ export default async function handler(req, res) {
                     Urgency: 'high'
                 },
                 notification: {
-                    icon: 'https://lams.vercel.app/logo.svg',
-                    badge: 'https://lams.vercel.app/logo.svg',
+                    icon: 'https://lams.vercel.app/logo.png',
+                    badge: 'https://lams.vercel.app/logo.png',
                     vibrate: [200, 100, 200],
                     requireInteraction: true
                 },
