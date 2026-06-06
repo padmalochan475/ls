@@ -9,14 +9,24 @@ import firebaseConfig from './firebaseConfig';
 // Guard: Only initialize once. During Vite HMR, this module may re-execute —
 // getApps() checks if Firebase is already initialized to prevent duplicate-app errors
 // which cause Firestore WebSocket assertion failures (ID: b815 / ca9).
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+let app;
+let db;
+let auth;
+let storage;
 
-// Enable offline caching and multi-tab persistence to save Firebase Free Tier reads using modern API
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
-});
-const auth = getAuth(app);
-const storage = getStorage(app);
+try {
+    // Guard: Only initialize once. During Vite HMR, this module may re-execute
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    
+    // Enable offline caching and multi-tab persistence
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+    });
+    auth = getAuth(app);
+    storage = getStorage(app);
+} catch (error) {
+    console.error("🔥 CRITICAL: Firebase failed to initialize. Check environment variables (.env.local).", error);
+}
 
 let messaging;
 try {

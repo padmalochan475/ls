@@ -52,7 +52,7 @@ const ForegroundToast = ({ notification, t }) => {
 export const NotificationProvider = ({ children }) => {
     const { currentUser } = useAuth();
     const [initialized, setInitialized] = useState(false);
-    const [permission, setPermission] = useState(Notification.permission);
+    const [permission, setPermission] = useState('Notification' in window ? Notification.permission : 'denied');
     const [fcmToken, setFcmToken] = useState(null);
     const lastLoginUid = useRef(null);
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
@@ -93,7 +93,7 @@ export const NotificationProvider = ({ children }) => {
                 lastLoginUid.current = currentUser.uid;
 
                 // Auto-Heal: If permission is already granted, silently get token
-                if (Notification.permission === 'granted' && messaging && vapidKey) {
+                if ('Notification' in window && Notification.permission === 'granted' && messaging && vapidKey) {
                     try {
                         const swReg = await registerFCMWorker();
                         const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
@@ -131,7 +131,7 @@ export const NotificationProvider = ({ children }) => {
     }, [currentUser, initialized, fcmToken, vapidKey]);
 
     const registerForPush = useCallback(async () => {
-        if (!messaging) {
+        if (!('Notification' in window) || !messaging) {
             toast.error("Push messaging not supported in this browser.");
             return;
         }
