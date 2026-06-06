@@ -4,13 +4,14 @@ import { Analytics } from "@vercel/analytics/react"
 import './styles/design-system.css'
 import App from './App.jsx'
 
-// Cleanup old OneSignal Workers to allow Firebase to take over
+// Cleanup old/conflicting Service Workers to allow Firebase to take over exclusively
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     for (const registration of registrations) {
-      const scriptURL = registration.active?.scriptURL || "";
-      if (scriptURL.includes('OneSignal')) {
-        console.log("Unregistering Legacy OneSignal SW:", scriptURL);
+      const scriptURL = registration.active?.scriptURL || registration.installing?.scriptURL || registration.waiting?.scriptURL || "";
+      // Unregister anything that is NOT our Firebase worker
+      if (!scriptURL.includes('firebase-messaging-sw.js') && scriptURL !== "") {
+        console.log("Unregistering Conflicting SW:", scriptURL);
         registration.unregister();
       }
     }
