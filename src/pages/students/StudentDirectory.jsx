@@ -76,50 +76,56 @@ function StatCard({ icon, value, label, glow, gradient, loading }) {
   const IconComponent = icon;
   return (
     <div style={{
-      flex: '1 1 200px',
       background: 'rgba(15, 23, 42, 0.4)',
-      border: '1px solid rgba(255, 255, 255, 0.05)',
+      border: '1px solid rgba(255, 255, 255, 0.08)',
       borderRadius: '24px',
       padding: '24px',
       display: 'flex', alignItems: 'center', gap: 20,
       position: 'relative', overflow: 'hidden',
-      boxShadow: `0 10px 30px -10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)`,
+      boxShadow: `0 4px 24px -4px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.05)`,
       backdropFilter: 'blur(20px)',
-      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-      cursor: 'default',
+      transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+      cursor: 'pointer',
     }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-4px)';
-        e.currentTarget.style.boxShadow = `0 20px 40px -10px ${glow}44, inset 0 1px 0 rgba(255,255,255,0.1)`;
-        e.currentTarget.style.border = `1px solid ${glow}44`;
-        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.6)';
+        e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+        e.currentTarget.style.boxShadow = `0 24px 48px -12px ${glow}55, inset 0 1px 1px rgba(255,255,255,0.15)`;
+        e.currentTarget.style.border = `1px solid ${glow}66`;
+        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.7)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = 'none';
-        e.currentTarget.style.boxShadow = `0 10px 30px -10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)`;
-        e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+        e.currentTarget.style.boxShadow = `0 4px 24px -4px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.05)`;
+        e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.08)';
         e.currentTarget.style.background = 'rgba(15, 23, 42, 0.4)';
       }}
     >
       {/* Animated bg glow blob */}
       <div style={{
-        position: 'absolute', top: -30, right: -30, width: 140, height: 140,
-        borderRadius: '50%', background: glow, opacity: 0.15, filter: 'blur(40px)',
-        pointerEvents: 'none', animation: 'pulse 3s ease-in-out infinite alternate'
+        position: 'absolute', top: -50, right: -50, width: 180, height: 180,
+        borderRadius: '50%', background: gradient, opacity: 0.15, filter: 'blur(45px)',
+        pointerEvents: 'none', animation: 'pulse 4s ease-in-out infinite alternate'
       }} />
       <div style={{
-        width: 54, height: 54, borderRadius: '18px',
+        position: 'absolute', bottom: -20, left: -20, width: 100, height: 100,
+        borderRadius: '50%', background: glow, opacity: 0.08, filter: 'blur(30px)',
+        pointerEvents: 'none'
+      }} />
+      
+      <div style={{
+        width: 60, height: 60, borderRadius: '20px',
         background: gradient, display: 'flex', alignItems: 'center',
         justifyContent: 'center', flexShrink: 0,
-        boxShadow: `0 8px 24px ${glow}66, inset 0 2px 4px rgba(255,255,255,0.3)`,
+        boxShadow: `0 8px 24px ${glow}66, inset 0 2px 4px rgba(255,255,255,0.4)`,
+        position: 'relative', zIndex: 1
       }}>
-        <IconComponent size={26} color="#fff" strokeWidth={2.2} style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+        <IconComponent size={28} color="#ffffff" strokeWidth={2.2} style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
       </div>
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
-          {loading ? <span style={{ fontSize: 16, color: '#64748b', animation: 'pulse 1.5s infinite' }}>Loading...</span> : value}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
+        <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#ffffff', lineHeight: 1, letterSpacing: '-0.03em', textShadow: '0 2px 10px rgba(0,0,0,0.4)' }}>
+          {loading ? <span style={{ fontSize: 16, color: '#64748b', animation: 'pulse 1.5s infinite' }}>...</span> : value}
         </div>
-        <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
       </div>
     </div>
   );
@@ -365,7 +371,7 @@ function ProfileModal({ student, onClose }) {
 // ─────────────────────────────────────────────
 // Add / Edit Modal
 // ─────────────────────────────────────────────
-function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
+function AddEditModal({ student, groups, semesters, availableBatches = [], onClose, onSaved }) {
   const isEdit = !!student;
   const [form, setForm] = useState({
     regNo: student?.regNo || '',
@@ -1025,11 +1031,11 @@ export default function StudentDirectory() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 28 }}>
-        <StatCard icon={UserCheck} value={stats.active} label="Active Students" glow="#3b82f6" gradient="linear-gradient(135deg,#3b82f6,#2563eb)" loading={statsLoading} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24, marginBottom: 32 }}>
+        <StatCard icon={UserCheck} value={stats.active} label="Active Students" glow="#3b82f6" gradient="linear-gradient(135deg,#3b82f6,#1d4ed8)" loading={statsLoading} />
         <StatCard icon={BookOpen} value={stats.groups} label="Total Batches" glow="#8b5cf6" gradient="linear-gradient(135deg,#8b5cf6,#6d28d9)" loading={statsLoading} />
-        <StatCard icon={GraduationCap} value={stats.alumni} label="Alumni" glow="#22c55e" gradient="linear-gradient(135deg,#22c55e,#16a34a)" loading={statsLoading} />
-        <StatCard icon={UserX} value={stats.tc} label="Transferred (TC)" glow="#ef4444" gradient="linear-gradient(135deg,#ef4444,#dc2626)" loading={statsLoading} />
+        <StatCard icon={GraduationCap} value={stats.alumni} label="Alumni" glow="#10b981" gradient="linear-gradient(135deg,#10b981,#047857)" loading={statsLoading} />
+        <StatCard icon={UserX} value={stats.tc} label="Transferred (TC)" glow="#ef4444" gradient="linear-gradient(135deg,#ef4444,#b91c1c)" loading={statsLoading} />
       </div>
 
       {/* Control Bar */}
@@ -1267,6 +1273,7 @@ export default function StudentDirectory() {
           student={editStudent}
           groups={groups}
           semesters={semesters}
+          availableBatches={availableBatches}
           onClose={() => { setShowAddModal(false); setEditStudent(null); }}
           onSaved={() => { setShowAddModal(false); setEditStudent(null); }}
         />

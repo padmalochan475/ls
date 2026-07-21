@@ -19,6 +19,9 @@ export const certApi = {
             }
             return res;
         } catch (err) {
+            if (err.message === 'Failed to fetch') {
+                return { success: false, error: "Cannot connect to server. Please check your Google Apps Script Deployment URL." };
+            }
             return { success: false, error: err.toString() };
         }
     },
