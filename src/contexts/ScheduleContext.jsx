@@ -43,18 +43,11 @@ export const ScheduleProvider = ({ children }) => {
                 let q;
                 const scheduleRef = collection(db, 'schedule');
 
-                if (isAdmin) {
-                    q = query(scheduleRef, where('academicYear', 'in', searchYears));
-                } else if (empId) {
-                    q = query(scheduleRef, 
-                        and(
-                            where('academicYear', 'in', searchYears),
-                            or(where('facultyEmpId', '==', empId), where('faculty2EmpId', '==', empId))
-                        )
-                    );
-                } else {
-                    q = query(scheduleRef, where('academicYear', 'in', searchYears));
-                }
+                // We query the entire schedule for the active academic year for ALL users.
+                // This is critical because:
+                // 1. Students need to see the full class schedule.
+                // 2. Local conflict detection requires the full schedule to prevent double-booking rooms/faculty.
+                q = query(scheduleRef, where('academicYear', 'in', searchYears));
 
                 unsubscribe = onSnapshot(q, (snapshot) => {
                     if (!isActive) return;
