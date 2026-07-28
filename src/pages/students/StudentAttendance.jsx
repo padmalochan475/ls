@@ -520,39 +520,33 @@ const StudentAttendance = () => {
                                             // Default Chrome A4 print width = ~718px (with Default margins)
                                             // Name column is 25% = ~179px. Minus 10px padding = 169px usable width.
                                             // Bold uppercase character is roughly 0.6x fontSize in pixels.
-                                            const maxNameWidth = 165; // reduced slightly to account for padding
-                                            const estimatedNameWidth = nameLen * printSettings.fontSize * 0.60; // 0.60 safety factor for medium weight
-                                            const nameScale = estimatedNameWidth > maxNameWidth ? (maxNameWidth / estimatedNameWidth) : 1;
-                                            
-                                            const regText = student.regNo || '';
-                                            const regLen = regText.length;
-                                            
-                                            // Regd No column is 12% = ~86px. Minus 2px padding = 84px usable.
-                                            // Numeric character is roughly 0.55x fontSize in pixels.
-                                            const maxRegWidth = 80; // reduced slightly for padding
-                                            const estimatedRegWidth = regLen * printSettings.fontSize * 0.55; // 0.55 safety factor for monospace numbers
-                                            const regScale = estimatedRegWidth > maxRegWidth ? (maxRegWidth / estimatedRegWidth) : 1;
+                                            // Use a uniform slightly smaller font size for names and reg numbers
+                                            // instead of squishing them, and let extremely long names naturally wrap to 2 lines.
 
                                             return (
                                                 <tr key={student.id} style={{ height: `${printSettings.rowHeight}px` }}>
                                                     <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, whiteSpace: 'nowrap', overflow: 'hidden' }}>{student.rollNo || '--'}</td>
                                                     <td style={{ textAlign: 'center', padding: `${cellPadding}px`, overflow: 'hidden' }}>
                                                         <div style={{
-                                                            fontSize: `${(printSettings.fontSize * regScale).toFixed(2)}px`,
+                                                            fontSize: `${(printSettings.fontSize * 0.85).toFixed(2)}px`,
                                                             whiteSpace: 'nowrap',
                                                             overflow: 'hidden'
                                                         }}>
-                                                            {regText}
+                                                            {student.regNo || ''}
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: `0 ${cellPadding + 4}px`, fontWeight: '500', overflow: 'hidden' }}>
                                                         <div style={{
-                                                            fontSize: `${(printSettings.fontSize * nameScale).toFixed(2)}px`,
-                                                            whiteSpace: 'nowrap',
+                                                            fontSize: `${(printSettings.fontSize * 0.95).toFixed(2)}px`,
+                                                            whiteSpace: 'normal',
+                                                            wordBreak: 'break-word',
+                                                            lineHeight: '1.1',
                                                             overflow: 'hidden',
-                                                            textOverflow: 'ellipsis'
+                                                            display: '-webkit-box',
+                                                            WebkitLineClamp: 2,
+                                                            WebkitBoxOrient: 'vertical'
                                                         }}>
-                                                            {nameText}
+                                                            {(student.name || '').toUpperCase()}
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: `${cellPadding}px` }}></td>
