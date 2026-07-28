@@ -167,7 +167,6 @@ export const AuthProvider = ({ children }) => {
             createdAt: new Date().toISOString()
         };
         await setDoc(doc(db, 'users', user.uid), userProfileData);
-        await setDoc(doc(db, 'emp_lookups', empId), { email: recoveryEmail });
         if (empId) {
             await setDoc(doc(db, 'emp_lookups', empId), { email: recoveryEmail, uid: user.uid });
         }

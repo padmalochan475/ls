@@ -27,7 +27,9 @@ service cloud.firestore {
     match /subjects/{docId}    { allow read: if isAuth(); allow write: if isAdmin(); }
     match /faculty/{docId}     { 
         allow read: if isAuth(); 
-        allow write: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid); 
+        allow write: if isAdmin() || 
+                     (isAuth() && resource.data.uid == request.auth.uid) ||
+                     (isAuth() && (!("uid" in resource.data) || resource.data.uid == null) && request.resource.data.uid == request.auth.uid); 
     }
     match /rooms/{docId}       { allow read: if isAuth(); allow write: if isAdmin(); }
     match /groups/{docId}      { allow read: if isAuth(); allow write: if isAdmin(); }
@@ -76,7 +78,7 @@ service cloud.firestore {
     match /emp_lookups/{empId} {
       allow get: if true;
       allow list: if false;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || (isAuth() && request.resource.data.uid == request.auth.uid);
     }
 
     // 6. Config/Settings
