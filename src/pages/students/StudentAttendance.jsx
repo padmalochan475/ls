@@ -520,8 +520,8 @@ const StudentAttendance = () => {
                                             // Default Chrome A4 print width = ~718px (with Default margins)
                                             // Name column is 25% = ~179px. Minus 10px padding = 169px usable width.
                                             // Bold uppercase character is roughly 0.6x fontSize in pixels.
-                                            const maxNameWidth = 169;
-                                            const estimatedNameWidth = nameLen * printSettings.fontSize * 0.65; // 0.65 safety factor
+                                            const maxNameWidth = 165; // reduced slightly to account for padding
+                                            const estimatedNameWidth = nameLen * printSettings.fontSize * 0.75; // 0.75 safety factor for bold uppercase
                                             const nameScale = estimatedNameWidth > maxNameWidth ? (maxNameWidth / estimatedNameWidth) : 1;
                                             
                                             const regText = student.regNo || '';
@@ -529,8 +529,8 @@ const StudentAttendance = () => {
                                             
                                             // Regd No column is 12% = ~86px. Minus 2px padding = 84px usable.
                                             // Numeric character is roughly 0.55x fontSize in pixels.
-                                            const maxRegWidth = 84;
-                                            const estimatedRegWidth = regLen * printSettings.fontSize * 0.55;
+                                            const maxRegWidth = 80; // reduced slightly for padding
+                                            const estimatedRegWidth = regLen * printSettings.fontSize * 0.65; // 0.65 safety factor for monospace numbers
                                             const regScale = estimatedRegWidth > maxRegWidth ? (maxRegWidth / estimatedRegWidth) : 1;
 
                                             return (
