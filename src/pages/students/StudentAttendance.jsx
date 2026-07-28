@@ -274,7 +274,7 @@ const StudentAttendance = () => {
                 {/* ── Config Body ── */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     {/* Row 1 */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1.5fr', gap: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                         <div>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', marginBottom: '8px', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                                 <span style={{ color: '#a855f7', fontSize: '1.2rem' }}>•</span> SEMESTER
@@ -353,7 +353,7 @@ const StudentAttendance = () => {
                         </div>
                         <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '2.5rem', position: 'relative' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '2.5rem', position: 'relative' }}>
                             <style>{`
                                 .premium-slider { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 10px; outline: none; transition: all 0.2s; }
                                 .premium-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #ffffff; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 10px rgba(0,0,0,0.5), inset 0 0 0 2px var(--thumb-color); }
@@ -456,12 +456,12 @@ const StudentAttendance = () => {
 
             {/* ═══════════════════════ PRINT PREVIEW ═══════════════════════ */}
             {isReady && sheetStudents.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: 'min(2.5rem, 5vw)', background: 'linear-gradient(135deg, rgba(15,23,42,0.4), rgba(30,41,59,0.4))', borderRadius: '24px', overflowX: 'auto' }} className="preview-wrapper">
+                <div style={{ display: 'flex', justifyContent: 'flex-start', padding: 'min(2.5rem, 5vw)', background: 'linear-gradient(135deg, rgba(15,23,42,0.4), rgba(30,41,59,0.4))', borderRadius: '24px', overflowX: 'auto' }} className="preview-wrapper">
                     {/* True WYSIWYG Print Preview Box - Exactly simulates paper aspect ratio */}
                     <div className="print-area" style={{ 
                         background: 'white', color: 'black', padding: 'min(24px, 4vw)', 
                         borderRadius: '2px', fontFamily: "'Lato', sans-serif", 
-                        width: '100%', maxWidth: '1050px', minWidth: '800px',
+                        width: '100%', maxWidth: '1050px', minWidth: '800px', margin: '0 auto',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
                         display: 'flex', flexDirection: 'column'
                     }}>

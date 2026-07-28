@@ -183,7 +183,7 @@ const StudentPromotions = () => {
 
             {/* Selection Engine */}
             <div className="glass-panel" style={{ 
-                padding: '2.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem',
+                padding: '2.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2.5rem',
                 background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', 
                 borderRadius: '24px', backdropFilter: 'blur(16px)', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)'
             }}>
@@ -320,7 +320,7 @@ const StudentPromotions = () => {
                     </div>
 
                     {/* Grouped by Section */}
-                    <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                    <div style={{ maxHeight: '600px', overflowY: 'auto', overflowX: 'auto' }}>
                         {Object.entries(studentsBySection).map(([section, sectionStudents]) => {
                             const allSelected = sectionStudents.every(s => selectedIds.has(s.id));
                             const someSelected = sectionStudents.some(s => selectedIds.has(s.id));
