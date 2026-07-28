@@ -132,7 +132,8 @@ export const sendNotification = async ({
         let pushStatus = "skipped";
 
         try {
-            const apiRes = await fetch('/api/send-notification', {
+            const apiUrl = import.meta.env.VITE_API_URL || '';
+            const apiRes = await fetch(`${apiUrl}/api/send-notification`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

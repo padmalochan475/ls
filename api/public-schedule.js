@@ -3,34 +3,19 @@ import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// Singleton Initialization (Copied from revoke-session.js)
+// Singleton Initialization
 if (!admin.apps.length) {
     try {
-        const pathsToCheck = [
-            join(process.cwd(), 'service-account.json'),
-            join(process.cwd(), 'api', 'service-account.json'),
-            '/var/task/service-account.json'
-        ];
-
-        let serviceAccount;
-        for (const p of pathsToCheck) {
-            try {
-                serviceAccount = JSON.parse(readFileSync(p, 'utf8'));
-                console.log(`Loaded service account from: ${p}`);
-                break;
-            } catch {
-                // Continue
-            }
-        }
-
-        if (!serviceAccount && process.env.FIREBASE_SERVICE_ACCOUNT) {
-            serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-        }
-
-        if (serviceAccount) {
+        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount)
             });
+            console.log("Firebase Admin Initialized Successfully from ENV");
+        } else {
+            // Fallback to Application Default Credentials
+            admin.initializeApp();
+            console.log("Firebase Admin Initialized Successfully with Default Credentials");
         }
     } catch (error) {
         console.error("Firebase Admin Init Failed:", error);

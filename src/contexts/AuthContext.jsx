@@ -134,26 +134,38 @@ export const AuthProvider = ({ children }) => {
 
     const signup = async (empId, password, name, recoveryEmail, mobileNumber) => {
         const { user } = await createUserWithEmailAndPassword(auth, recoveryEmail, password);
-        const usersSnapshot = await getDocs(collection(db, 'users'));
-        const isFirstUser = usersSnapshot.empty;
-        let facultySnap = await getDocs(query(collection(db, 'faculty'), where('empId', '==', empId)));
-        if (facultySnap.empty && recoveryEmail) {
-            facultySnap = await getDocs(query(collection(db, 'faculty'), where('email', '==', recoveryEmail)));
+
+        let isFirstUser = false;
+        try {
+            const usersSnapshot = await getDocs(collection(db, 'users'));
+            isFirstUser = usersSnapshot.empty;
+        } catch (e) {
+            console.warn("First-user check failed, defaulting to pending user:", e);
         }
+
         let linkedDept = null;
         let isFaculty = false;
-        if (!facultySnap.empty) {
-            const facDoc = facultySnap.docs[0];
-            const facData = facDoc.data();
-            linkedDept = facData.department || facData.dept;
-            isFaculty = true;
-            await updateDoc(doc(db, 'faculty', facDoc.id), {
-                uid: user.uid,
-                isRegistered: true,
-                email: recoveryEmail,
-                empId: empId
-            });
+        try {
+            let facultySnap = await getDocs(query(collection(db, 'faculty'), where('empId', '==', empId)));
+            if (facultySnap.empty && recoveryEmail) {
+                facultySnap = await getDocs(query(collection(db, 'faculty'), where('email', '==', recoveryEmail)));
+            }
+            if (!facultySnap.empty) {
+                const facDoc = facultySnap.docs[0];
+                const facData = facDoc.data();
+                linkedDept = facData.department || facData.dept;
+                isFaculty = true;
+                await updateDoc(doc(db, 'faculty', facDoc.id), {
+                    uid: user.uid,
+                    isRegistered: true,
+                    email: recoveryEmail,
+                    empId: empId
+                });
+            }
+        } catch (facErr) {
+            console.warn("Faculty lookup/link failed during signup:", facErr);
         }
+
         const userProfileData = {
             empId,
             name,
@@ -166,15 +178,37 @@ export const AuthProvider = ({ children }) => {
             whatsappEnabled: true,
             createdAt: new Date().toISOString()
         };
-        await setDoc(doc(db, 'users', user.uid), userProfileData);
+
+        // Always create user profile document in Firestore
+        try {
+            await setDoc(doc(db, 'users', user.uid), userProfileData);
+        } catch (err) {
+            console.error("Critical error creating Firestore profile:", err);
+            // Rollback Auth User to prevent zombie accounts
+            try {
+                await user.delete();
+            } catch (rollbackErr) {
+                console.error("Failed to rollback auth user:", rollbackErr);
+            }
+            throw new Error("Failed to create user profile in database. Please try again.");
+        }
+
         if (empId) {
-            await setDoc(doc(db, 'emp_lookups', empId), { email: recoveryEmail, uid: user.uid });
+            try {
+                await setDoc(doc(db, 'emp_lookups', empId), { email: recoveryEmail, uid: user.uid });
+            } catch (lookupErr) {
+                console.warn("Emp lookup write failed:", lookupErr);
+            }
         }
 
         // WhatsApp Notification on Signup
         if (mobileNumber) {
-            const welcomeMsg = `🤖 *Welcome to LAMS* 🤖\n\nHi ${name},\nYour account has been successfully created and is pending approval.\n\n_You will receive updates directly on this number._`;
-            sendWhatsAppNotification(mobileNumber, welcomeMsg);
+            try {
+                const welcomeMsg = `🤖 *Welcome to LAMS* 🤖\n\nHi ${name},\nYour account has been successfully created and is pending approval.\n\n_You will receive updates directly on this number._`;
+                sendWhatsAppNotification(mobileNumber, welcomeMsg);
+            } catch (waErr) {
+                console.warn("WhatsApp notification failed:", waErr);
+            }
         }
 
         return user;

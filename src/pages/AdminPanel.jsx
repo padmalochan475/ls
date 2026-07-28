@@ -35,13 +35,46 @@ const AdminPanel = () => {
     const [suggestions, setSuggestions] = useState([]);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
+    const getUserStatus = (u) => {
+        if (u.status) return normalizeStr(u.status);
+        if (u.role === 'admin') return 'approved';
+        return 'pending';
+    };
+
     // Analytics Metrics
     const stats = useMemo(() => {
         const total = users.length;
-        const pending = users.filter(u => u.status === 'pending').length;
-        const approved = users.filter(u => u.status === 'approved').length;
-        const admins = users.filter(u => u.role === 'admin').length;
-        const faculty = users.filter(u => u.role === 'user' || !u.role).length; // Default to user/faculty
+        
+        // Dynamic Status Distribution
+        const statusCounts = {};
+        users.forEach(u => {
+            const s = getUserStatus(u) || 'unknown';
+            statusCounts[s] = (statusCounts[s] || 0) + 1;
+        });
+        
+        const statusData = Object.entries(statusCounts).map(([name, value]) => ({
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            value
+        }));
+
+        // Dynamic Role Distribution
+        const roleCounts = {};
+        users.forEach(u => {
+            const r = (u.role ? normalizeStr(u.role) : 'user');
+            roleCounts[r] = (roleCounts[r] || 0) + 1;
+        });
+
+        const roleData = Object.entries(roleCounts).map(([name, value]) => ({
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            value
+        }));
+
+        // We still extract specifically 'pending' for the top stat cards if it exists,
+        // otherwise default to 0.
+        const pending = statusCounts['pending'] || 0;
+        const approved = statusCounts['approved'] || 0;
+        const admins = roleCounts['admin'] || 0;
+        const faculty = roleCounts['user'] || 0;
 
         // Online & Idle Calculation
         const now = new Date();
@@ -103,18 +136,6 @@ const AdminPanel = () => {
             // A better way is needed for proper sorting, but this is a quick fix.
             // Let's just limit to last 6 entries to look nice.
             .slice(-6);
-
-        // 4. Role Distribution
-        const roleData = [
-            { name: 'Admins', value: admins },
-            { name: 'Faculty', value: faculty },
-        ];
-
-        // 5. Status Distribution
-        const statusData = [
-            { name: 'Active', value: approved },
-            { name: 'Pending', value: pending },
-        ];
 
         return { total, pending, approved, admins, faculty, roleData, statusData, growthData, online: onlineCount, idle: idleCount, onlineUsersList, totalActiveDevices };
     }, [users]);
@@ -390,7 +411,8 @@ const AdminPanel = () => {
     };
 
     const filteredUsers = users.filter(user => {
-        const matchesFilter = filter === 'all' || user.status === filter;
+        const uStatus = getUserStatus(user);
+        const matchesFilter = filter === 'all' || uStatus === filter.toLowerCase();
         const matchesSearch = normalizeStr(user.name).includes(normalizeStr(searchTerm)) ||
             normalizeStr(user.email).includes(normalizeStr(searchTerm)) ||
             normalizeStr(user.empId).includes(normalizeStr(searchTerm));
@@ -909,8 +931,8 @@ const AdminPanel = () => {
 
                     {/* 3. Filters & Search */}
                     <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.25rem', borderRadius: '12px' }}>
-                            {['all', 'pending', 'approved'].map(type => (
+                        <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.25rem', borderRadius: '12px', flexWrap: 'wrap' }}>
+                            {['all', ...Array.from(new Set(users.map(u => getUserStatus(u)).filter(Boolean)))].map(type => (
                                 <button
                                     key={type}
                                     onClick={() => setFilter(type)}
@@ -920,10 +942,11 @@ const AdminPanel = () => {
                                         color: filter === type ? 'white' : 'var(--color-text-muted)',
                                         padding: '0.5rem 1.25rem',
                                         borderRadius: '8px',
-                                        boxShadow: filter === type ? '0 4px 12px rgba(0,0,0,0.2)' : 'none'
+                                        boxShadow: filter === type ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
+                                        textTransform: 'capitalize'
                                     }}
                                 >
-                                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                                    {type}
                                 </button>
                             ))}
                         </div>
@@ -985,16 +1008,22 @@ const AdminPanel = () => {
                                             </td>
                                             <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)', color: '#94a3b8' }}>{user.empId}</td>
                                             <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                                <span style={{
-                                                    padding: '0.35rem 0.75rem', borderRadius: '99px', fontSize: '0.8rem', fontWeight: 600,
-                                                    background: user.status === 'approved' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(251, 191, 36, 0.15)',
-                                                    color: user.status === 'approved' ? '#34d399' : '#fbbf24',
-                                                    border: user.status === 'approved' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(251, 191, 36, 0.2)',
-                                                    display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
-                                                }}>
-                                                    {user.status === 'approved' ? <CheckCircle size={12} /> : <Activity size={12} />}
-                                                    {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
-                                                </span>
+                                                {(() => {
+                                                    const uStatus = getUserStatus(user);
+                                                    const isApproved = uStatus === 'approved';
+                                                    return (
+                                                        <span style={{
+                                                            padding: '0.35rem 0.75rem', borderRadius: '99px', fontSize: '0.8rem', fontWeight: 600,
+                                                            background: isApproved ? 'rgba(16, 185, 129, 0.15)' : 'rgba(251, 191, 36, 0.15)',
+                                                            color: isApproved ? '#34d399' : '#fbbf24',
+                                                            border: isApproved ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(251, 191, 36, 0.2)',
+                                                            display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                                                        }}>
+                                                            {isApproved ? <CheckCircle size={12} /> : <Activity size={12} />}
+                                                            {uStatus.charAt(0).toUpperCase() + uStatus.slice(1)}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                                                 <select
@@ -1009,7 +1038,7 @@ const AdminPanel = () => {
                                             </td>
                                             <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                                                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                                    {user.status === 'pending' && (
+                                                    {getUserStatus(user) === 'pending' && (
                                                         <button
                                                             onClick={() => handleStatusChange(user.id, 'approved')}
                                                             className="btn"

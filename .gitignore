@@ -34,3 +34,4 @@ service-account.json
 
 # Safety backups (created by backup-src.ps1)
 __backups/
+.env.vercel.downloaded

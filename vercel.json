@@ -1,7 +1,8 @@
 {
     "functions": {
         "api/**/*.js": {
-            "includeFiles": "service-account.json"
+            "memory": 1024,
+            "maxDuration": 10
         }
     },
     "cleanUrls": false,

@@ -5,23 +5,26 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { useScheduleData } from './hooks/useScheduleData';
 import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
-import Scheduler from './pages/Scheduler';
-import PublicView from './pages/PublicView';
-import AdminPanel from './pages/AdminPanel';
-import MasterData from './pages/MasterData';
-import Profile from './pages/Profile';
-import Assignments from './pages/Assignments';
-import Suggestions from './pages/Suggestions';
-import Substitutions from './pages/Substitutions';
-import Students from './pages/students/index';
-import Resources from './pages/Resources';
-import Syllabus from './pages/Syllabus';
+import React, { Suspense } from 'react';
+
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Login = React.lazy(() => import('./pages/Login'));
+const Scheduler = React.lazy(() => import('./pages/Scheduler'));
+const PublicView = React.lazy(() => import('./pages/PublicView'));
+const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
+const MasterData = React.lazy(() => import('./pages/MasterData'));
+const Profile = React.lazy(() => import('./pages/Profile'));
+const Assignments = React.lazy(() => import('./pages/Assignments'));
+const Suggestions = React.lazy(() => import('./pages/Suggestions'));
+const Substitutions = React.lazy(() => import('./pages/Substitutions'));
+const Students = React.lazy(() => import('./pages/students/index'));
+const Resources = React.lazy(() => import('./pages/Resources'));
+const Syllabus = React.lazy(() => import('./pages/Syllabus'));
+const Analytics = React.lazy(() => import('./pages/Analytics'));
+const Certificates = React.lazy(() => import('./pages/Certificates'));
+const ApplyCertificate = React.lazy(() => import('./pages/ApplyCertificate'));
+
 import ErrorBoundary from './components/ErrorBoundary';
-import Analytics from './pages/Analytics';
-import Certificates from './pages/Certificates';
-import ApplyCertificate from './pages/ApplyCertificate';
 
 import OfflineAlert from './components/OfflineAlert';
 
@@ -45,7 +48,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   }
 
   // Check for pending status
-  if (userProfile.status === 'pending') {
+  if (userProfile.status?.toLowerCase() === 'pending') {
     return (
       <div className="glass-panel" style={{ margin: '2rem', padding: '2rem', textAlign: 'center', color: 'white' }}>
         <h1>Account Pending</h1>
@@ -75,42 +78,44 @@ function App() {
     <ErrorBoundary>
       <Toaster position="top-right" />
       <Router>
-        <Routes>
-          {/* 1. Public Routes (Zero-Init / Firebase Independent) */}
-          <Route path="/apply-certificate" element={<ApplyCertificate />} />
-          <Route path="/view" element={<PublicView />} />
+        <Suspense fallback={<QuantumLoader />}>
+          <Routes>
+            {/* 1. Public Routes (Zero-Init / Firebase Independent) */}
+            <Route path="/apply-certificate" element={<ApplyCertificate />} />
+            <Route path="/view" element={<PublicView />} />
 
-          {/* 2. Protected Internal App (Firebase Dependent) */}
-          <Route path="*" element={
-            <AuthProvider>
-              <MasterDataProvider>
-                <NotificationProvider>
-                  <ScheduleProvider>
-                    <VersionManager />
-                    <OfflineAlert />
-                    <Routes>
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
-                      <Route path="/schedule" element={<ProtectedRoute><Layout><Scheduler /></Layout></ProtectedRoute>} />
-                      <Route path="/assignments" element={<ProtectedRoute><Layout><Assignments /></Layout></ProtectedRoute>} />
-                      <Route path="/master-data" element={<ProtectedRoute requiredRole="admin"><Layout><MasterData /></Layout></ProtectedRoute>} />
-                      <Route path="/analytics" element={<ProtectedRoute><Layout><Analytics /></Layout></ProtectedRoute>} />
-                      <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><Layout><AdminPanel /></Layout></ProtectedRoute>} />
-                      <Route path="/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
-                      <Route path="/suggestions" element={<ProtectedRoute><Layout><Suggestions /></Layout></ProtectedRoute>} />
-                      <Route path="/substitutions" element={<ProtectedRoute><Layout><Substitutions /></Layout></ProtectedRoute>} />
-                      <Route path="/students" element={<ProtectedRoute><Layout><Students /></Layout></ProtectedRoute>} />
-                      <Route path="/resources" element={<ProtectedRoute><Layout><Resources /></Layout></ProtectedRoute>} />
-                      <Route path="/syllabus" element={<ProtectedRoute><Layout><Syllabus /></Layout></ProtectedRoute>} />
-                      <Route path="/certificates" element={<ProtectedRoute requiredRole="admin"><Layout><Certificates /></Layout></ProtectedRoute>} />
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </ScheduleProvider>
-                </NotificationProvider>
-              </MasterDataProvider>
-            </AuthProvider>
-          } />
-        </Routes>
+            {/* 2. Protected Internal App (Firebase Dependent) */}
+            <Route path="*" element={
+              <AuthProvider>
+                <MasterDataProvider>
+                  <NotificationProvider>
+                    <ScheduleProvider>
+                      <VersionManager />
+                      <OfflineAlert />
+                      <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+                        <Route path="/schedule" element={<ProtectedRoute><Layout><Scheduler /></Layout></ProtectedRoute>} />
+                        <Route path="/assignments" element={<ProtectedRoute><Layout><Assignments /></Layout></ProtectedRoute>} />
+                        <Route path="/master-data" element={<ProtectedRoute requiredRole="admin"><Layout><MasterData /></Layout></ProtectedRoute>} />
+                        <Route path="/analytics" element={<ProtectedRoute><Layout><Analytics /></Layout></ProtectedRoute>} />
+                        <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><Layout><AdminPanel /></Layout></ProtectedRoute>} />
+                        <Route path="/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
+                        <Route path="/suggestions" element={<ProtectedRoute><Layout><Suggestions /></Layout></ProtectedRoute>} />
+                        <Route path="/substitutions" element={<ProtectedRoute><Layout><Substitutions /></Layout></ProtectedRoute>} />
+                        <Route path="/students" element={<ProtectedRoute><Layout><Students /></Layout></ProtectedRoute>} />
+                        <Route path="/resources" element={<ProtectedRoute><Layout><Resources /></Layout></ProtectedRoute>} />
+                        <Route path="/syllabus" element={<ProtectedRoute><Layout><Syllabus /></Layout></ProtectedRoute>} />
+                        <Route path="/certificates" element={<ProtectedRoute requiredRole="admin"><Layout><Certificates /></Layout></ProtectedRoute>} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </ScheduleProvider>
+                  </NotificationProvider>
+                </MasterDataProvider>
+              </AuthProvider>
+            } />
+          </Routes>
+        </Suspense>
       </Router>
     </ErrorBoundary>
   );

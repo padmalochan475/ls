@@ -929,7 +929,8 @@ const Profile = () => {
                                                 const token = await currentUser.getIdToken();
 
                                                 // Call Vercel API
-                                                const response = await fetch('/api/revoke-session', {
+                                                const apiUrl = import.meta.env.VITE_API_URL || '';
+                                                const response = await fetch(`${apiUrl}/api/revoke-session`, {
                                                     method: 'POST',
                                                     headers: {
                                                         'Content-Type': 'application/json',
