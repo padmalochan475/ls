@@ -1173,3 +1173,86 @@ input:checked + .slider::before {
 input:checked:hover + .slider {
   filter: brightness(1.1);
 }
+/* Premium Top Navbar */
+.premium-top-navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    margin: -1.5rem -1.5rem 2rem -1.5rem;
+    background: rgba(20, 20, 25, 0.4);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: sticky;
+    top: -1.5rem;
+    z-index: 1000;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+.navbar-search {
+    flex: 0 1 400px;
+    margin: 0 2rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top-color: rgba(255, 255, 255, 0.12);
+    /* Lift lighting */
+    border-radius: 999px;
+    padding: 0.6rem 0.6rem 0.6rem 1.25rem;
+    color: rgba(255, 255, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.navbar-search:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(96, 165, 250, 0.4);
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.search-kbd-badge {
+    display: flex;
+    gap: 4px;
+}
+
+.search-kbd-badge kbd {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.navbar-search:active .search-kbd-badge kbd {
+    transform: translateY(2px);
+    box-shadow: none;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 768px) {
+    .premium-top-navbar {
+        padding: 1rem 1rem 1rem 4.5rem;
+        /* Add left padding for hamburger menu */
+        margin: 0 -1rem 1.5rem -1rem;
+        top: 0;
+    }
+}
+
+.navbar-brand {
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #ffffff 0%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}

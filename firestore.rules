@@ -56,7 +56,20 @@ service cloud.firestore {
     // SECURED: Only authenticated users can read profiles.
     match /users/{userId} {
       allow read: if isAuth();
-      allow write: if isAuth() && (request.auth.uid == userId || isAdmin());
+      
+      // Allow users to create their own profile. We can't strictly block 'admin' here because the first user needs to become admin, 
+      // but we block them from UPDATING their role/status later.
+      allow create: if isAuth() && request.auth.uid == userId;
+      
+      // Allow admin to update anything. 
+      // Allow users to update their own profile, BUT block changes to 'role' and 'status'.
+      allow update: if isAdmin() || (
+          isAuth() && request.auth.uid == userId 
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']))
+      );
+      
+      // Only admins can delete users.
+      allow delete: if isAdmin();
       
       // Free Tier Notification System:
       // Allow any auth user to DROP a message into another user's mailbox.
@@ -78,7 +91,8 @@ service cloud.firestore {
     match /emp_lookups/{empId} {
       allow get: if true;
       allow list: if false;
-      allow write: if isAdmin() || (isAuth() && request.resource.data.uid == request.auth.uid);
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
     }
 
     // 6. Config/Settings

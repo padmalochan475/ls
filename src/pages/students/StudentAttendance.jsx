@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Printer, Download, Calendar, Type, Maximize2, FileText, SlidersHorizontal } from 'lucide-react';
@@ -112,69 +112,74 @@ const StudentAttendance = () => {
 
 
 
-    // Calculate settings immediately when data changes
-    const calculateOptimalSettings = () => {
+    const [isAiOptimizing, setIsAiOptimizing] = useState(false);
+    const [aiProgress, setAiProgress] = useState(0);
+    const aiTimeoutRef = useRef(null);
+    const aiIntervalRef = useRef(null);
+
+    const runAiOptimizer = () => {
         if (sheetStudents.length === 0) return;
-        setAutoFitActive(true);
-    };
-
-    const [autoFitActive, setAutoFitActive] = useState(false);
-
-    // 1-Pass Pure Mathematical Auto-Fit + Real-Time DOM Measurement
-    useEffect(() => {
-        if (!autoFitActive || sheetStudents.length === 0) return;
-
-        const currentPaper = PAPER_SIZES[printSettings.paperSize] || PAPER_SIZES['A4'];
         
-        // Exact pixel height of the target paper (A4 = 1000px max safe height)
+        if (aiTimeoutRef.current) clearTimeout(aiTimeoutRef.current);
+        if (aiIntervalRef.current) clearInterval(aiIntervalRef.current);
+
+        setIsAiOptimizing(true);
+        setAiProgress(0);
+
+        // Calculate math immediately to lock in the closure values
+        const currentPaper = PAPER_SIZES[printSettings.paperSize] || PAPER_SIZES['A4'];
         const PAGE_HEIGHT = currentPaper.maxSafeHeight; 
         
-        // Dynamically measure the exact pixel heights of the header and footer blocks on the screen!
         const headerEl = document.getElementById('print-header');
         const footerEl = document.getElementById('print-footer');
         
         const dynamicHeaderHeight = headerEl ? headerEl.offsetHeight : 160;
         const dynamicFooterHeight = footerEl ? footerEl.offsetHeight : 95;
-        
-        // Total fixed space = measured heights + 25px absolute safety cushion
-        const exactFixedSpace = dynamicHeaderHeight + dynamicFooterHeight + 25; 
-        
-        // The exact remaining pixel space for the table
+        const exactFixedSpace = dynamicHeaderHeight + dynamicFooterHeight + 65; 
         const targetTableHeight = PAGE_HEIGHT - exactFixedSpace;
         
-        // Pure Math: Divide exactly available pixels by the number of students
         let idealRowHeight = (targetTableHeight / sheetStudents.length);
+        idealRowHeight = Math.max(9, Math.min(idealRowHeight, 75));
         
-        // Prevent it from becoming insanely huge for very small classes
-        idealRowHeight = Math.max(9, Math.min(idealRowHeight, 45));
-        
-        // Scale font size to exactly 55% of row height. 
-        // This guarantees that (font + line-height + padding) is strictly less than rowHeight, 
-        // preventing the browser from artificially stretching the row and spilling to page 2!
-        let idealFontSize = idealRowHeight * 0.55;
-        idealFontSize = Math.max(6, Math.min(idealFontSize, 18));
+        // Dramatically increased font size multiplier to 0.65 so the text fills the row height better
+        let idealFontSize = idealRowHeight * 0.65;
+        // Capped at 14px to guarantee Regd No fits in 12% width without overlapping
+        idealFontSize = Math.max(7.5, Math.min(idealFontSize, 14));
         
         const finalRowHeight = Number(idealRowHeight.toFixed(2));
         const finalFontSize = Number(idealFontSize.toFixed(2));
 
-        setPrintSettings(prev => ({
-            ...prev,
-            rowHeight: finalRowHeight,
-            fontSize: finalFontSize
-        }));
-        
-        setMaxPrintLimits({ 
-            fontSize: finalFontSize, 
-            rowHeight: finalRowHeight 
-        });
-        
-        setAutoFitActive(false);
-
-    }, [autoFitActive, sheetStudents.length, printSettings.paperSize]);
+        // Simulate AI Processing visually
+        let progress = 0;
+        aiIntervalRef.current = setInterval(() => {
+            progress += 18;
+            setAiProgress(Math.min(progress, 100));
+            if (progress >= 100) {
+                clearInterval(aiIntervalRef.current);
+                
+                aiTimeoutRef.current = setTimeout(() => {
+                    setPrintSettings(prev => ({
+                        ...prev,
+                        rowHeight: finalRowHeight,
+                        fontSize: finalFontSize
+                    }));
+                    
+                    setMaxPrintLimits({ 
+                        fontSize: finalFontSize + 6, 
+                        rowHeight: finalRowHeight + 15 
+                    });
+                    
+                    setIsAiOptimizing(false);
+                }, 100);
+            }
+        }, 50);
+    };
 
     // Auto-adjust the sliders to optimal values when the batch or paper size changes
     useEffect(() => {
-        calculateOptimalSettings();
+        if (sheetStudents.length > 0) {
+            runAiOptimizer();
+        }
     }, [config.group, sheetStudents.length, printSettings.paperSize]);
 
     const handleExportExcel = () => {
@@ -333,11 +338,20 @@ const StudentAttendance = () => {
                                 </div>
                                 <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Print Layout Adjustments</h4>
                             </div>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16,185,129,0.2)', padding: '4px 10px', borderRadius: '999px', fontWeight: 600, boxShadow: '0 0 10px rgba(16,185,129,0.1)' }}>
-                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
-                                Auto-Fitted
-                            </span>
+                            
+                            {isAiOptimizing ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(99, 102, 241, 0.1)', padding: '4px 12px', borderRadius: '999px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                                    <div style={{ width: '12px', height: '12px', border: '2px solid #818cf8', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                                    <span style={{ fontSize: '0.75rem', color: '#a5b4fc', fontWeight: 700 }}>AI Optimizing {Math.floor(aiProgress)}%</span>
+                                </div>
+                            ) : (
+                                <button onClick={runAiOptimizer} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16,185,129,0.2)', padding: '4px 10px', borderRadius: '999px', fontWeight: 600, boxShadow: '0 0 10px rgba(16,185,129,0.1)', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
+                                    AI Auto-Fit Ready
+                                </button>
+                            )}
                         </div>
+                        <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
                         
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '2.5rem', position: 'relative' }}>
                             <style>{`
@@ -482,50 +496,79 @@ const StudentAttendance = () => {
                                         <span style={{ fontWeight: '900', marginRight: '5px' }}>Lab No:</span><span style={{ borderBottom: '1px dotted black', flex: 1, textAlign: 'center', fontWeight: '900' }}>{config.labNo}</span>
                                     </div>
                                 </div>
-                                <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: `${printSettings.fontSize}px` }}>
+                            </div>
+                            <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: `${printSettings.fontSize}px`, tableLayout: 'fixed' }}>
                                     <thead>
                                         <tr>
                                             <th style={{ width: '5%', padding: `${cellPadding}px` }}>Roll<br/>No</th>
-                                            <th style={{ width: '11%', padding: `${cellPadding}px` }}>Regd. No</th>
-                                            <th style={{ width: '23%', padding: `${cellPadding}px` }}>Name of the Student</th>
-                                            <th style={{ width: '29%', padding: `${cellPadding}px` }}>Signature</th>
+                                            <th style={{ width: '12%', padding: `${cellPadding}px` }}>Regd. No</th>
+                                            <th style={{ width: '25%', padding: `${cellPadding}px` }}>Name of the Student</th>
+                                            <th style={{ width: '28%', padding: `${cellPadding}px` }}>Signature</th>
                                             <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>DP&A<br/>(2)</th>
                                             <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>LR<br/>(2)</th>
                                             <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>LQ<br/>(1)</th>
                                             <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>E&V<br/>(5)</th>
-                                            <th style={{ width: '8%', fontSize: '0.9em', padding: `${cellPadding}px` }}>TOTAL<br/>(10)</th>
+                                            <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>TOTAL<br/>(10)</th>
                                         </tr>
                                     </thead>
-                                </table>
-                            </div>
-                            
-                            {/* ── TABLE BODY ── */}
-                            <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: `${printSettings.fontSize}px` }}>
-                                <tbody>
-                                    {sheetStudents.map(student => {
-                                        // Dynamically shrink font size for long names to avoid overlapping cell borders
-                                        const nameLen = (student.name || '').length;
-                                        const nameSize = nameLen > 30 ? '0.65em' : nameLen > 24 ? '0.75em' : nameLen > 20 ? '0.85em' : '0.95em';
-                                        
-                                        const regLen = (student.regNo || '').length;
-                                        const regSize = regLen > 14 ? '0.80em' : '0.95em';
+                                    <tbody>
+                                        {sheetStudents.map((student, index) => {
+                                            const nameText = (student.name || '').toUpperCase();
+                                            const nameLen = nameText.length;
+                                            
+                                            // PURE MATHEMATICAL SCALING
+                                            // Default Chrome A4 print width = ~718px (with Default margins)
+                                            // Name column is 25% = ~179px. Minus 10px padding = 169px usable width.
+                                            // Bold uppercase character is roughly 0.6x fontSize in pixels.
+                                            const maxNameWidth = 169;
+                                            const estimatedNameWidth = nameLen * printSettings.fontSize * 0.65; // 0.65 safety factor
+                                            const nameScale = estimatedNameWidth > maxNameWidth ? (maxNameWidth / estimatedNameWidth) : 1;
+                                            
+                                            const regText = student.regNo || '';
+                                            const regLen = regText.length;
+                                            
+                                            // Regd No column is 12% = ~86px. Minus 2px padding = 84px usable.
+                                            // Numeric character is roughly 0.55x fontSize in pixels.
+                                            const maxRegWidth = 84;
+                                            const estimatedRegWidth = regLen * printSettings.fontSize * 0.55;
+                                            const regScale = estimatedRegWidth > maxRegWidth ? (maxRegWidth / estimatedRegWidth) : 1;
 
-                                        return (
-                                            <tr key={student.id} style={{ height: `${printSettings.rowHeight}px` }}>
-                                                <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, whiteSpace: 'nowrap', overflow: 'hidden', width: '5%' }}>{student.rollNo || '--'}</td>
-                                                <td style={{ textAlign: 'center', fontSize: regSize, padding: `${cellPadding}px`, whiteSpace: 'nowrap', overflow: 'hidden', width: '11%' }}>{student.regNo}</td>
-                                                <td style={{ padding: `0 ${cellPadding + 4}px`, fontWeight: '600', fontSize: nameSize, whiteSpace: 'nowrap', overflow: 'hidden', width: '23%' }}>{(student.name || '').toUpperCase()}</td>
-                                                <td style={{ padding: `${cellPadding}px`, width: '29%' }}></td>
-                                                <td style={{ padding: `${cellPadding}px`, width: '6%' }}></td>
-                                                <td style={{ padding: `${cellPadding}px`, width: '6%' }}></td>
-                                                <td style={{ padding: `${cellPadding}px`, width: '6%' }}></td>
-                                                <td style={{ padding: `${cellPadding}px`, width: '6%' }}></td>
-                                                <td style={{ padding: `${cellPadding}px`, width: '8%' }}></td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                            return (
+                                                <tr key={student.id} style={{ height: `${printSettings.rowHeight}px` }}>
+                                                    <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, whiteSpace: 'nowrap', overflow: 'hidden' }}>{student.rollNo || '--'}</td>
+                                                    <td style={{ textAlign: 'center', padding: `${cellPadding}px`, overflow: 'hidden' }}>
+                                                        <div style={{
+                                                            width: `${(100 / regScale)}%`,
+                                                            transform: `scaleX(${regScale})`,
+                                                            transformOrigin: 'center center',
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden'
+                                                        }}>
+                                                            {regText}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: `0 ${cellPadding + 4}px`, fontWeight: '600', overflow: 'hidden' }}>
+                                                        <div style={{
+                                                            width: `${(100 / nameScale)}%`,
+                                                            transform: `scaleX(${nameScale})`,
+                                                            transformOrigin: 'left center',
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden'
+                                                        }}>
+                                                            {nameText}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: `${cellPadding}px` }}></td>
+                                                    <td style={{ padding: `${cellPadding}px` }}></td>
+                                                    <td style={{ padding: `${cellPadding}px` }}></td>
+                                                    <td style={{ padding: `${cellPadding}px` }}></td>
+                                                    <td style={{ padding: `${cellPadding}px` }}></td>
+                                                    <td style={{ padding: `${cellPadding}px` }}></td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                         </div>
                         
                         {/* ════════════ SIGNATURE BLOCK (OUTSIDE TABLE BORDER) ════════════ */}

@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { writeBatch, doc, updateDoc } from 'firebase/firestore';
+import { writeBatch, doc, updateDoc, collection, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
 import { Users, Save, Plus, Trash2, GripVertical, CheckCircle, AlertTriangle, Layers, Sparkles } from 'lucide-react';
@@ -12,10 +12,28 @@ const GROUP_BG = ['rgba(59,130,246,0.12)', 'rgba(16,185,129,0.12)', 'rgba(245,15
 const GROUP_BORDER = ['rgba(59,130,246,0.3)', 'rgba(16,185,129,0.3)', 'rgba(245,158,11,0.3)', 'rgba(239,68,68,0.3)'];
 
 // ─── GroupManager ──────────────────────────────────────────────────────────────
-const GroupManager = ({ allStudents }) => {
+const GroupManager = () => {
     const { activeAcademicYear, userProfile } = useAuth();
     const isAdmin = userProfile?.role === 'admin';
     const { departments, semesters, groups: masterGroups = [] } = useMasterData();
+
+    // ── fetch students ─────────────────────────────────────────────────────────
+    const [allStudents, setAllStudents] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const col = collection(db, 'students');
+        const unsub = onSnapshot(col, (snap) => {
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setAllStudents(data);
+            setLoading(false);
+        }, (err) => {
+            console.error('Failed to fetch students for GroupManager:', err);
+            toast.error('Failed to load students');
+            setLoading(false);
+        });
+        return () => unsub();
+    }, []);
 
     // ── filters ────────────────────────────────────────────────────────────────
     const [filterYear, setFilterYear] = useState(activeAcademicYear || '');
@@ -372,12 +390,18 @@ const GroupManager = ({ allStudents }) => {
                     </div>
                 </div>
 
-                {/* ── Modern Section Badges ── */}
-                {filterBranch && filterSem && (
-                    <div style={{ marginTop: '1.25rem' }}>
-                        <label style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '8px' }}>
-                            Section / Filter
-                        </label>
+                {loading ? (
+                    <div style={{ marginTop: '1.25rem', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', textAlign: 'center', color: '#94a3b8' }}>
+                        Loading students...
+                    </div>
+                ) : (
+                    <>
+                        {/* ── Modern Section Badges ── */}
+                        {filterBranch && filterSem && (
+                            <div style={{ marginTop: '1.25rem' }}>
+                                <label style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '8px' }}>
+                                    Section / Filter
+                                </label>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                             <button
                                 onClick={() => setFilterSection('')}
@@ -418,11 +442,13 @@ const GroupManager = ({ allStudents }) => {
                         <span><strong>{displayList.length}</strong> active students found in {filterBranch} · Sem {filterSem} {filterSection ? `· Sect ${filterSection}` : ''}</span>
                     </div>
                 )}
-                {filterBranch && filterSem && !hasCohort && (
-                    <div style={{ marginTop: '1rem', padding: '10px 16px', background: 'rgba(245,158,11,0.08)', borderRadius: '12px', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.875rem', color: '#fcd34d' }}>
-                        <AlertTriangle size={16} />
-                        <span>No students found for this combination. Import students first.</span>
-                    </div>
+                        {filterBranch && filterSem && !hasCohort && (
+                            <div style={{ marginTop: '1rem', padding: '10px 16px', background: 'rgba(245,158,11,0.08)', borderRadius: '12px', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.875rem', color: '#fcd34d' }}>
+                                <AlertTriangle size={16} />
+                                <span>No students found for this combination. Import students first.</span>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 

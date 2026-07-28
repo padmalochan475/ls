@@ -583,7 +583,7 @@ const Layout = ({ children }) => {
                 position: 'relative'
             }}>
                 <header className="premium-top-navbar">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
                         <h2 className="navbar-brand" style={{ margin: 0 }}>
                             {(() => {
                                 const found = navItems.find(i => i.path === location.pathname);
@@ -595,17 +595,22 @@ const Layout = ({ children }) => {
                         </h2>
                     </div>
 
-                    <button className="navbar-search hide-on-mobile" onClick={() => setIsSearchOpen(true)}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Search size={16} />
-                            <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)' }}>Search assignments, pages...</span>
+                    <div 
+                        className="navbar-search hide-on-mobile" 
+                        onClick={() => setIsSearchOpen(true)}
+                        role="button"
+                        tabIndex={0}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                            <Search size={16} style={{ flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Search assignments, pages...</span>
                         </div>
-                        <div className="search-kbd-badge">
+                        <div className="search-kbd-badge" style={{ flexShrink: 0 }}>
                             <kbd>⌘</kbd><kbd>K</kbd>
                         </div>
-                    </button>
+                    </div>
 
-                    <div style={{ position: 'relative', display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <div style={{ position: 'relative', display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'flex-end', flex: 1 }}>
                         <div className="hide-on-mobile"><AcademicYearSelector /></div>
 
                         {/* Premium Mobile Search Button */}

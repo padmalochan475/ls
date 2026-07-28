@@ -24,7 +24,8 @@ const PublicView = () => {
         const fetchData = async () => {
             try {
                 // Secure API Call (Sanitized Data)
-                const response = await fetch('/api/public-schedule');
+                const apiUrl = import.meta.env.VITE_API_URL || '';
+                const response = await fetch(`${apiUrl}/api/public-schedule`);
                 if (!response.ok) throw new Error('Unable to Connect to Public Schedule Service');
 
                 const result = await response.json();

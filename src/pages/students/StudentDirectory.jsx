@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../lib/firebase';
 import {
   collection, query, where, orderBy, onSnapshot, getDoc, setDoc,
@@ -256,7 +257,7 @@ function Modal({ onClose, children, width = 640 }) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
-  return (
+  return createPortal(
     <div
       onClick={e => e.target === e.currentTarget && onClose()}
       style={{
@@ -275,7 +276,8 @@ function Modal({ onClose, children, width = 640 }) {
       }}>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -371,7 +373,7 @@ function ProfileModal({ student, onClose }) {
 // ─────────────────────────────────────────────
 // Add / Edit Modal
 // ─────────────────────────────────────────────
-function AddEditModal({ student, groups, semesters, availableBatches = [], onClose, onSaved }) {
+function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
   const isEdit = !!student;
   const [form, setForm] = useState({
     regNo: student?.regNo || '',
@@ -475,12 +477,13 @@ function AddEditModal({ student, groups, semesters, availableBatches = [], onClo
           </div>
           {/* Section/Batch */}
           <div>
-            <label style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Section / Batch</label>
+            <label style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Section</label>
             <select style={{ ...fieldStyle(false), appearance: 'none' }} value={form.section} onChange={e => set('section', e.target.value)}>
-              <option value="">Select Batch</option>
-              {availableBatches.map(b => (
-                <option key={b} value={b}>{b}</option>
-              ))}
+              <option value="">Select Section</option>
+              {(groups || []).map(g => {
+                const gName = g.name || g.label || g.value || g;
+                return <option key={gName} value={gName}>{gName}</option>;
+              })}
             </select>
           </div>
           {/* Roll No */}
@@ -540,7 +543,7 @@ function StatusPopover({ student, onClose, onChanged }) {
       toast.error('Failed to update status');
     } finally { setSaving(false); }
   };
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, zIndex: 99998,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -571,17 +574,21 @@ function StatusPopover({ student, onClose, onChanged }) {
           </button>
         ))}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 // ─────────────────────────────────────────────
 // Import Modal
 // ─────────────────────────────────────────────
-const IMPORT_FIELDS = ['regNo', 'name', 'branch', 'semester', 'section', 'rollNo'];
-const FIELD_LABELS = { regNo: 'Reg No', name: 'Name', branch: 'Branch', semester: 'Semester', section: 'Section/Batch', rollNo: 'Roll No' };
+const IMPORT_FIELDS = ['regNo', 'name', 'branch', 'semester', 'section', 'group', 'rollNo'];
+const FIELD_LABELS = { regNo: 'Reg No', name: 'Name', branch: 'Branch', semester: 'Semester', section: 'Section', group: 'Lab Group', rollNo: 'Roll No' };
 
-function ImportModal({ onClose, onImported }) {
+function ImportModal({ semesters, onClose, onImported }) {
+  const [importMethod, setImportMethod] = useState('upload'); // upload | paste
+  const [pasteData, setPasteData] = useState('');
+  const [globalSemester, setGlobalSemester] = useState('');
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState(null);
   const [headers, setHeaders] = useState([]);
@@ -589,27 +596,66 @@ function ImportModal({ onClose, onImported }) {
   const [preview, setPreview] = useState([]);
   const [mapping, setMapping] = useState({});
   const [conflict, setConflict] = useState('skip');
-  const [step, setStep] = useState('upload'); // upload | map | confirm
+  const [step, setStep] = useState('input'); // input | map | confirm
   const [progress, setProgress] = useState(null);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef();
 
-  const parseFile = useCallback((f) => {
+  const validRows = useMemo(() => {
+    if (!mapping.regNo || !mapping.name) return rows;
+    return rows.filter(r => {
+      const reg = String(r[mapping.regNo] || '').trim();
+      const name = String(r[mapping.name] || '').trim();
+      if (!reg || !name) return false;
+      
+      // Filter out sub-header rows that leaked through
+      const lowerReg = reg.toLowerCase();
+      if (lowerReg === 'classes attended' || lowerReg === 'classes held' || lowerReg === 'percentile' || lowerReg === 'fine') return false;
+      
+      return true;
+    });
+  }, [rows, mapping]);
+
+  const validCount = validRows.length;
+
+  const handleDataParsed = (hdrs, data, fileName) => {
+    setHeaders(hdrs); setRows(data);
+    autoMap(hdrs);
+    setStep('map');
+  };
+
+  const parseFile = useCallback(async (f) => {
     setFile(f);
     const ext = f.name.split('.').pop().toLowerCase();
+    
     if (ext === 'csv') {
       Papa.parse(f, {
         header: true, skipEmptyLines: true,
-        complete: (res) => {
-          setHeaders(res.meta.fields || []);
-          setRows(res.data);
-          setPreview(res.data.slice(0, 5));
-          autoMap(res.meta.fields || []);
-          setStep('map');
-        },
+        complete: (res) => handleDataParsed(res.meta.fields || [], res.data, f.name),
         error: () => toast.error('Failed to parse CSV'),
       });
     } else {
+      // Fallback for HTML-based XLS exports
+      const text = await f.text();
+      if (text.toLowerCase().includes('<table')) {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(text, 'text/html');
+          const table = doc.querySelector('table');
+          if (table) {
+            const wb = XLSX.utils.table_to_book(table);
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            const hdrs = data.length ? Object.keys(data[0]) : [];
+            handleDataParsed(hdrs, data, f.name);
+            return;
+          }
+        } catch (e) {
+          console.error("HTML Table parse error:", e);
+        }
+      }
+
+      // Standard Excel fallback
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -618,22 +664,70 @@ function ImportModal({ onClose, onImported }) {
           const ws = wb.Sheets[wb.SheetNames[0]];
           const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
           const hdrs = data.length ? Object.keys(data[0]) : [];
-          setHeaders(hdrs); setRows(data); setPreview(data.slice(0, 5));
-          autoMap(hdrs);
-          setStep('map');
+          handleDataParsed(hdrs, data, f.name);
         } catch (err) {
           console.error("Excel parse error:", err);
-          toast.error("Failed to read Excel file. Ensure it is a valid .xlsx or .xls file.");
+          toast.error("Failed to read Excel file.");
         }
       };
       reader.readAsArrayBuffer(f);
     }
   }, []);
 
+  const handlePasteParse = () => {
+    if (!pasteData.trim()) return toast.error('Please paste some data first');
+    setFile({ name: 'Pasted Data' });
+    
+    // Preprocess: Copying from SIS/ERP websites often includes garbage text before the table.
+    // Find the first line that looks like a student table header.
+    const lines = pasteData.split(/\r?\n/);
+    let headerIdx = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const lower = lines[i].toLowerCase();
+        if ((lower.includes('regd') || lower.includes('reg no')) && lower.includes('name')) {
+            headerIdx = i;
+            break;
+        }
+    }
+    
+    let dataLines = lines.slice(headerIdx);
+    
+    // Check if the row immediately after the header is a sub-header row (common in ERPs)
+    if (dataLines.length > 1) {
+        const nextLineLower = dataLines[1].toLowerCase();
+        if (nextLineLower.includes('classes attended') || nextLineLower.includes('percentile')) {
+            // Remove the sub-header row so it doesn't get parsed as a student
+            dataLines.splice(1, 1);
+        }
+    }
+    
+    const cleanedData = dataLines.join('\n');
+
+    Papa.parse(cleanedData, {
+      delimiter: '\t', // Usually pasted data from excel is tab-separated
+      header: true, skipEmptyLines: true,
+      complete: (res) => {
+        if (!res.meta.fields || res.meta.fields.length < 2) {
+           // Fallback to comma if tab fails
+           Papa.parse(cleanedData, {
+             header: true, skipEmptyLines: true,
+             complete: (res2) => handleDataParsed(res2.meta.fields || [], res2.data, 'Pasted Data')
+           });
+           return;
+        }
+        handleDataParsed(res.meta.fields || [], res.data, 'Pasted Data');
+      },
+      error: () => toast.error('Failed to parse pasted data'),
+    });
+  };
+
   const autoMap = (hdrs) => {
     const m = {};
     IMPORT_FIELDS.forEach(field => {
-      const match = hdrs.find(h => h.toLowerCase().replace(/[\s_-]/g, '') === field.toLowerCase());
+      // Create flexible matchers (e.g. "Regd.No", "Lab Group")
+      let match = hdrs.find(h => h.toLowerCase().replace(/[\s_\-\.]/g, '') === field.toLowerCase());
+      if (!match && field === 'group') match = hdrs.find(h => h.toLowerCase().includes('lab group'));
+      if (!match && field === 'regNo') match = hdrs.find(h => h.toLowerCase().includes('regd'));
       if (match) m[field] = match;
     });
     setMapping(m);
@@ -647,20 +741,27 @@ function ImportModal({ onClose, onImported }) {
 
   const handleImport = async () => {
     if (!mapping.regNo || !mapping.name) { toast.error('Map at least Reg No and Name'); return; }
+    if (!mapping.semester && !globalSemester) { 
+      toast.error('Please map the Semester column or select a Target Semester'); 
+      return; 
+    }
     setImporting(true);
     try {
-      const mapped = rows.map(r => ({
-        regNo: String(r[mapping.regNo] || '').trim(),
-        name: String(r[mapping.name] || '').trim(),
-        branch: String(r[mapping.branch] || '').trim(),
-        semester: String(r[mapping.semester] || '').trim(),
-        section: String(r[mapping.section] || '').trim(),
-        rollNo: String(r[mapping.rollNo] || '').trim(),
-        status: 'active',
-        isLateral: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })).filter(r => r.regNo && r.name);
+      const mapped = validRows.map(r => {
+        const student = {
+          regNo: String(r[mapping.regNo] || '').trim(),
+          name: String(r[mapping.name] || '').trim(),
+          status: 'active',
+          updatedAt: new Date().toISOString(),
+        };
+        // Only include fields that were explicitly mapped (or fallback targets)
+        if (mapping.branch) student.branch = String(r[mapping.branch] || '').trim();
+        if (mapping.semester || globalSemester) student.semester = String(r[mapping.semester] || globalSemester).trim();
+        if (mapping.section) student.section = String(r[mapping.section] || '').trim();
+        if (mapping.group) student.group = String(r[mapping.group] || '1').trim();
+        if (mapping.rollNo) student.rollNo = String(r[mapping.rollNo] || '').trim();
+        return student;
+      }).filter(r => r.regNo && r.name);
 
       const chunks = chunkArray(mapped, CHUNK_SIZE);
       let done = 0;
@@ -671,7 +772,7 @@ function ImportModal({ onClose, onImported }) {
           for (const student of chunk) {
             const docId = student.regNo.toLowerCase().replace(/\s+/g, '_');
             const ref = doc(db, 'students', docId);
-            batch.set(ref, student);
+            batch.set(ref, student, { merge: true });
           }
         } else {
           // Fetch concurrently to avoid UI freeze on large imports
@@ -680,7 +781,7 @@ function ImportModal({ onClose, onImported }) {
             const ref = doc(db, 'students', docId);
             const existing = await getDoc(ref);
             if (!existing.exists()) {
-              batch.set(ref, student);
+              batch.set(ref, { ...student, isLateral: false, createdAt: new Date().toISOString() });
             }
           }));
         }
@@ -702,35 +803,89 @@ function ImportModal({ onClose, onImported }) {
     <Modal onClose={onClose} width={700}>
       <ModalHeader title="Import Students" onClose={onClose} />
       <div style={{ padding: 24 }}>
-        {step === 'upload' && (
-          <div
-            onDragOver={e => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-            style={{
-              border: `2px dashed ${dragging ? '#3b82f6' : 'rgba(255,255,255,0.15)'}`,
-              borderRadius: 16, padding: '48px 24px', textAlign: 'center',
-              cursor: 'pointer', transition: 'all 0.2s',
-              background: dragging ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.02)',
-              boxShadow: dragging ? '0 0 30px rgba(59,130,246,0.2)' : 'none',
-            }}
-          >
-            <Upload size={40} color={dragging ? '#3b82f6' : '#475569'} style={{ marginBottom: 12 }} />
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#cbd5e1', marginBottom: 6 }}>
-              {dragging ? 'Drop to upload' : 'Drag & drop your file here'}
+        {step === 'input' && (
+          <>
+            {/* Tabs for Upload vs Paste */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <button 
+                onClick={() => setImportMethod('upload')}
+                style={{ padding: '10px 20px', background: 'none', border: 'none', color: importMethod === 'upload' ? '#3b82f6' : '#94a3b8', borderBottom: importMethod === 'upload' ? '2px solid #3b82f6' : '2px solid transparent', fontWeight: 600, cursor: 'pointer' }}>
+                Upload File
+              </button>
+              <button 
+                onClick={() => setImportMethod('paste')}
+                style={{ padding: '10px 20px', background: 'none', border: 'none', color: importMethod === 'paste' ? '#3b82f6' : '#94a3b8', borderBottom: importMethod === 'paste' ? '2px solid #3b82f6' : '2px solid transparent', fontWeight: 600, cursor: 'pointer' }}>
+                Copy & Paste
+              </button>
             </div>
-            <div style={{ fontSize: 13, color: '#64748b' }}>or click to browse — CSV or Excel (.xlsx) supported</div>
-            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" hidden onChange={e => e.target.files[0] && parseFile(e.target.files[0])} />
-          </div>
+
+            {importMethod === 'upload' && (
+              <div
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  border: `2px dashed ${dragging ? '#3b82f6' : 'rgba(255,255,255,0.15)'}`,
+                  borderRadius: 16, padding: '48px 24px', textAlign: 'center',
+                  cursor: 'pointer', transition: 'all 0.2s',
+                  background: dragging ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.02)',
+                  boxShadow: dragging ? '0 0 30px rgba(59,130,246,0.2)' : 'none',
+                }}
+              >
+                <Upload size={40} color={dragging ? '#3b82f6' : '#475569'} style={{ marginBottom: 12 }} />
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#cbd5e1', marginBottom: 6 }}>
+                  {dragging ? 'Drop to upload' : 'Drag & drop your file here'}
+                </div>
+                <div style={{ fontSize: 13, color: '#64748b' }}>CSV or Excel (.xlsx, .xls, HTML tables) supported</div>
+                <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.html" hidden onChange={e => e.target.files[0] && parseFile(e.target.files[0])} />
+              </div>
+            )}
+
+            {importMethod === 'paste' && (
+              <div>
+                <textarea 
+                  value={pasteData}
+                  onChange={e => setPasteData(e.target.value)}
+                  placeholder="Paste your Excel or CSV data here (must include headers)..."
+                  style={{ width: '100%', height: 200, padding: 16, borderRadius: 12, background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <Btn variant="primary" onClick={handlePasteParse}>Parse Data</Btn>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {step === 'map' && (
           <>
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10 }}>
               <span style={{ fontSize: 13, color: '#93c5fd' }}>
-                <strong>{rows.length}</strong> rows detected from <strong>{file?.name}</strong>. Map the columns below.
+                <strong>{rows.length}</strong> raw rows detected from <strong>{file?.name || 'Pasted Data'}</strong>. 
+                {validCount > 0 && <span style={{ marginLeft: 6, color: '#10b981', fontWeight: 600 }}>✓ {validCount} valid students found based on mapping.</span>}
               </span>
+            </div>
+
+            <div style={{ marginBottom: 20, padding: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12 }}>
+              <label style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 8 }}>
+                Target Semester (Fallback)
+              </label>
+              <select
+                value={globalSemester}
+                onChange={e => setGlobalSemester(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: 'rgba(15,23,42,0.6)', border: '1px solid #3b82f6', color: '#f8fafc', fontSize: 14, outline: 'none' }}
+              >
+                <option value="">-- No Default Semester --</option>
+                {semesters.map(s => (
+                  <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s}>
+                    {s.label || s.name || `Semester ${s.number || s.value || s}`}
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+                If your file doesn't have a semester column, all students will be assigned to this semester.
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
@@ -753,19 +908,23 @@ function ImportModal({ onClose, onImported }) {
 
             {/* Preview */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>Preview (first 5 rows)</div>
-              <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>
+                Preview (All Valid Rows)
+              </div>
+              <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '350px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#0f172a' }}>
                     <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <th style={{ padding: '8px 12px', color: '#64748b', fontWeight: 600, textAlign: 'left', width: '40px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>S.No</th>
                       {IMPORT_FIELDS.filter(f => mapping[f]).map(f => (
-                        <th key={f} style={{ padding: '8px 12px', color: '#64748b', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>{FIELD_LABELS[f]}</th>
+                        <th key={f} style={{ padding: '8px 12px', color: '#64748b', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>{FIELD_LABELS[f]}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.map((row, i) => (
-                      <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                    {validRows.map((row, i) => (
+                      <tr key={i} style={{ borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '7px 12px', color: '#94a3b8', fontWeight: 700 }}>{i + 1}</td>
                         {IMPORT_FIELDS.filter(f => mapping[f]).map(f => (
                           <td key={f} style={{ padding: '7px 12px', color: '#cbd5e1' }}>{String(row[mapping[f]] || '').slice(0, 40)}</td>
                         ))}
@@ -804,11 +963,11 @@ function ImportModal({ onClose, onImported }) {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-              <Btn variant="ghost" onClick={() => setStep('upload')}>← Back</Btn>
+              <Btn variant="ghost" onClick={() => setStep('input')}>← Back</Btn>
               <div style={{ display: 'flex', gap: 10 }}>
                 <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
                 <Btn variant="primary" onClick={handleImport} disabled={importing} icon={Upload}>
-                  {importing ? 'Importing…' : `Import ${rows.length} Students`}
+                  {importing ? 'Importing…' : `Import ${validCount > 0 ? validCount : rows.length} Students`}
                 </Btn>
               </div>
             </div>
@@ -853,20 +1012,19 @@ export default function StudentDirectory() {
   const [showImport, setShowImport] = useState(false);
   const [statusPopover, setStatusPopover] = useState(null);
 
-  // ── Derive Batches from Master Data Groups & SubGroups ──
+  // ── Derive Batches dynamically from loaded students (Exact match with Attendance) ──
   const availableBatches = useMemo(() => {
-    if (!groups) return [];
-    let batches = [];
-    groups.forEach(g => {
-      const gName = g.name || g.label || g.value || g;
-      if (g.subGroups && Array.isArray(g.subGroups) && g.subGroups.length > 0) {
-        g.subGroups.forEach(sg => batches.push(`${gName}-${sg}`));
-      } else {
-        batches.push(gName);
-      }
+    if (!students || students.length === 0) return [];
+    const groupSet = new Set();
+    students.forEach(s => {
+        const sSection = (s.section || '').trim();
+        const sGroup = String(s.group || '1').trim();
+        const subStr = sSection ? sSection : (s.branch || '').trim();
+        const badge = `${subStr}-${sGroup}`.toUpperCase();
+        groupSet.add(badge);
     });
-    return batches;
-  }, [groups]);
+    return Array.from(groupSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [students]);
 
   // ── Fetch stats on mount ──
   useEffect(() => {
@@ -906,12 +1064,11 @@ export default function StudentDirectory() {
     setSelected(new Set());
     const col = collection(db, 'students');
     let constraints = [];
-    if (filterBatch) constraints.push(where('section', '==', filterBatch));
     if (filterSemester) constraints.push(where('semester', '==', filterSemester));
-    constraints.push(orderBy('name'));
     const q = query(col, ...constraints);
     unsubRef.current = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setStudents(data);
       setLoading(false);
     }, (err) => {
@@ -926,6 +1083,17 @@ export default function StudentDirectory() {
   const filteredStudents = useMemo(() => {
     let list = students || [];
     if (filterStatus !== 'all') list = list.filter(s => s.status === filterStatus);
+    
+    if (filterBatch) {
+      const fb = filterBatch.toUpperCase();
+      list = list.filter(s => {
+        const sSection = (s.section || '').trim().toUpperCase();
+        const sGroup = String(s.group || '1').trim().toUpperCase();
+        const subStr = sSection ? sSection : (s.branch || '').trim().toUpperCase();
+        const badge = `${subStr}-${sGroup}`;
+        return sSection === fb || badge === fb;
+      });
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(s =>
@@ -970,6 +1138,46 @@ export default function StudentDirectory() {
       toast.success(`${selected.size} students deleted`);
       setSelected(new Set());
     } catch { toast.error('Bulk delete failed'); }
+  };
+
+  // ── Delete Batch ──
+  const handleDeleteBatch = async () => {
+    if (!filterBatch) return;
+    
+    // Get ALL students in this batch regardless of search or status
+    const batchStudents = (students || []).filter(s => {
+      const fb = filterBatch.toUpperCase();
+      const sSection = (s.section || '').trim().toUpperCase();
+      const sGroup = String(s.group || '1').trim().toUpperCase();
+      const subStr = sSection ? sSection : (s.branch || '').trim().toUpperCase();
+      const badge = `${subStr}-${sGroup}`;
+      return sSection === fb || badge === fb;
+    });
+
+    if (batchStudents.length === 0) {
+      toast.error('No students found in this batch');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to completely delete the ENTIRE "${filterBatch}" lab batch?\n\nThis will permanently delete ${batchStudents.length} students and cannot be undone.`)) return;
+    
+    if (window.prompt(`Type "DELETE" to confirm the deletion of ${filterBatch}`) !== 'DELETE') {
+      toast.error('Deletion cancelled.');
+      return;
+    }
+
+    try {
+      const ids = batchStudents.map(s => s._id);
+      const chunks = chunkArray(ids, CHUNK_SIZE);
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach(id => batch.delete(doc(db, 'students', id)));
+        await batch.commit();
+      }
+      toast.success(`${ids.length} students deleted from ${filterBatch}`);
+      setFilterBatch('');
+      setSelected(new Set());
+    } catch { toast.error('Failed to delete batch'); }
   };
 
   // ── Bulk Status Change ──
@@ -1033,39 +1241,87 @@ export default function StudentDirectory() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24, marginBottom: 32 }}>
         <StatCard icon={UserCheck} value={stats.active} label="Active Students" glow="#3b82f6" gradient="linear-gradient(135deg,#3b82f6,#1d4ed8)" loading={statsLoading} />
-        <StatCard icon={BookOpen} value={stats.groups} label="Total Batches" glow="#8b5cf6" gradient="linear-gradient(135deg,#8b5cf6,#6d28d9)" loading={statsLoading} />
+        <StatCard icon={BookOpen} value={stats.groups} label="Total Lab Batches" glow="#8b5cf6" gradient="linear-gradient(135deg,#8b5cf6,#6d28d9)" loading={statsLoading} />
         <StatCard icon={GraduationCap} value={stats.alumni} label="Alumni" glow="#10b981" gradient="linear-gradient(135deg,#10b981,#047857)" loading={statsLoading} />
         <StatCard icon={UserX} value={stats.tc} label="Transferred (TC)" glow="#ef4444" gradient="linear-gradient(135deg,#ef4444,#b91c1c)" loading={statsLoading} />
       </div>
 
-      {/* Control Bar */}
+      {/* Control Bar (Attendance Style) */}
       <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center',
-        marginBottom: 24, padding: '16px 20px',
+        display: 'flex', flexDirection: 'column', gap: '1.5rem',
+        marginBottom: 24, padding: '2rem',
         background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)',
         borderRadius: '20px', backdropFilter: 'blur(16px)',
         boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
       }}>
-        <ControlInput icon={Search} placeholder="Search name or reg no…" value={search} onChange={setSearch} style={{ flex: '1 1 240px', minWidth: 200 }} />
-        <ControlSelect value={filterBatch} onChange={setFilterBatch} style={{ flex: '1 1 160px', minWidth: 140 }}>
-          <option value="">All Batches</option>
-          {availableBatches.map(b => <option key={b} value={b}>{b}</option>)}
-        </ControlSelect>
-        <ControlSelect value={filterSemester} onChange={setFilterSemester} style={{ flex: '1 1 160px', minWidth: 140 }}>
-          <option value="">All Semesters</option>
-          {semesters.map(s => <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s}>{s.label || s.name || `Semester ${s.number || s.value || s}`}</option>)}
-        </ControlSelect>
-        <ControlSelect value={filterStatus} onChange={setFilterStatus} style={{ flex: '0 0 140px' }}>
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="alumni">Alumni</option>
-          <option value="tc">TC</option>
-        </ControlSelect>
-        <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' }}>
-          {isAdmin && <Btn variant="primary" icon={Plus} onClick={() => setShowAddModal(true)} style={{ borderRadius: '12px', padding: '10px 18px', background: 'linear-gradient(135deg, #3b82f6, #0ea5e9)' }}>Add Student</Btn>}
-          {isAdmin && <Btn variant="ghost" icon={Upload} onClick={() => setShowImport(true)} style={{ borderRadius: '12px', padding: '10px 18px' }}>Import</Btn>}
-          <Btn variant="ghost" icon={Download} onClick={handleExport} style={{ borderRadius: '12px', padding: '10px 18px' }}>Export</Btn>
-        </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+              {/* Semester */}
+              <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', marginBottom: '8px', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      <span style={{ color: '#a855f7', fontSize: '1.2rem' }}>•</span> SEMESTER
+                  </label>
+                  <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.95rem', outline: 'none' }} value={filterSemester} onChange={e => { setFilterSemester(e.target.value); setFilterBatch(''); }}>
+                      <option value="" style={{ background: '#0f172a' }}>— All Semesters —</option>
+                      {semesters.map(s => <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s} style={{ background: '#0f172a' }}>{s.label || s.name || `Semester ${s.number || s.value || s}`}</option>)}
+                  </select>
+              </div>
+
+              {/* Lab Batch */}
+              <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', marginBottom: '8px', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      <span style={{ color: '#10b981', fontSize: '1.2rem' }}>•</span> LAB BATCH / SUB-GROUP
+                  </label>
+                  <select 
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(15,23,42,0.6)', border: filterSemester && !filterBatch ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.95rem', outline: 'none' }} 
+                      value={filterBatch} 
+                      onChange={e => setFilterBatch(e.target.value)}
+                      disabled={!filterSemester}
+                  >
+                      <option value="" style={{ background: '#0f172a' }}>{!filterSemester ? '— Select Semester First —' : '— All Lab Batches —'}</option>
+                      {availableBatches.map(b => <option key={b} value={b} style={{ background: '#0f172a' }}>{b}</option>)}
+                  </select>
+              </div>
+
+              {/* Status */}
+              <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', marginBottom: '8px', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      <span style={{ color: '#ef4444', fontSize: '1.2rem' }}>•</span> STATUS
+                  </label>
+                  <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.95rem', outline: 'none' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                      <option value="all" style={{ background: '#0f172a' }}>All Status</option>
+                      <option value="active" style={{ background: '#0f172a' }}>Active</option>
+                      <option value="alumni" style={{ background: '#0f172a' }}>Alumni</option>
+                      <option value="tc" style={{ background: '#0f172a' }}>TC</option>
+                  </select>
+              </div>
+
+              {/* Search */}
+              <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', marginBottom: '8px', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      <span style={{ color: '#3b82f6', fontSize: '1.2rem' }}>•</span> SEARCH
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Search size={18} color="#64748b" style={{ position: 'absolute', left: 14, pointerEvents: 'none' }} />
+                      <input
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          placeholder="Search name or reg no…"
+                          style={{
+                              width: '100%', boxSizing: 'border-box', padding: '11px 14px 11px 40px', borderRadius: '12px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.95rem', outline: 'none'
+                          }}
+                      />
+                  </div>
+              </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: 8 }}>
+            {isAdmin && filterBatch && (
+              <Btn variant="danger" icon={Trash2} onClick={handleDeleteBatch} style={{ borderRadius: '12px', padding: '10px 18px', background: 'linear-gradient(135deg, #ef4444, #b91c1c)' }}>Delete Batch</Btn>
+            )}
+            {isAdmin && <Btn variant="primary" icon={Plus} onClick={() => setShowAddModal(true)} style={{ borderRadius: '12px', padding: '10px 18px', background: 'linear-gradient(135deg, #3b82f6, #0ea5e9)' }}>Add Student</Btn>}
+            {isAdmin && <Btn variant="ghost" icon={Upload} onClick={() => setShowImport(true)} style={{ borderRadius: '12px', padding: '10px 18px' }}>Import</Btn>}
+            <Btn variant="ghost" icon={Download} onClick={handleExport} style={{ borderRadius: '12px', padding: '10px 18px' }}>Export</Btn>
+          </div>
       </div>
 
       {/* Bulk Action Bar */}
@@ -1105,8 +1361,8 @@ export default function StudentDirectory() {
         {noFilter && !loading && (
           <div style={{ padding: '60px 24px', textAlign: 'center' }}>
             <Filter size={48} color="#334155" style={{ marginBottom: 16 }} />
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Select a Batch or Semester</div>
-            <div style={{ fontSize: 14, color: '#334155' }}>Choose a batch or semester filter above to load students and avoid unnecessary reads.</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Select a Lab Batch or Semester</div>
+            <div style={{ fontSize: 14, color: '#334155' }}>Choose a lab batch or semester filter above to load students and avoid unnecessary reads.</div>
           </div>
         )}
 
@@ -1141,7 +1397,7 @@ export default function StudentDirectory() {
                       style={{ accentColor: '#3b82f6', width: 16, height: 16, cursor: 'pointer' }}
                     />
                   </th>
-                  {['#', 'Student', 'Reg No', 'Branch', 'Sem', 'Batch', 'Status', 'Actions'].map(h => (
+                  {['#', 'Student', 'Reg No', 'Branch', 'Sem', 'Lab Batch', 'Status', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '16px', textAlign: 'left', color: '#94a3b8', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -1188,7 +1444,14 @@ export default function StudentDirectory() {
                     {/* Semester */}
                     <td style={{ padding: '12px 16px', color: '#94a3b8', textAlign: 'center' }}>{student.semester || '—'}</td>
                     {/* Section */}
-                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>{student.section || '—'}</td>
+                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>
+                      {(() => {
+                        const sSection = (student.section || '').trim();
+                        const sGroup = String(student.group || '1').trim();
+                        const subStr = sSection ? sSection : (student.branch || '').trim();
+                        return subStr ? `${subStr}-${sGroup}`.toUpperCase() : '—';
+                      })()}
+                    </td>
                     {/* Status */}
                     <td style={{ padding: '12px 16px' }}>
                       <StatusBadge
@@ -1273,7 +1536,7 @@ export default function StudentDirectory() {
           student={editStudent}
           groups={groups}
           semesters={semesters}
-          availableBatches={availableBatches}
+          groups={groups}
           onClose={() => { setShowAddModal(false); setEditStudent(null); }}
           onSaved={() => { setShowAddModal(false); setEditStudent(null); }}
         />
@@ -1281,6 +1544,7 @@ export default function StudentDirectory() {
 
       {showImport && (
         <ImportModal
+          semesters={semesters}
           onClose={() => setShowImport(false)}
           onImported={() => setShowImport(false)}
         />

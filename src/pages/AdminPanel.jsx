@@ -401,9 +401,34 @@ const AdminPanel = () => {
                 }
             }
 
-            // 4. Finally Delete User
+            // 4. Delete User from Firestore
             await deleteDoc(doc(db, 'users', userId));
-            toast.success("User deleted and unlinked successfully.");
+            
+            // 5. Securely Delete User from Firebase Auth via Vercel Backend
+            try {
+                const idToken = await auth.currentUser?.getIdToken();
+                const apiUrl = import.meta.env.VITE_API_URL || '';
+                
+                const response = await fetch(`${apiUrl}/api/delete-user`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({ targetUid: userId })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("Failed to delete user from Auth:", errorText);
+                    toast.error("User removed from database, but Auth deletion failed.");
+                } else {
+                    toast.success("User completely deleted and unlinked successfully.");
+                }
+            } catch (apiError) {
+                console.error("API Call Error:", apiError);
+                toast.error("User removed from database, but Auth API call failed.");
+            }
         } catch (error) {
             console.error("Error deleting user: ", error);
             alert("Failed to delete user.");

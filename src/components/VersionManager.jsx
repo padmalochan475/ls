@@ -6,7 +6,8 @@ const VersionManager = () => {
         if (import.meta.env.DEV) return; // Skip in Dev
 
         try {
-            const res = await fetch('/api/version');
+            const apiUrl = import.meta.env.VITE_API_URL || '';
+            const res = await fetch(`${apiUrl}/api/version`);
             if (res.ok) {
                 const data = await res.json();
                 const serverBuildId = data.buildId;
