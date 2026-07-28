@@ -479,7 +479,7 @@ const StudentAttendance = () => {
                                 </div>
                                 <div style={{ display: 'flex', borderBottom: '1px solid black', fontSize: '13px' }}>
                                     <div style={{ width: '50%', borderRight: '1px solid black', padding: '4px 8px', display: 'flex' }}>
-                                        <span style={{ fontWeight: '900', marginRight: '5px' }}>Date:</span><span style={{ borderBottom: '1px dotted black', flex: 1, textAlign: 'center', fontWeight: '900' }}>{config.date}</span>
+                                        <span style={{ fontWeight: '900', marginRight: '5px' }}>Date:</span><span style={{ borderBottom: '1px dotted black', flex: 1, textAlign: 'center', fontWeight: '900' }}>{config.date ? config.date.split('-').reverse().join('-') : ''}</span>
                                     </div>
                                     <div style={{ flex: 1, padding: '4px 8px', display: 'flex' }}>
                                         <span style={{ fontWeight: '900', marginRight: '5px' }}>Branch:</span><span style={{ borderBottom: '1px dotted black', flex: 1, textAlign: 'center', fontWeight: '900' }}>{config.group}</span>
@@ -526,7 +526,7 @@ const StudentAttendance = () => {
                                             return (
                                                 <tr key={student.id} style={{ height: `${printSettings.rowHeight}px` }}>
                                                     <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, whiteSpace: 'nowrap', overflow: 'hidden' }}>{student.rollNo || '--'}</td>
-                                                    <td style={{ textAlign: 'center', padding: `${cellPadding}px`, overflow: 'hidden' }}>
+                                                    <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, overflow: 'hidden' }}>
                                                         <div style={{
                                                             fontSize: `${(printSettings.fontSize * 0.85).toFixed(2)}px`,
                                                             whiteSpace: 'nowrap',
