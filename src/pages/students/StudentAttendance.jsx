@@ -339,17 +339,7 @@ const StudentAttendance = () => {
                                 <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Print Layout Adjustments</h4>
                             </div>
                             
-                            {isAiOptimizing ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(99, 102, 241, 0.1)', padding: '4px 12px', borderRadius: '999px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-                                    <div style={{ width: '12px', height: '12px', border: '2px solid #818cf8', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                                    <span style={{ fontSize: '0.75rem', color: '#a5b4fc', fontWeight: 700 }}>AI Optimizing {Math.floor(aiProgress)}%</span>
-                                </div>
-                            ) : (
-                                <button onClick={runAiOptimizer} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16,185,129,0.2)', padding: '4px 10px', borderRadius: '999px', fontWeight: 600, boxShadow: '0 0 10px rgba(16,185,129,0.1)', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-                                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
-                                    AI Auto-Fit Ready
-                                </button>
-                            )}
+
                         </div>
                         <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
                         

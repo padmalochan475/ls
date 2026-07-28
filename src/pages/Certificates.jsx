@@ -596,7 +596,7 @@ The institute has no objection to ${pronoun.toLowerCase()} attending the same fo
                     <div style={{ width: '50px', height: '50px', background: 'var(--color-accent-gradient)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}><GraduationCap size={30} /></div>
                     <div>
                         <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>Certificates HUB</h1>
-                        <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>LAMS 2.0 institutional Control Panel</p>
+                        <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>LAMS institutional Control Panel</p>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>

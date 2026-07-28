@@ -62,7 +62,7 @@ const QuantumLoader = ({ size }) => {
 
             {/* Typography */}
             <div className="text-container">
-                <h1 className="brand-title">LAMS 2.0</h1>
+                <h1 className="brand-title">LAMS</h1>
                 <div className="loading-status">
                     <span className="dot"></span> INITIALIZING SYSTEM
                 </div>

@@ -1636,7 +1636,7 @@ const Scheduler = () => {
                 </table>
 
                 <div className="print-footer">
-                    <span>LAMS 2.0 - Intelligent Scheduler</span>
+                    <span>LAMS - Intelligent Scheduler</span>
                     <span>Page 1 of 1</span>
                 </div>
             </div>
