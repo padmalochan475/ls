@@ -521,7 +521,7 @@ const StudentAttendance = () => {
                                             // Name column is 25% = ~179px. Minus 10px padding = 169px usable width.
                                             // Bold uppercase character is roughly 0.6x fontSize in pixels.
                                             const maxNameWidth = 165; // reduced slightly to account for padding
-                                            const estimatedNameWidth = nameLen * printSettings.fontSize * 0.75; // 0.75 safety factor for bold uppercase
+                                            const estimatedNameWidth = nameLen * printSettings.fontSize * 0.60; // 0.60 safety factor for medium weight
                                             const nameScale = estimatedNameWidth > maxNameWidth ? (maxNameWidth / estimatedNameWidth) : 1;
                                             
                                             const regText = student.regNo || '';
@@ -530,7 +530,7 @@ const StudentAttendance = () => {
                                             // Regd No column is 12% = ~86px. Minus 2px padding = 84px usable.
                                             // Numeric character is roughly 0.55x fontSize in pixels.
                                             const maxRegWidth = 80; // reduced slightly for padding
-                                            const estimatedRegWidth = regLen * printSettings.fontSize * 0.65; // 0.65 safety factor for monospace numbers
+                                            const estimatedRegWidth = regLen * printSettings.fontSize * 0.55; // 0.55 safety factor for monospace numbers
                                             const regScale = estimatedRegWidth > maxRegWidth ? (maxRegWidth / estimatedRegWidth) : 1;
 
                                             return (
@@ -538,22 +538,19 @@ const StudentAttendance = () => {
                                                     <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, whiteSpace: 'nowrap', overflow: 'hidden' }}>{student.rollNo || '--'}</td>
                                                     <td style={{ textAlign: 'center', padding: `${cellPadding}px`, overflow: 'hidden' }}>
                                                         <div style={{
-                                                            width: `${(100 / regScale)}%`,
-                                                            transform: `scaleX(${regScale})`,
-                                                            transformOrigin: 'center center',
+                                                            fontSize: `${(printSettings.fontSize * regScale).toFixed(2)}px`,
                                                             whiteSpace: 'nowrap',
                                                             overflow: 'hidden'
                                                         }}>
                                                             {regText}
                                                         </div>
                                                     </td>
-                                                    <td style={{ padding: `0 ${cellPadding + 4}px`, fontWeight: '600', overflow: 'hidden' }}>
+                                                    <td style={{ padding: `0 ${cellPadding + 4}px`, fontWeight: '500', overflow: 'hidden' }}>
                                                         <div style={{
-                                                            width: `${(100 / nameScale)}%`,
-                                                            transform: `scaleX(${nameScale})`,
-                                                            transformOrigin: 'left center',
+                                                            fontSize: `${(printSettings.fontSize * nameScale).toFixed(2)}px`,
                                                             whiteSpace: 'nowrap',
-                                                            overflow: 'hidden'
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
                                                         }}>
                                                             {nameText}
                                                         </div>
