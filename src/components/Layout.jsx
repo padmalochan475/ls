@@ -104,12 +104,33 @@ const Layout = ({ children }) => {
             }
         };
 
-        // Initial call
-        updateHeartbeat();
+        let interval;
+        const startHeartbeat = () => {
+            stopHeartbeat();
+            updateHeartbeat();
+            interval = setInterval(updateHeartbeat, 5 * 60 * 1000); // 5 minutes
+        };
 
-        // Interval
-        const interval = setInterval(updateHeartbeat, 20000); // Every 20 seconds
-        return () => clearInterval(interval);
+        const stopHeartbeat = () => {
+            if (interval) clearInterval(interval);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                startHeartbeat();
+            } else {
+                stopHeartbeat();
+            }
+        };
+
+        // Initial setup
+        startHeartbeat();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            stopHeartbeat();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [currentUser]);
 
     // Handle Window Resize

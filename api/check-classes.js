@@ -5,9 +5,15 @@ import axios from 'axios';
 // Initialize Firebase Admin (Singleton)
 if (!admin.apps.length) {
     try {
-        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-            ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-            : null;
+        let serviceAccount = null;
+        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+            let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
+            if (serviceAccountStr.startsWith('"') && serviceAccountStr.endsWith('"')) {
+                serviceAccountStr = serviceAccountStr.slice(1, -1);
+            }
+            serviceAccountStr = serviceAccountStr.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
+            serviceAccount = JSON.parse(serviceAccountStr);
+        }
 
         if (serviceAccount) {
             admin.initializeApp({
@@ -188,7 +194,7 @@ export default async function handler(req, res) {
             db.collection('settings').doc('templates').get()
         ]);
 
-        const activeAcademicYear = configSnap.exists ? configSnap.data().activeAcademicYear : '2024-2025';
+        const activeAcademicYear = (configSnap.exists && configSnap.data().activeAcademicYear) ? configSnap.data().activeAcademicYear : null;
         const notifSettings = notifSnap.exists ? notifSnap.data() : {};
         const warn1Min = parseInt(notifSettings.firstWarning) || 15;
         const warn2Min = parseInt(notifSettings.secondWarning) || 5;

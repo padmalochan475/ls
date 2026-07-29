@@ -5,7 +5,12 @@ import admin from 'firebase-admin';
 if (!admin.apps.length) {
     try {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
+            if (serviceAccountStr.startsWith('"') && serviceAccountStr.endsWith('"')) {
+                serviceAccountStr = serviceAccountStr.slice(1, -1);
+            }
+            serviceAccountStr = serviceAccountStr.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
+            const serviceAccount = JSON.parse(serviceAccountStr);
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount)
             });

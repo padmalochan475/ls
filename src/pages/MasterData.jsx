@@ -103,116 +103,8 @@ const MasterData = ({ initialTab }) => {
         }
     }, [activeTab]);
 
-    // Security Sync State
-    const [syncStatus, setSyncStatus] = useState('');
-
-
-
-    // eslint-disable-next-line sonarjs/cognitive-complexity
-    const runSecuritySync = async () => {
-        setSyncStatus('Starting Sync...');
-        try {
-            const usersSnap = await getDocs(collection(db, 'users'));
-            if (usersSnap.empty) {
-                setSyncStatus('No users found to sync.');
-                return;
-            }
-
-            const BATCH_SIZE = 450; // Safety margin below 500
-            let count = 0;
-            let batch = writeBatch(db);
-            let batchCount = 0;
-
-            // 1. Sync Emp Lookups
-            for (const userDoc of usersSnap.docs) {
-                const userData = userDoc.data();
-                if (userData.empId && userData.email) {
-                    const lookupRef = doc(db, 'emp_lookups', userData.empId);
-                    batch.set(lookupRef, {
-                        email: userData.email,
-                        uid: userDoc.id,
-                        syncedAt: new Date().toISOString()
-                    });
-                    count++;
-                    batchCount++;
-
-                    // Check batch limit
-                    if (batchCount >= BATCH_SIZE) {
-                        await batch.commit();
-                        batch = writeBatch(db);
-                        batchCount = 0;
-                    }
-                }
-            }
-
-            // 2. FORCE SYNC PHOTOS (Fix for "Wrong Photos")
-            // Iterate all FACTULTY and find matching USER to update photoURL
-            const facultySnap = await getDocs(collection(db, 'faculty'));
-            let photoCount = 0;
-
-            let skippedCount = 0;
-            let missingUidCount = 0;
-
-            for (const facDoc of facultySnap.docs) {
-                const facData = facDoc.data();
-                if (facData.uid) {
-                    const userDoc = usersSnap.docs.find(u => u.id === facData.uid);
-                    if (userDoc) {
-                        const userData = userDoc.data();
-                        batch.update(doc(db, 'faculty', facDoc.id), {
-                            photoURL: userData.photoURL || null,
-                            email: userData.email || facData.email,
-                            name: userData.name || facData.name,
-                            mobile: userData.mobile || facData.mobile || null,
-                            phone: userData.mobile || facData.phone || null
-                        });
-                        count++;
-                        batchCount++;
-                        photoCount++;
-
-                        if (batchCount >= BATCH_SIZE) {
-                            await batch.commit();
-                            batch = writeBatch(db);
-                            batchCount = 0;
-                        }
-                    } else {
-                        skippedCount++; // UID exists but User not found (Deleted user?)
-                    }
-                } else {
-                    missingUidCount++; // Faculty has no linked User
-                }
-            }
-
-            if (batchCount > 0) {
-                await batch.commit();
-            }
-
-            let msg = `Success! Synced ${count} records (${photoCount} photos).`;
-            if (missingUidCount > 0) msg += ` Warning: ${missingUidCount} faculty have no linked User account.`;
-            if (skippedCount > 0) msg += ` Warning: ${skippedCount} faculty linked to non-existent users.`;
-
-            setSyncStatus(msg);
-
-            // Auto revert tab after 3 seconds
-            setTimeout(() => { setSyncStatus(''); setActiveTab('faculty'); }, 3000);
-
-        } catch (err) {
-            console.error("Sync Failed:", err);
-            setSyncStatus(`Error: ${err.message}`);
-        }
-    };
-
     useEffect(() => {
-        if (activeTab === 'security') {
-            runSecuritySync();
-        } else if (initialTab) {
-            // Only set if not security
-            // Removed strictly forced set to avoid loop, simple check is enough
-        }
-    }, [activeTab, initialTab]);
-
-    useEffect(() => {
-        if (initialTab && initialTab !== 'security') setActiveTab(initialTab);
+        if (initialTab) setActiveTab(initialTab);
     }, [initialTab]);
     const hasAutoSyncedRef = useRef(false);
 
@@ -349,8 +241,7 @@ const MasterData = ({ initialTab }) => {
         { id: 'semesters', label: 'Semesters', singular: 'Semester', icon: <Hash size={18} />, collection: 'semesters' },
         { id: 'holidays', label: 'Holidays', singular: 'Holiday', icon: <CalendarOff size={18} />, collection: 'settings' },
         { id: 'settings', label: 'Settings', singular: 'Setting', icon: <Settings size={18} />, collection: 'settings' },
-        // Security Sync (Hidden: Run once during migration)
-        { id: 'security', label: 'Sync Security', singular: 'Sync Action', icon: <RefreshCw size={18} />, collection: 'users', isAction: true },
+
     ];
 
     const activeCollection = tabs.find(t => t.id === activeTab)?.collection;
@@ -1889,31 +1780,7 @@ const MasterData = ({ initialTab }) => {
                     </div>
 
                 )}
-                {
-                    activeTab === 'security' && (
-                        <div className="glass-panel animate-fade-in" style={{ padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                            <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
-                                <RefreshCw size={64} className={syncStatus.includes('Starting') ? 'spin-animation' : ''} color="#60a5fa" />
-                                {syncStatus.includes('Starting') && (
-                                    <div style={{
-                                        position: 'absolute', inset: -10, borderRadius: '50%',
-                                        border: '2px solid rgba(96, 165, 250, 0.3)',
-                                        borderTopColor: '#60a5fa',
-                                        animation: 'rotate 1s linear infinite'
-                                    }} />
-                                )}
-                            </div>
-                            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1rem 0' }}>
-                                {syncStatus || 'Initializing Security Sync...'}
-                            </h3>
-                            <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', lineHeight: '1.6' }}>
-                                {syncStatus.includes('Success')
-                                    ? 'Your user database is now synchronized with the secure lookup table. You can safely lock the main users collection.'
-                                    : 'This process securely copies Employee IDs to a restricted lookup table, enabling secure login without exposing your user list.'}
-                            </p>
-                        </div>
-                    )
-                }
+
                 {
                     !['settings', 'security'].includes(activeTab) && (
                         <>

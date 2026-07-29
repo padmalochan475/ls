@@ -1,5 +1,4 @@
 import React from 'react';
-import { FlaskConical } from 'lucide-react';
 
 const QuantumLoader = ({ size }) => {
     // If size is provided, render inline spinner version
@@ -23,7 +22,7 @@ const QuantumLoader = ({ size }) => {
                         position: absolute;
                         border: 2px solid transparent;
                         border-radius: 50%;
-                        animation: spin 1s linear infinite;
+                        animation: qs-spin 1s linear infinite;
                     }
                     .quantum-spinner .orbit-1 {
                         inset: 0;
@@ -35,7 +34,7 @@ const QuantumLoader = ({ size }) => {
                         animation-direction: reverse;
                         animation-duration: 1.5s;
                     }
-                    @keyframes spin { 100% { transform: rotate(360deg); } }
+                    @keyframes qs-spin { 100% { transform: rotate(360deg); } }
                 `}</style>
             </div>
         );
@@ -55,7 +54,7 @@ const QuantumLoader = ({ size }) => {
 
                 {/* Floating Glass Icon */}
                 <div className="glass-prism">
-                    <FlaskConical size={48} className="beaker-icon" />
+                    <img src="/logo.png" alt="LAMS Logo" style={{ width: '48px', height: 'auto', zIndex: 10 }} className="beaker-icon" />
                     <div className="prism-shine"></div>
                 </div>
             </div>
@@ -64,7 +63,8 @@ const QuantumLoader = ({ size }) => {
             <div className="text-container">
                 <h1 className="brand-title">LAMS</h1>
                 <div className="loading-status">
-                    <span className="dot"></span> INITIALIZING SYSTEM
+                    <span className="dot"></span> 
+                    <span>INITIALIZING SYSTEM</span>
                 </div>
             </div>
 
@@ -81,6 +81,7 @@ const QuantumLoader = ({ size }) => {
     z-index: 9999;
     font-family: 'Inter', sans-serif;
     overflow: hidden;
+    animation: loaderFadeIn 0.3s ease-out;
 }
 
 .aurora-bg {
@@ -116,6 +117,7 @@ const QuantumLoader = ({ size }) => {
     height: 100%;
     border-top-color: rgba(56, 189, 248, 0.8);
     animation: spin 3s linear infinite;
+    will-change: transform;
 }
 
 .orbit-2 {
@@ -123,6 +125,7 @@ const QuantumLoader = ({ size }) => {
     height: 80%;
     border-bottom-color: rgba(139, 92, 246, 0.8);
     animation: spin-reverse 4s linear infinite;
+    will-change: transform;
 }
 
 /* Glass Prism */
@@ -140,6 +143,7 @@ const QuantumLoader = ({ size }) => {
     animation: float 4s ease-in-out infinite;
     position: relative;
     overflow: hidden;
+    will-change: transform;
 }
 
 .beaker-icon {
@@ -158,18 +162,25 @@ const QuantumLoader = ({ size }) => {
     animation: shine 4s ease-in-out infinite;
 }
 
+/* Text Container */
+.text-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
 /* Text */
 .brand-title {
     font-size: 2rem;
     font-weight: 800;
     letter-spacing: 0.2em;
-    margin-right: -0.2em; /* offset for letter-spacing to fix centering */
+    padding-left: 0.2em; /* Standard fix: counteracts trailing letter-spacing to truly center */
     background: linear-gradient(to right, #fff, #94a3b8);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-top: 0;
     margin-bottom: 0;
-    margin-left: 0;
     text-transform: uppercase;
     text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
 }
@@ -179,6 +190,7 @@ const QuantumLoader = ({ size }) => {
     color: #64748b;
     font-size: 0.75rem;
     letter-spacing: 0.3em;
+    padding-left: 0.3em; /* Same fix: counteracts trailing letter-spacing */
     display: flex;
     align-items: center;
     gap: 8px;
@@ -251,6 +263,15 @@ const QuantumLoader = ({ size }) => {
 
     50% {
         opacity: 0.3;
+    }
+}
+
+@keyframes loaderFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
     }
 }
             `}</style>

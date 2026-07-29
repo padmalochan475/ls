@@ -9,7 +9,6 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
 // FlaskConical and Logo removed (unused)
-import QuantumLoader from '../components/QuantumLoader';
 import toast from 'react-hot-toast';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 
@@ -51,12 +50,7 @@ const cleanYears = (years) => {
     return valid.sort().reverse();
 };
 
-const predictCurrentYear = () => {
-    const now = new Date();
-    const month = now.getMonth(); // 0-11. June(5) is start of academic year usually.
-    const startYear = month >= 5 ? now.getFullYear() : now.getFullYear() - 1;
-    return `${startYear}-${startYear + 1}`;
-};
+
 
 const STORAGE_KEYS = {
     SELECTED_YEAR: 'lams_sel_year',
@@ -79,25 +73,26 @@ export const AuthProvider = ({ children }) => {
         } catch (e) {
             console.warn("Failed to parse cached years", e);
         }
-        return [predictCurrentYear()];
+        return [];
     });
 
     // 4. State: Active/System Year
     const [systemAcademicYear, setSystemAcademicYear] = useState(() => {
-        // We can trust the "System Year" cache slightly more, or just wait for server.
-        // Let's rely on server to avoid mismatch.
-        return localStorage.getItem(STORAGE_KEYS.SYSTEM_YEAR) || predictCurrentYear();
+        const stored = localStorage.getItem(STORAGE_KEYS.SYSTEM_YEAR);
+        return (stored && stored !== 'null') ? stored : null;
     });
 
     // 5. State: User Selection (Persist this, it's a user preference)
     const [selectedAcademicYear, setSelectedAcademicYear] = useState(() => {
-        return localStorage.getItem(STORAGE_KEYS.SELECTED_YEAR) || null;
+        const stored = localStorage.getItem(STORAGE_KEYS.SELECTED_YEAR);
+        return (stored && stored !== 'null') ? stored : null;
     });
 
     const [maxFacultyLoad, setMaxFacultyLoad] = useState(18);
     const [yearConfigs, setYearConfigs] = useState({});
     const [loading, setLoading] = useState(true);
     const [isSystemSyncing, setIsSystemSyncing] = useState(false); // Global Sync Shield
+    const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
     const selectedAcademicYearRef = useRef(null);
     const previousSystemYear = useRef(null);
@@ -242,7 +237,7 @@ export const AuthProvider = ({ children }) => {
                     const data = docSnap.data();
 
                     // A. Validate & Clean Server Data
-                    const fetchedSystemYear = data.activeAcademicYear || predictCurrentYear();
+                    const fetchedSystemYear = data.activeAcademicYear || null;
                     const fetchedYears = cleanYears(data.academicYears || []);
                     const fetchedConfigs = data.yearConfigs || {};
                     const fetchedAllowChange = data.allowUserYearChange || false;
@@ -275,31 +270,48 @@ export const AuthProvider = ({ children }) => {
 
                     // Update the Ref and Storage for next time
                     previousSystemYear.current = fetchedSystemYear;
-                    localStorage.setItem(STORAGE_KEYS.SYSTEM_YEAR, fetchedSystemYear);
+                    if (fetchedSystemYear) {
+                        localStorage.setItem(STORAGE_KEYS.SYSTEM_YEAR, fetchedSystemYear);
+                    } else {
+                        localStorage.removeItem(STORAGE_KEYS.SYSTEM_YEAR);
+                    }
 
                     // E. Persistence
                     localStorage.setItem(STORAGE_KEYS.ALL_YEARS, JSON.stringify(finalYears));
 
                     // Short artificial delay to let contexts catch up visually
                     setTimeout(() => setIsSystemSyncing(false), 800);
+                    setIsConfigLoaded(true);
 
                 } else {
                     console.log("No Remote Config Found - Running in Offline/Fallback Mode");
-                    setAcademicYears(prev => {
-                        const predicted = predictCurrentYear();
-                        if (!prev.includes(predicted)) {
-                            return cleanYears([...prev, predicted]);
-                        }
-                        return prev;
-                    });
+                    const cachedSysYear = localStorage.getItem(STORAGE_KEYS.SYSTEM_YEAR);
+                    const cachedAllYears = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_YEARS) || '[]');
+                    
+                    if (cachedSysYear) {
+                        setSystemAcademicYear(cachedSysYear);
+                    }
+                    if (cachedAllYears && cachedAllYears.length > 0) {
+                        setAcademicYears(cachedAllYears);
+                    }
+                    setTimeout(() => setIsSystemSyncing(false), 800);
+                    setIsConfigLoaded(true);
                 }
             } catch (err) {
                 console.error("Global Config Sync Error:", err);
+                const cachedSysYear = localStorage.getItem(STORAGE_KEYS.SYSTEM_YEAR);
+                if (cachedSysYear) setSystemAcademicYear(cachedSysYear);
                 setIsSystemSyncing(false); // Force dismiss loader on error
+                setIsConfigLoaded(true);
             }
         }, (err) => {
             console.error("Config Snapshot Error:", err);
+            const cachedSysYear = localStorage.getItem(STORAGE_KEYS.SYSTEM_YEAR);
+            const cachedAllYears = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_YEARS) || '[]');
+            if (cachedSysYear) setSystemAcademicYear(cachedSysYear);
+            if (cachedAllYears && cachedAllYears.length > 0) setAcademicYears(cachedAllYears);
             setIsSystemSyncing(false); // Force dismiss loader on snapshot error
+            setIsConfigLoaded(true);
         });
 
         return () => unsub();
@@ -340,6 +352,7 @@ export const AuthProvider = ({ children }) => {
         const safetyTimer = setTimeout(() => {
             setLoading(prev => {
                 if (prev) console.warn("Auth initialization timed out (Likely Firestore Limit). Forcing degraded mode.");
+                setIsConfigLoaded(true); // Must also force this to true, otherwise value.loading stays true forever
                 return false;
             });
         }, 7000);
@@ -356,13 +369,34 @@ export const AuthProvider = ({ children }) => {
         if (currentUser) {
             // Using onSnapshot for Real-Time Role/Profile Updates
             // This allows Admins to Ban/Promote users instantly.
-            setLoading(true);
+            if (!userProfile) setLoading(true);
             const docRef = doc(db, 'users', currentUser.uid);
 
             unsubscribeProfile = onSnapshot(docRef,
                 (docSnap) => {
                     if (docSnap.exists()) {
-                        setUserProfile(docSnap.data());
+                        const newData = docSnap.data();
+                        setUserProfile(prev => {
+                            if (!prev) return newData;
+                            
+                            // Prevent re-renders from background 'lastSeen' updates (Heartbeat)
+                            // We ignore 'lastSeen', 'sessions', and 'isOnline'
+                            const ignoreKeys = ['lastSeen', 'sessions', 'isOnline'];
+                            const keys1 = Object.keys(prev).filter(k => !ignoreKeys.includes(k));
+                            const keys2 = Object.keys(newData).filter(k => !ignoreKeys.includes(k));
+                            
+                            let isMeaningfulChange = keys1.length !== keys2.length;
+                            if (!isMeaningfulChange) {
+                                for (let key of keys1) {
+                                    if (JSON.stringify(prev[key]) !== JSON.stringify(newData[key])) {
+                                        isMeaningfulChange = true;
+                                        break;
+                                    }
+                                }
+                            }
+                                
+                            return isMeaningfulChange ? newData : prev;
+                        });
                     } else {
                         console.warn("User Profile Missing!");
                         setUserProfile(null);
@@ -394,7 +428,7 @@ export const AuthProvider = ({ children }) => {
         signup,
         resetPassword,
         logout,
-        loading,
+        loading: loading || (currentUser && !isConfigLoaded),
         isSystemSyncing,
         allowUserYearChange // Expose the new setting
     }), [
@@ -405,13 +439,14 @@ export const AuthProvider = ({ children }) => {
         academicYears,
         maxFacultyLoad,
         loading,
+        isConfigLoaded,
         isSystemSyncing,
         allowUserYearChange
     ]);
 
     return (
         <AuthContext.Provider value={value}>
-            {loading ? <QuantumLoader /> : children}
+            {loading ? <div style={{ position:'fixed', inset:0, background:'#050505', zIndex:9999 }} /> : children}
         </AuthContext.Provider>
     );
 };

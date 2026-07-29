@@ -182,7 +182,7 @@ const Dashboard = () => {
     const { userProfile, activeAcademicYear } = useAuth();
     // Schedules derived via useMemo
     const [roomCount, setRoomCount] = useState(0);
-    const { schedule: allData = [] } = useScheduleData() || {};
+    const { schedule: allData = [], loading: scheduleLoading, refreshSchedule } = useScheduleData() || {};
     const totalClasses = allData ? allData.length : 0; // Derived instead
     const [facultyList, setFacultyList] = useState([]);
     const [selectedFaculty, setSelectedFaculty] = useState('');
@@ -275,7 +275,7 @@ const Dashboard = () => {
         return { label: 'Upcoming', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' };
     };
 
-    const { loading: scheduleLoading, refreshSchedule } = useScheduleData() || {};
+    // Removed duplicate useScheduleData call
     // Use Real-Time Master Data Context instead of manual fetch
     const {
         faculty: masterFaculty = [],

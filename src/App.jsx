@@ -36,6 +36,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   const { loading: scheduleLoading } = useScheduleData() || {};
   const location = useLocation();
 
+  // Single QuantumLoader covering all loading states (auth + masterData + schedule)
   if (loading || masterLoading || scheduleLoading) return <QuantumLoader />;
 
   if (!userProfile) {

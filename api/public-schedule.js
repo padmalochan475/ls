@@ -7,7 +7,12 @@ import { join } from 'path';
 if (!admin.apps.length) {
     try {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
+            if (serviceAccountStr.startsWith('"') && serviceAccountStr.endsWith('"')) {
+                serviceAccountStr = serviceAccountStr.slice(1, -1);
+            }
+            serviceAccountStr = serviceAccountStr.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
+            const serviceAccount = JSON.parse(serviceAccountStr);
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount)
             });
@@ -40,7 +45,7 @@ export default async function handler(req, res) {
         // 1. Get Config
         const configSnap = await db.collection('settings').doc('config').get();
         if (!configSnap.exists) throw new Error("Config not found");
-        const activeYear = configSnap.data().activeAcademicYear;
+        const activeYear = configSnap.data().activeAcademicYear || null;
 
         // 2. Parallel Fetch
         const [daysSnap, timeSnap, scheduleSnap, subjectsSnap, deptsSnap, roomsSnap, semsSnap, facultySnap] = await Promise.all([

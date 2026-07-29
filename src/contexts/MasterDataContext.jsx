@@ -75,19 +75,28 @@ export const MasterDataProvider = ({ children }) => {
                 const cache = JSON.parse(localStorage.getItem(`lams_master_cache_${currentUser.uid}`) || '{}');
                 if (cache.faculty) {
                     setDepartments(cache.departments || []);
+                    departmentsRef.current = cache.departments || [];
                     setSemesters(cache.semesters || []);
+                    semestersRef.current = cache.semesters || [];
                     setSubjects(cache.subjects || []);
+                    subjectsRef.current = cache.subjects || [];
                     setFaculty(cache.faculty || []);
+                    facultyRef.current = cache.faculty || [];
                     setRooms(cache.rooms || []);
+                    roomsRef.current = cache.rooms || [];
                     setDays(cache.days || []);
+                    daysRef.current = cache.days || [];
                     setTimeSlots(cache.timeSlots || []);
+                    timeSlotsRef.current = cache.timeSlots || [];
                     setGroups(cache.groups || []);
+                    groupsRef.current = cache.groups || [];
                     setHolidays(cache.holidays || []);
+                    holidaysRef.current = cache.holidays || [];
                     // We stay in "loading" state until live sync finishes, but UI has data!
                 }
             } catch (e) { console.warn("Cache load failed"); }
 
-            setLoading(true);
+            if (!departmentsRef.current || departmentsRef.current.length === 0) setLoading(true);
             cleanupListeners();
 
             const loadStatus = {
@@ -155,17 +164,30 @@ export const MasterDataProvider = ({ children }) => {
                         items.sort((a, b) => naturalSort(a.name || '', b.name || ''));
                     }
                     
-                    // Update State + Ref for caching
-                    setState(items);
-                    if (statusKey === 'departments') departmentsRef.current = items;
-                    if (statusKey === 'semesters') semestersRef.current = items;
-                    if (statusKey === 'subjects') subjectsRef.current = items;
-                    if (statusKey === 'faculty') facultyRef.current = items;
-                    if (statusKey === 'rooms') roomsRef.current = items;
-                    if (statusKey === 'days') daysRef.current = items;
-                    if (statusKey === 'timeslots') timeSlotsRef.current = items;
-                    if (statusKey === 'groups') groupsRef.current = items;
-                    if (statusKey === 'settings') holidaysRef.current = items;
+                    // Check if data actually changed to prevent violent React re-renders on boot
+                    let prevItems = [];
+                    if (statusKey === 'departments') prevItems = departmentsRef.current;
+                    else if (statusKey === 'semesters') prevItems = semestersRef.current;
+                    else if (statusKey === 'subjects') prevItems = subjectsRef.current;
+                    else if (statusKey === 'faculty') prevItems = facultyRef.current;
+                    else if (statusKey === 'rooms') prevItems = roomsRef.current;
+                    else if (statusKey === 'days') prevItems = daysRef.current;
+                    else if (statusKey === 'timeslots') prevItems = timeSlotsRef.current;
+                    else if (statusKey === 'groups') prevItems = groupsRef.current;
+                    else if (statusKey === 'settings') prevItems = holidaysRef.current;
+
+                    if (JSON.stringify(prevItems) !== JSON.stringify(items)) {
+                        setState(items);
+                        if (statusKey === 'departments') departmentsRef.current = items;
+                        if (statusKey === 'semesters') semestersRef.current = items;
+                        if (statusKey === 'subjects') subjectsRef.current = items;
+                        if (statusKey === 'faculty') facultyRef.current = items;
+                        if (statusKey === 'rooms') roomsRef.current = items;
+                        if (statusKey === 'days') daysRef.current = items;
+                        if (statusKey === 'timeslots') timeSlotsRef.current = items;
+                        if (statusKey === 'groups') groupsRef.current = items;
+                        if (statusKey === 'settings') holidaysRef.current = items;
+                    }
 
                     loadStatus[statusKey] = true;
                     checkAllLoaded();
@@ -177,17 +199,15 @@ export const MasterDataProvider = ({ children }) => {
                 unsubsRef.current.push(unsubscribe);
             };
 
-            setupTimer = setTimeout(() => {
-                setupListener('departments', setDepartments, 'departments');
-                setupListener('semesters', setSemesters, 'semesters');
-                setupListener('subjects', setSubjects, 'subjects');
-                setupListener('faculty', setFaculty, 'faculty');
-                setupListener('rooms', setRooms, 'rooms');
-                setupListener('days', setDays, 'days');
-                setupListener('timeslots', setTimeSlots, 'timeslots');
-                setupListener('groups', setGroups, 'groups');
-                setupListener('settings', setHolidays, 'settings', query(collection(db, 'settings'), where('type', '==', 'holiday')));
-            }, 300);
+            setupListener('departments', setDepartments, 'departments');
+            setupListener('semesters', setSemesters, 'semesters');
+            setupListener('subjects', setSubjects, 'subjects');
+            setupListener('faculty', setFaculty, 'faculty');
+            setupListener('rooms', setRooms, 'rooms');
+            setupListener('days', setDays, 'days');
+            setupListener('timeslots', setTimeSlots, 'timeslots');
+            setupListener('groups', setGroups, 'groups');
+            setupListener('settings', setHolidays, 'settings', query(collection(db, 'settings'), where('type', '==', 'holiday')));
         };
 
         const handleVisibilityChange = () => {

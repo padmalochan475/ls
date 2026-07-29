@@ -17,7 +17,10 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText
     if (!isVisible && !isOpen) return null;
 
     return createPortal(
-        <div className={`modal-overlay ${isOpen ? 'open' : 'closing'}`} style={{
+        <div 
+            className={`modal-overlay ${isOpen ? 'open' : 'closing'}`} 
+            onClick={onCancel}
+            style={{
             position: 'fixed',
             inset: 0,
             zIndex: 9999,
@@ -30,7 +33,10 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText
             transition: 'opacity 0.2s',
             pointerEvents: isOpen ? 'auto' : 'none'
         }}>
-            <div className={`modal-content-glass ${isOpen ? 'open' : 'closing'}`} style={{
+            <div 
+                className={`modal-content-glass ${isOpen ? 'open' : 'closing'}`} 
+                onClick={(e) => e.stopPropagation()}
+                style={{
                 background: 'var(--color-bg-main, #0f172a)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '16px',

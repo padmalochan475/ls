@@ -90,7 +90,7 @@ const AdminPanel = () => {
             if (u.sessions) {
                 Object.values(u.sessions).forEach(timestamp => {
                     const diffMinutes = (now - new Date(timestamp)) / 1000 / 60;
-                    if (diffMinutes < 2) {
+                    if (diffMinutes < 6) {
                         userActiveDevices++;
                     }
                 });
@@ -99,7 +99,7 @@ const AdminPanel = () => {
             // Fallback to lastSeen if sessions empty/missing (backward compatibility)
             if (userActiveDevices === 0 && u.lastSeen) {
                 const diffMinutes = (now - new Date(u.lastSeen)) / 1000 / 60;
-                if (diffMinutes < 2) userActiveDevices = 1;
+                if (diffMinutes < 6) userActiveDevices = 1;
             }
 
             if (userActiveDevices > 0) {
@@ -113,7 +113,7 @@ const AdminPanel = () => {
                     email: u.email,
                     deviceCount: userActiveDevices
                 });
-            } else if (u.lastSeen && (now - new Date(u.lastSeen)) / 1000 / 60 < 10) {
+            } else if (u.lastSeen && (now - new Date(u.lastSeen)) / 1000 / 60 < 15) {
                 idleCount++;
             }
         });
@@ -390,14 +390,18 @@ const AdminPanel = () => {
                 if (userData.empId) {
                     const q = query(collection(db, 'faculty'), where('uid', '==', userId));
                     const facSnap = await getDocs(q);
-                    facSnap.forEach(async (d) => {
-                        await updateDoc(d.ref, {
-                            uid: null,
-                            isRegistered: false,
-                            // We keep the email in master data as it might be their official contact
-                            // but we strip the linkage
+                    if (!facSnap.empty) {
+                        const batch = writeBatch(db);
+                        facSnap.forEach((d) => {
+                            batch.update(d.ref, {
+                                uid: null,
+                                isRegistered: false,
+                                // We keep the email in master data as it might be their official contact
+                                // but we strip the linkage
+                            });
                         });
-                    });
+                        await batch.commit();
+                    }
                 }
             }
 

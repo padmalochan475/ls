@@ -9,7 +9,7 @@ const ScheduleContext = createContext();
 export const useScheduleContext = () => useContext(ScheduleContext);
 
 export const ScheduleProvider = ({ children }) => {
-    const { currentUser, userProfile, activeAcademicYear } = useAuth();
+    const { currentUser, userProfile, activeAcademicYear, loading: authLoading } = useAuth();
     const [schedule, setSchedule] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -19,14 +19,15 @@ export const ScheduleProvider = ({ children }) => {
         let isActive = true;
 
         const setupLiveSchedule = () => {
-            // Validation: Ensure we have a valid string year and user is logged in
+            // Don't flip loading=false if auth is still settling — prevents flash
+            if (authLoading) return;
+
             if (!activeAcademicYear || typeof activeAcademicYear !== 'string' || !currentUser) {
                 setSchedule([]);
-                setLoading(false);
+                setLoading(false); // ALWAYS drop loader if we abort
                 return;
             }
-
-            setLoading(true);
+            if (!schedule || schedule.length === 0) setLoading(true);
 
             try {
                 const baseYear = activeAcademicYear.replace(/ \((ODD|EVEN)\)/i, '').trim();
@@ -83,7 +84,7 @@ export const ScheduleProvider = ({ children }) => {
             unsubscribe();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [activeAcademicYear, currentUser, userProfile?.role, userProfile?.empId]);
+    }, [activeAcademicYear, currentUser, userProfile?.role, userProfile?.empId, authLoading]);
 
     // Manual refresh is no longer needed with real-time listeners, 
     // but kept as a stub to prevent breaking components that call it.

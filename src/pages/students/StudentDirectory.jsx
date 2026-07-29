@@ -1536,7 +1536,6 @@ export default function StudentDirectory() {
           student={editStudent}
           groups={groups}
           semesters={semesters}
-          groups={groups}
           onClose={() => { setShowAddModal(false); setEditStudent(null); }}
           onSaved={() => { setShowAddModal(false); setEditStudent(null); }}
         />
