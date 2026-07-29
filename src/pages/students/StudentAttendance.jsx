@@ -102,12 +102,12 @@ const StudentAttendance = () => {
     }, [semesterStudents, config.group]);
 
     const PAPER_SIZES = useMemo(() => ({
-        'A4': { css: 'A4 portrait', maxSafeHeight: 1000, name: 'A4 (Standard)' },
-        'A3': { css: 'A3 portrait', maxSafeHeight: 1450, name: 'A3 (Large)' },
-        'Letter': { css: 'letter portrait', maxSafeHeight: 950, name: 'Letter (8.5 x 11")' },
-        'Legal': { css: 'legal portrait', maxSafeHeight: 1150, name: 'Legal (8.5 x 14")' },
-        'B5': { css: 'B5 portrait', maxSafeHeight: 820, name: 'B5 (Notebook)' },
-        '6x4': { css: '4in 6in', maxSafeHeight: 420, name: '6x4 (Photo Card)' }
+        'A4': { css: 'A4 portrait', maxSafeHeight: 1000, name: 'A4 (Standard)', width: '210mm' },
+        'A3': { css: 'A3 portrait', maxSafeHeight: 1450, name: 'A3 (Large)', width: '297mm' },
+        'Letter': { css: 'letter portrait', maxSafeHeight: 950, name: 'Letter (8.5 x 11")', width: '215.9mm' },
+        'Legal': { css: 'legal portrait', maxSafeHeight: 1150, name: 'Legal (8.5 x 14")', width: '215.9mm' },
+        'B5': { css: 'B5 portrait', maxSafeHeight: 820, name: 'B5 (Notebook)', width: '176mm' },
+        '6x4': { css: '4in 6in', maxSafeHeight: 420, name: '6x4 (Photo Card)', width: '101.6mm' }
     }), []);
 
 
@@ -243,6 +243,49 @@ const StudentAttendance = () => {
     else if (printSettings.rowHeight <= 24) cellPadding = 1;
 
     const isReady = config.semester && config.group;
+
+    // AI-like Dynamic Exact Fitting Math
+    useEffect(() => {
+        if (!isReady || sheetStudents.length === 0) return;
+        
+        let timeoutId;
+        const calculateExactWidths = () => {
+            const containers = document.querySelectorAll('.name-cell-container');
+            containers.forEach(container => {
+                const textSpan = container.querySelector('.name-scale-target');
+                if (!textSpan) return;
+                
+                // Reset scale to measure natural width
+                textSpan.style.transform = 'scaleX(1)';
+                
+                const availableWidth = container.clientWidth;
+                const naturalWidth = textSpan.scrollWidth;
+                
+                if (naturalWidth > availableWidth && availableWidth > 0) {
+                    // Exact mathematical scale to squeeze the name horizontally, minus 1px for pixel rounding safety
+                    const scale = (availableWidth - 1) / naturalWidth;
+                    textSpan.style.transform = `scaleX(${scale})`;
+                }
+            });
+        };
+
+        // Ensure font is loaded before calculating
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                timeoutId = setTimeout(calculateExactWidths, 100);
+            });
+        } else {
+            timeoutId = setTimeout(calculateExactWidths, 100);
+        }
+        
+        // Ensure calculations fire exactly when the print dialog opens
+        window.addEventListener('beforeprint', calculateExactWidths);
+
+        return () => {
+            clearTimeout(timeoutId);
+            window.removeEventListener('beforeprint', calculateExactWidths);
+        };
+    }, [sheetStudents, printSettings.fontSize, printSettings.rowHeight, printSettings.paperSize, isReady]);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -449,9 +492,10 @@ const StudentAttendance = () => {
                 <div style={{ display: 'flex', justifyContent: 'flex-start', padding: 'min(2.5rem, 5vw)', background: 'linear-gradient(135deg, rgba(15,23,42,0.4), rgba(30,41,59,0.4))', borderRadius: '24px', overflowX: 'auto' }} className="preview-wrapper">
                     {/* True WYSIWYG Print Preview Box - Exactly simulates paper aspect ratio */}
                     <div className="print-area" style={{ 
-                        background: 'white', color: 'black', padding: 'min(24px, 4vw)', 
+                        background: 'white', color: 'black', padding: '10mm', 
                         borderRadius: '2px', fontFamily: "'Lato', sans-serif", 
-                        width: '100%', maxWidth: '1050px', minWidth: '800px', margin: '0 auto',
+                        width: PAPER_SIZES[printSettings.paperSize]?.width || '210mm', 
+                        boxSizing: 'border-box', margin: '0 auto',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
                         display: 'flex', flexDirection: 'column'
                     }}>
@@ -526,17 +570,20 @@ const StudentAttendance = () => {
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: `0 ${cellPadding + 4}px`, fontWeight: '500', overflow: 'hidden' }}>
-                                                        <div style={{
+                                                        <div className="name-cell-container" style={{
+                                                            width: '100%',
                                                             fontSize: `${(printSettings.fontSize * 0.95).toFixed(2)}px`,
-                                                            whiteSpace: 'normal',
-                                                            wordBreak: 'break-word',
-                                                            lineHeight: '1.1',
-                                                            overflow: 'hidden',
-                                                            display: '-webkit-box',
-                                                            WebkitLineClamp: 2,
-                                                            WebkitBoxOrient: 'vertical'
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden'
                                                         }}>
-                                                            {(student.name || '').toUpperCase()}
+                                                            <span className="name-scale-target" style={{
+                                                                display: 'inline-block',
+                                                                transformOrigin: 'left center',
+                                                                whiteSpace: 'nowrap',
+                                                                transition: 'transform 0.1s ease-out'
+                                                            }}>
+                                                                {(student.name || '').toUpperCase()}
+                                                            </span>
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: `${cellPadding}px` }}></td>
