@@ -237,8 +237,8 @@ const StudentPromotions = () => {
 
                 {/* FROM */}
                 <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1.25rem', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.08)', position: 'relative', boxSizing: 'border-box' }}>
-                    <div style={{ position: 'absolute', top: -10, left: 30, background: '#1e293b', padding: '0 12px', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: '10px' }}>Current State</div>
-                    <h3 style={{ color: '#94a3b8', margin: '0.5rem 0 1.5rem', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                    <div style={{ display: 'inline-block', background: '#1e293b', padding: '2px 12px', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: '8px', marginBottom: '1rem' }}>Current State</div>
+                    <h3 style={{ color: '#94a3b8', margin: '0 0 1.5rem', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
                         <History size={18} /> Will be vaulted
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -262,7 +262,7 @@ const StudentPromotions = () => {
                                 placeholder="Select or type Section"
                             />
                             <datalist id="promoSectionList">
-                                {dbSections.map(s => <option key={s} value={s} />)}
+                                {Array.from(new Set([...dbSections, ...(groups?.map(g => g.name) || [])])).sort().map(s => <option key={s} value={s} />)}
                             </datalist>
                         </div>
                         <button
@@ -277,9 +277,9 @@ const StudentPromotions = () => {
 
                 {/* TO */}
                 <div style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.06), rgba(6, 182, 212, 0.03))', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.2)', position: 'relative', boxSizing: 'border-box' }}>
-                    <div style={{ position: 'absolute', top: -10, left: 30, background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', padding: '2px 14px', fontSize: '0.8rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: '10px', boxShadow: '0 4px 12px rgba(59,130,246,0.4)' }}>Target State</div>
+                    <div style={{ display: 'inline-block', background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', padding: '2px 14px', fontSize: '0.8rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: '8px', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', marginBottom: '1rem' }}>Target State</div>
                     
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                         <h3 style={{ color: '#60a5fa', margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
                             <ArrowRight size={18} /> Moving to
                         </h3>
