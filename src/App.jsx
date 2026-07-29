@@ -32,8 +32,8 @@ import QuantumLoader from './components/QuantumLoader';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { userProfile, loading, logout } = useAuth();
-  const { loading: masterLoading } = useMasterData();
-  const { loading: scheduleLoading } = useScheduleData();
+  const { loading: masterLoading } = useMasterData() || {};
+  const { loading: scheduleLoading } = useScheduleData() || {};
   const location = useLocation();
 
   if (loading || masterLoading || scheduleLoading) return <QuantumLoader />;

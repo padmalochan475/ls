@@ -275,7 +275,7 @@ const Dashboard = () => {
         return { label: 'Upcoming', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' };
     };
 
-    const { loading: scheduleLoading, refreshSchedule } = useScheduleData();
+    const { loading: scheduleLoading, refreshSchedule } = useScheduleData() || {};
     // Use Real-Time Master Data Context instead of manual fetch
     const {
         faculty: masterFaculty = [],
