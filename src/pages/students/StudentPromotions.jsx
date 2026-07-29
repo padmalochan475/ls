@@ -7,12 +7,13 @@ import QuantumLoader from '../../components/QuantumLoader';
 import { ArrowRight, ShieldAlert, History, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const processStudent = (student, batch, mode, targetSem, targetGroup, activeAcademicYear) => {
+const processStudent = (student, batch, mode, targetSem, targetGroup, activeAcademicYear, clearRollNos) => {
     const studentRef = doc(db, 'students', student.id);
     const historyRecord = {
-        academicYear: activeAcademicYear?.name || 'Unknown',
+        academicYear: activeAcademicYear || 'Unknown',
         semester: student.semester,
-        section: student.section,
+        section: student.section || student.branch || '',
+        group: student.group || '1',
         rollNo: student.rollNo || student.rollno || null,
         timestamp: new Date().toISOString()
     };
@@ -28,12 +29,18 @@ const processStudent = (student, batch, mode, targetSem, targetGroup, activeAcad
             graduatedAt: new Date().toISOString()
         });
     } else {
-        batch.update(studentRef, {
+        const updatePayload = {
             semester: targetSem.toString(),
             ...(targetGroup ? { section: targetGroup } : {}),
             academicHistory: newHistory,
             updatedAt: new Date().toISOString()
-        });
+        };
+        
+        if (clearRollNos) {
+            updatePayload.rollNo = '';
+        }
+        
+        batch.update(studentRef, updatePayload);
     }
 };
 
@@ -51,6 +58,37 @@ const StudentPromotions = () => {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [loading, setLoading] = useState(false);
     const [processing, setProcessing] = useState(false);
+    const [clearRollNos, setClearRollNos] = useState(false);
+
+    const [dbSections, setDbSections] = useState([]);
+    const [loadingBatches, setLoadingBatches] = useState(false);
+
+    React.useEffect(() => {
+        if (!fromSem) {
+            setDbSections([]);
+            return;
+        }
+        const fetchSections = async () => {
+            setLoadingBatches(true);
+            try {
+                const q = query(collection(db, 'students'), where('semester', '==', fromSem.toString()), where('status', '==', 'active'));
+                const snap = await getDocs(q);
+                const secSet = new Set();
+                snap.forEach(doc => {
+                    const s = doc.data();
+                    const sSection = (s.section || '').trim();
+                    const subStr = sSection ? sSection : (s.branch || '').trim();
+                    if (subStr) secSet.add(subStr);
+                });
+                setDbSections(Array.from(secSet).sort());
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoadingBatches(false);
+            }
+        };
+        fetchSections();
+    }, [fromSem]);
 
     const handleFetchEligible = async () => {
         if (!fromSem) {
@@ -73,9 +111,16 @@ const StudentPromotions = () => {
                 .map(d => ({ id: d.id, ...d.data() }))
                 .filter(s => s.status === 'active')
                 .sort((a, b) => {
-                    // Sort by section first, then by regNo
-                    const secCompare = (a.section || '').localeCompare(b.section || '');
+                    const secA = a.section || a.branch || 'Unknown';
+                    const secB = b.section || b.branch || 'Unknown';
+                    const secCompare = secA.localeCompare(secB);
                     if (secCompare !== 0) return secCompare;
+                    
+                    const grpA = String(a.group || '1');
+                    const grpB = String(b.group || '1');
+                    const grpCompare = grpA.localeCompare(grpB);
+                    if (grpCompare !== 0) return grpCompare;
+                    
                     return (a.regNo || '').localeCompare(b.regNo || '');
                 });
 
@@ -87,7 +132,7 @@ const StudentPromotions = () => {
             else setMode('promote');
 
             if (data.length === 0) toast.error("No active students found for this selection.");
-            else toast.success(`Found ${data.length} eligible students across ${new Set(data.map(s => s.section)).size} batch(es).`);
+            else toast.success(`Found ${data.length} eligible students across ${new Set(data.map(s => s.section || s.branch)).size} section(s).`);
 
         } catch (error) {
             toast.error("Failed to fetch eligible students.");
@@ -106,7 +151,7 @@ const StudentPromotions = () => {
 
         const batchNote = targetGroup ? `to ${targetGroup}` : `(keeping their existing section)`;
         if (!window.confirm(
-            `Promote ${selectedIds.size} students to Sem ${targetSem} ${batchNote}?\n\nTheir current Sem/Batch will be saved to academic history before updating.`
+            `Promote ${selectedIds.size} students to Sem ${targetSem} ${batchNote}?\n\nTheir current Sem/Section/Group will be saved to academic history before updating.${clearRollNos ? '\n\nWARNING: Roll Numbers will be cleared for the promoted students!' : ''}`
         )) return;
 
         setProcessing(true);
@@ -119,7 +164,7 @@ const StudentPromotions = () => {
                 const batch = writeBatch(db);
 
                 for (const student of chunk) {
-                    processStudent(student, batch, mode, targetSem, targetGroup, activeAcademicYear);
+                    processStudent(student, batch, mode, targetSem, targetGroup, activeAcademicYear, clearRollNos);
                 }
 
                 await batch.commit();
@@ -142,9 +187,11 @@ const StudentPromotions = () => {
 
     // Group students by section for display
     const studentsBySection = eligibleStudents.reduce((acc, s) => {
-        const sec = s.section || 'Unknown';
-        if (!acc[sec]) acc[sec] = [];
-        acc[sec].push(s);
+        const sec = s.section || s.branch || 'Unknown';
+        const grp = s.group || '1';
+        const key = `${sec} - Group ${grp}`;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(s);
         return acc;
     }, {});
 
@@ -167,7 +214,7 @@ const StudentPromotions = () => {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '2rem', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
 
             {/* Info Banner */}
             <div style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.05))', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '1.25rem 1.75rem', borderRadius: '20px', display: 'flex', gap: '1.25rem', alignItems: 'flex-start', boxShadow: '0 8px 32px rgba(245, 158, 11, 0.05)' }}>
@@ -175,21 +222,21 @@ const StudentPromotions = () => {
                 <div>
                     <h4 style={{ color: '#fbbf24', margin: '0 0 0.5rem', fontWeight: 800, fontSize: '1rem', letterSpacing: '0.01em' }}>Academic History Vault Active</h4>
                     <p style={{ margin: 0, color: '#fcd34d', fontSize: '0.88rem', lineHeight: 1.6, opacity: 0.9 }}>
-                        Before any student is updated, their <b>current Semester, Batch, and Roll No</b> is safely stored in their academic history record ({activeAcademicYear?.name}).
-                        If you leave <b>Target Batch blank</b>, each student keeps their existing batch — only the semester number changes.
+                        Before any student is updated, their <b>current Semester, Section, Group, and Roll No</b> is safely stored in their academic history record ({activeAcademicYear || 'Unknown'}).
+                        If you leave <b>Target Section blank</b>, each student keeps their existing section and group — only the semester number changes.
                     </p>
                 </div>
             </div>
 
             {/* Selection Engine */}
             <div className="glass-panel" style={{ 
-                padding: '2.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2.5rem',
+                padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem',
                 background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', 
                 borderRadius: '24px', backdropFilter: 'blur(16px)', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)'
             }}>
 
                 {/* FROM */}
-                <div style={{ background: 'rgba(0,0,0,0.25)', padding: '2rem', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.08)', position: 'relative' }}>
+                <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1.25rem', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.08)', position: 'relative', boxSizing: 'border-box' }}>
                     <div style={{ position: 'absolute', top: -10, left: 30, background: '#1e293b', padding: '0 12px', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: '10px' }}>Current State</div>
                     <h3 style={{ color: '#94a3b8', margin: '0.5rem 0 1.5rem', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
                         <History size={18} /> Will be vaulted
@@ -197,20 +244,26 @@ const StudentPromotions = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         <div>
                             <label style={{ display: 'block', color: '#94a3b8', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Current Semester <span style={{ color: '#f87171' }}>*</span></label>
-                            <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} value={fromSem} onChange={e => { setFromSem(e.target.value); setEligibleStudents([]); setSelectedIds(new Set()); }}>
+                            <select style={{ boxSizing: 'border-box', width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} value={fromSem} onChange={e => { setFromSem(e.target.value); setEligibleStudents([]); setSelectedIds(new Set()); }}>
                                 <option value="" style={{ background: '#0f172a' }}>— Select Semester —</option>
                                 {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>Sem {s.number}</option>)}
                             </select>
                         </div>
                         <div>
                             <label style={{ display: 'block', color: '#94a3b8', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                Filter by Batch
-                                <span style={{ marginLeft: '10px', fontSize: '0.7rem', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '4px 8px', borderRadius: '10px', textTransform: 'none' }}>Optional — blank = ALL batches</span>
+                                Filter by Section {loadingBatches && <span style={{ color: '#60a5fa', textTransform: 'none', marginLeft: '4px' }}>(loading...)</span>}
+                                <span style={{ marginLeft: '10px', fontSize: '0.7rem', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '4px 8px', borderRadius: '10px', textTransform: 'none' }}>Optional — blank = ALL sections</span>
                             </label>
-                            <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} value={fromGroup} onChange={e => { setFromGroup(e.target.value); setEligibleStudents([]); setSelectedIds(new Set()); }}>
-                                <option value="" style={{ background: '#0f172a' }}>— All Batches —</option>
-                                {groups.map(g => <option key={g.id} value={g.name} style={{ background: '#0f172a' }}>{g.name}</option>)}
-                            </select>
+                            <input 
+                                style={{ boxSizing: 'border-box', width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} 
+                                value={fromGroup} 
+                                onChange={e => { setFromGroup(e.target.value); setEligibleStudents([]); setSelectedIds(new Set()); }}
+                                list="promoSectionList"
+                                placeholder="Select or type Section"
+                            />
+                            <datalist id="promoSectionList">
+                                {dbSections.map(s => <option key={s} value={s} />)}
+                            </datalist>
                         </div>
                         <button
                             onClick={handleFetchEligible}
@@ -223,7 +276,7 @@ const StudentPromotions = () => {
                 </div>
 
                 {/* TO */}
-                <div style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.06), rgba(6, 182, 212, 0.03))', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(59, 130, 246, 0.2)', position: 'relative' }}>
+                <div style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.06), rgba(6, 182, 212, 0.03))', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.2)', position: 'relative', boxSizing: 'border-box' }}>
                     <div style={{ position: 'absolute', top: -10, left: 30, background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', padding: '2px 14px', fontSize: '0.8rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: '10px', boxShadow: '0 4px 12px rgba(59,130,246,0.4)' }}>Target State</div>
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', marginTop: '0.5rem' }}>
@@ -240,26 +293,41 @@ const StudentPromotions = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                             <div>
                                 <label style={{ display: 'block', color: '#94a3b8', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Target Semester <span style={{ color: '#f87171' }}>*</span></label>
-                                <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} value={targetSem} onChange={e => setTargetSem(e.target.value)}>
+                                <select style={{ boxSizing: 'border-box', width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} value={targetSem} onChange={e => setTargetSem(e.target.value)}>
                                     <option value="" style={{ background: '#0f172a' }}>— Select Target Semester —</option>
                                     {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>Sem {s.number}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label style={{ display: 'block', color: '#94a3b8', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                    Target Batch
+                                    Target Section
                                     <span style={{ marginLeft: '10px', fontSize: '0.7rem', background: 'rgba(16,185,129,0.1)', color: '#34d399', padding: '4px 8px', borderRadius: '10px', textTransform: 'none' }}>Optional — blank = keep existing</span>
                                 </label>
-                                <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} value={targetGroup} onChange={e => setTargetGroup(e.target.value)}>
-                                    <option value="" style={{ background: '#0f172a' }}>— Keep Existing Batch —</option>
-                                    {groups.map(g => <option key={g.id} value={g.name} style={{ background: '#0f172a' }}>{g.name}</option>)}
-                                </select>
+                                <input 
+                                    style={{ boxSizing: 'border-box', width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} 
+                                    value={targetGroup} 
+                                    onChange={e => setTargetGroup(e.target.value)}
+                                    list="promoSectionList"
+                                    placeholder="Leave blank to keep existing"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: '0.5rem' }}>
+                                <input
+                                    type="checkbox"
+                                    id="clearRollNosCheck"
+                                    checked={clearRollNos}
+                                    onChange={e => setClearRollNos(e.target.checked)}
+                                    style={{ width: 16, height: 16, accentColor: '#f43f5e', cursor: 'pointer' }}
+                                />
+                                <label htmlFor="clearRollNosCheck" style={{ fontSize: '0.85rem', color: clearRollNos ? '#f43f5e' : '#94a3b8', cursor: 'pointer', fontWeight: 500, transition: 'color 0.2s' }}>
+                                    Clear Roll Numbers on Promotion (Useful if re-assigning next semester)
+                                </label>
                             </div>
                             {targetSem && !targetGroup && (
                                 <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '12px', padding: '12px 16px', fontSize: '0.85rem', color: '#6ee7b7', lineHeight: 1.5, marginTop: '0.5rem', display: 'flex', gap: '10px' }}>
                                     <span style={{ fontSize: '1rem' }}>✅</span>
                                     <div>
-                                        Students move to <b>Sem {targetSem}</b> and remain in their <b>current batch/section</b>.
+                                        Students move to <b>Sem {targetSem}</b> and remain in their <b>current section & group</b>.
                                     </div>
                                 </div>
                             )}
@@ -283,8 +351,8 @@ const StudentPromotions = () => {
                     borderRadius: '24px', backdropFilter: 'blur(16px)', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)'
                 }}>
                     {/* Action Bar */}
-                    <div style={{ padding: '1.25rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0.1))', flexWrap: 'wrap', gap: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                    <div style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0.1))', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', width: 36, height: 36, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Users size={18} color="#60a5fa" />
@@ -340,7 +408,7 @@ const StudentPromotions = () => {
                                             style={{ accentColor: '#3b82f6', width: '18px', height: '18px', cursor: 'pointer' }}
                                         />
                                         <span style={{ fontWeight: 800, color: '#60a5fa', fontSize: '0.9rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                            Batch: {section}
+                                            {section}
                                         </span>
                                         <span style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#93c5fd', padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}>
                                             {sectionStudents.filter(s => selectedIds.has(s.id)).length} / {sectionStudents.length} selected

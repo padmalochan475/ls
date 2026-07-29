@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { db } from '../../lib/firebase';
 import {
   collection, query, where, orderBy, onSnapshot, getDoc, setDoc,
-  updateDoc, deleteDoc, doc, writeBatch, getCountFromServer
+  updateDoc, deleteDoc, doc, writeBatch, getCountFromServer, getDocs
 } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMasterData } from '../../contexts/MasterDataContext';
@@ -54,6 +54,89 @@ const STATUS_CONFIG = {
 };
 
 // ─────────────────────────────────────────────
+// Dynamic Roll & Group Auto-Rebalancing (Option B)
+// ─────────────────────────────────────────────
+async function rebalanceCohort(db, semester, section, branch) {
+  if (!semester) return;
+  const studentsRef = collection(db, 'students');
+  let q;
+  if (section) {
+    q = query(studentsRef, where('semester', '==', semester), where('section', '==', section), where('status', '==', 'active'));
+  } else if (branch) {
+    q = query(studentsRef, where('semester', '==', semester), where('branch', '==', branch), where('status', '==', 'active'));
+  } else {
+    return;
+  }
+  
+  const snap = await getDocs(q);
+  if (snap.empty) return;
+  
+  const activeStudents = [];
+  snap.forEach(doc => activeStudents.push({ _id: doc.id, ...doc.data() }));
+
+  // Option A: Sort exactly by Registration Number to put returning students in original spots
+  activeStudents.sort((a, b) => {
+    const regA = String(a.regNo || '').toLowerCase();
+    const regB = String(b.regNo || '').toLowerCase();
+    return regA.localeCompare(regB, undefined, { numeric: true });
+  });
+
+  // Unique existing groups
+  const uniqueGroups = Array.from(new Set(activeStudents.map(s => String(s.group || '1').trim().toUpperCase())))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  if (uniqueGroups.length === 0) uniqueGroups.push('1');
+
+  // Distribute Mathematically
+  const totalStudents = activeStudents.length;
+  const numGroups = uniqueGroups.length;
+  const capacities = [];
+  let remainingStudents = totalStudents;
+  let remainingGroups = numGroups;
+  
+  for (let i = 0; i < numGroups; i++) {
+    const capacity = Math.ceil(remainingStudents / remainingGroups);
+    capacities.push(capacity);
+    remainingStudents -= capacity;
+    remainingGroups--;
+  }
+
+  // Batch Update in chunks of 450 to avoid Firestore limits
+  let updates = [];
+  let currentIndex = 0;
+  
+  for (let gIndex = 0; gIndex < numGroups; gIndex++) {
+    const groupName = uniqueGroups[gIndex];
+    const capacity = capacities[gIndex];
+    
+    for (let i = 0; i < capacity; i++) {
+      if (currentIndex >= activeStudents.length) break;
+      const student = activeStudents[currentIndex];
+      const newRollNo = String(currentIndex + 1);
+      const curGroup = String(student.group || '').toUpperCase();
+      
+      if (String(student.rollNo) !== newRollNo || curGroup !== groupName) {
+        updates.push({
+          ref: doc(db, 'students', student._id),
+          data: { rollNo: newRollNo, group: groupName, updatedAt: new Date().toISOString() }
+        });
+      }
+      currentIndex++;
+    }
+  }
+  
+  if (updates.length > 0) {
+    const CHUNK_SIZE = 450;
+    for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach(u => batch.update(u.ref, u.data));
+      await batch.commit();
+    }
+    console.log(`Auto-rebalanced ${updates.length} students in cohort ${section || branch}.`);
+  }
+}
+
+// ─────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────
 
@@ -77,54 +160,56 @@ function StatCard({ icon, value, label, glow, gradient, loading }) {
   const IconComponent = icon;
   return (
     <div style={{
-      background: 'rgba(15, 23, 42, 0.4)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
-      borderRadius: '24px',
-      padding: '24px',
-      display: 'flex', alignItems: 'center', gap: 20,
+      background: 'linear-gradient(145deg, rgba(30,41,59,0.7), rgba(15,23,42,0.9))',
+      border: '1px solid rgba(255, 255, 255, 0.05)',
+      borderRadius: '16px',
+      padding: '14px 16px',
+      display: 'flex', alignItems: 'center', gap: 12,
       position: 'relative', overflow: 'hidden',
-      boxShadow: `0 4px 24px -4px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.05)`,
+      boxShadow: '0 10px 30px -10px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.1)',
       backdropFilter: 'blur(20px)',
       transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
       cursor: 'pointer',
     }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
-        e.currentTarget.style.boxShadow = `0 24px 48px -12px ${glow}55, inset 0 1px 1px rgba(255,255,255,0.15)`;
-        e.currentTarget.style.border = `1px solid ${glow}66`;
-        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.7)';
+        e.currentTarget.style.boxShadow = `0 20px 40px -10px ${glow}40, inset 0 1px 1px rgba(255,255,255,0.2)`;
+        e.currentTarget.style.border = `1px solid ${glow}88`;
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = 'none';
-        e.currentTarget.style.boxShadow = `0 4px 24px -4px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.05)`;
-        e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.08)';
-        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.4)';
+        e.currentTarget.style.boxShadow = '0 10px 30px -10px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.1)';
+        e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
       }}
     >
-      {/* Animated bg glow blob */}
+      {/* Subtle edge highlight */}
       <div style={{
-        position: 'absolute', top: -50, right: -50, width: 180, height: 180,
-        borderRadius: '50%', background: gradient, opacity: 0.15, filter: 'blur(45px)',
-        pointerEvents: 'none', animation: 'pulse 4s ease-in-out infinite alternate'
-      }} />
-      <div style={{
-        position: 'absolute', bottom: -20, left: -20, width: 100, height: 100,
-        borderRadius: '50%', background: glow, opacity: 0.08, filter: 'blur(30px)',
+        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+        background: `radial-gradient(circle at top right, ${glow}15, transparent 60%)`,
         pointerEvents: 'none'
       }} />
       
+      {/* Icon Box */}
       <div style={{
-        width: 60, height: 60, borderRadius: '20px',
-        background: gradient, display: 'flex', alignItems: 'center',
+        width: 40, height: 40, borderRadius: '12px',
+        background: `linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02))`,
+        border: `1px solid ${glow}44`,
+        display: 'flex', alignItems: 'center',
         justifyContent: 'center', flexShrink: 0,
-        boxShadow: `0 8px 24px ${glow}66, inset 0 2px 4px rgba(255,255,255,0.4)`,
+        boxShadow: `0 8px 32px ${glow}33, inset 0 2px 4px rgba(255,255,255,0.2)`,
         position: 'relative', zIndex: 1
       }}>
-        <IconComponent size={28} color="#ffffff" strokeWidth={2.2} style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
+        <IconComponent size={20} color={glow} strokeWidth={2.5} style={{ filter: `drop-shadow(0 2px 8px ${glow}aa)` }} />
       </div>
+      
+      {/* Content */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
-        <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#ffffff', lineHeight: 1, letterSpacing: '-0.03em', textShadow: '0 2px 10px rgba(0,0,0,0.4)' }}>
+        <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
+        <div style={{ 
+          fontSize: '1.5rem', fontWeight: 900, 
+          background: gradient, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          lineHeight: 1, letterSpacing: '-0.02em', filter: `drop-shadow(0 2px 4px rgba(0,0,0,0.5))`
+        }}>
           {loading ? <span style={{ fontSize: 16, color: '#64748b', animation: 'pulse 1.5s infinite' }}>...</span> : value}
         </div>
       </div>
@@ -373,7 +458,7 @@ function ProfileModal({ student, onClose }) {
 // ─────────────────────────────────────────────
 // Add / Edit Modal
 // ─────────────────────────────────────────────
-function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
+function AddEditModal({ student, groups, availableBatches, semesters, students, onClose, onSaved }) {
   const isEdit = !!student;
   const [form, setForm] = useState({
     regNo: student?.regNo || '',
@@ -381,12 +466,69 @@ function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
     branch: student?.branch || '',
     semester: student?.semester || '',
     section: student?.section || '',
-    rollNo: student?.rollNo || '',
+    group: String(student?.group || '1'),
+    rollNo: student?.rollNo || student?.rollno || '',
     status: student?.status || 'active',
     isLateral: student?.isLateral || false,
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  
+  const [dbSections, setDbSections] = useState([]);
+  const [dbGroups, setDbGroups] = useState(['1', '2']);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+
+  useEffect(() => {
+    if (!form.semester) {
+      setDbSections([]);
+      setDbGroups(['1', '2']);
+      return;
+    }
+
+    const semStr = String(form.semester);
+    const existingStudentsForSem = students?.filter(s => String(s.semester) === semStr) || [];
+
+    if (existingStudentsForSem.length > 0) {
+      const secSet = new Set();
+      const grpSet = new Set(['1', '2']);
+      existingStudentsForSem.forEach(s => {
+        const sSection = (s.section || '').trim();
+        const sGroup = String(s.group || '1').trim();
+        const subStr = sSection ? sSection : (s.branch || '').trim();
+        if (subStr) secSet.add(subStr.toUpperCase());
+        if (sGroup) grpSet.add(sGroup);
+      });
+      setDbSections(Array.from(secSet).sort());
+      setDbGroups(Array.from(grpSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
+      return;
+    }
+
+    const fetchBatches = async () => {
+      setLoadingBatches(true);
+      try {
+        const q = query(collection(db, 'students'), where('semester', '==', form.semester));
+        const snap = await getDocs(q);
+        const secSet = new Set();
+        const grpSet = new Set(['1', '2']);
+        snap.forEach(doc => {
+          const s = doc.data();
+          const sSection = (s.section || '').trim();
+          const sGroup = String(s.group || '1').trim();
+          const subStr = sSection ? sSection : (s.branch || '').trim();
+          if (subStr) secSet.add(subStr.toUpperCase());
+          if (sGroup) grpSet.add(sGroup);
+        });
+        setDbSections(Array.from(secSet).sort());
+        setDbGroups(Array.from(grpSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
+      } catch (err) {
+        console.error("Error fetching sections/groups:", err);
+      } finally {
+        setLoadingBatches(false);
+      }
+    };
+
+    fetchBatches();
+  }, [form.semester, students]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -404,18 +546,53 @@ function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
     if (!validate()) { toast.error('Fill all required fields'); return; }
     setSaving(true);
     try {
+      const finalSection = form.section.trim();
+      const finalGroup = String(form.group || '1').trim();
+
       const data = {
         regNo: form.regNo.trim(),
         name: form.name.trim(),
         branch: form.branch.trim(),
         semester: form.semester,
-        section: form.section,
-        rollNo: form.rollNo,
+        section: finalSection,
+        group: finalGroup,
+        rollNo: form.rollNo.trim(),
         status: form.status,
         isLateral: form.isLateral,
         updatedAt: new Date().toISOString(),
       };
       const docId = form.regNo.trim().toLowerCase().replace(/\s+/g, '_');
+
+      // Check for duplicate Roll No in the same Section (Cohort)
+      if (form.rollNo.trim()) {
+        const strRoll = form.rollNo.trim();
+        const numRoll = !isNaN(strRoll) ? Number(strRoll) : null;
+        
+        const baseConstraints = [
+          where('semester', '==', form.semester),
+          where('section', '==', finalSection)
+        ];
+
+        // 1. Check if it exists as a string
+        const rollQStr = query(collection(db, 'students'), ...baseConstraints, where('rollNo', '==', strRoll));
+        const strSnap = await getDocs(rollQStr);
+        let duplicateRoll = strSnap.docs.find(d => !isEdit || d.id !== student._id);
+
+        // 2. Check if it exists as a number (legacy imports)
+        if (!duplicateRoll && numRoll !== null) {
+          const rollQNum = query(collection(db, 'students'), ...baseConstraints, where('rollNo', '==', numRoll));
+          const numSnap = await getDocs(rollQNum);
+          duplicateRoll = numSnap.docs.find(d => !isEdit || d.id !== student._id);
+        }
+
+        if (duplicateRoll) {
+          const dupData = duplicateRoll.data();
+          const dupBatch = `${dupData.section || ''}-${dupData.group || '1'}`;
+          toast.error(`Roll No ${strRoll} is already taken in ${dupBatch} by ${dupData.name || 'another student'}`);
+          setSaving(false);
+          return;
+        }
+      }
 
       if (isEdit) {
         const ref = doc(db, 'students', student._id);
@@ -427,6 +604,26 @@ function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
         await setDoc(doc(db, 'students', docId), { ...data, createdAt: new Date().toISOString() });
         toast.success('Student added');
       }
+
+      // Auto-rebalance cohort if status or section/semester/branch changed
+      const oldCohortKey = isEdit ? `${student.semester}-${student.section}-${student.branch}` : '';
+      const newCohortKey = `${form.semester}-${finalSection}-${form.branch}`;
+      
+      const needsOldRebalance = isEdit && student.status === 'active' && oldCohortKey !== newCohortKey;
+      const needsNewRebalance = form.status === 'active' && (!isEdit || student.status !== 'active' || oldCohortKey !== newCohortKey);
+
+      if (needsOldRebalance) {
+        rebalanceCohort(db, student.semester, student.section, student.branch).catch(err => console.error('Rebalance failed:', err));
+      }
+      if (needsNewRebalance) {
+        rebalanceCohort(db, form.semester, finalSection, form.branch).catch(err => console.error('Rebalance failed:', err));
+      }
+      
+      // If simply marking as TC without changing cohort keys
+      if (isEdit && student.status === 'active' && form.status !== 'active' && oldCohortKey === newCohortKey) {
+        rebalanceCohort(db, form.semester, finalSection, form.branch).catch(err => console.error('Rebalance failed:', err));
+      }
+
       onSaved();
       onClose();
     } catch (err) {
@@ -475,15 +672,32 @@ function AddEditModal({ student, groups, semesters, onClose, onSaved }) {
               ))}
             </select>
           </div>
-          {/* Section/Batch */}
+          {/* Section */}
           <div>
-            <label style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Section</label>
-            <select style={{ ...fieldStyle(false), appearance: 'none' }} value={form.section} onChange={e => set('section', e.target.value)}>
-              <option value="">Select Section</option>
-              {(groups || []).map(g => {
-                const gName = g.name || g.label || g.value || g;
-                return <option key={gName} value={gName}>{gName}</option>;
-              })}
+            <label style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+              Section {loadingBatches && <span style={{fontSize: 10, color: '#3b82f6', marginLeft: 4}}>(loading...)</span>}
+            </label>
+            <input 
+              style={fieldStyle(false)} 
+              list="sectionList" 
+              value={form.section} 
+              onChange={e => set('section', e.target.value)} 
+              placeholder={dbSections.length > 0 ? "Select or type Section" : "e.g. CSE-A"}
+            />
+            <datalist id="sectionList">
+              {dbSections.map(s => <option key={s} value={s} />)}
+            </datalist>
+          </div>
+          {/* Group */}
+          <div>
+            <label style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+              Group
+            </label>
+            <select style={{ ...fieldStyle(false), appearance: 'none' }} value={form.group} onChange={e => set('group', e.target.value)}>
+              {dbGroups.map(g => (
+                <option key={g} value={g}>Group {g}</option>
+              ))}
+              {!dbGroups.includes('1') && <option value="1">Group 1</option>}
             </select>
           </div>
           {/* Roll No */}
@@ -581,7 +795,6 @@ function StatusPopover({ student, onClose, onChanged }) {
 
 // ─────────────────────────────────────────────
 // Import Modal
-// ─────────────────────────────────────────────
 const IMPORT_FIELDS = ['regNo', 'name', 'branch', 'semester', 'section', 'group', 'rollNo'];
 const FIELD_LABELS = { regNo: 'Reg No', name: 'Name', branch: 'Branch', semester: 'Semester', section: 'Section', group: 'Lab Group', rollNo: 'Roll No' };
 
@@ -600,6 +813,16 @@ function ImportModal({ semesters, onClose, onImported }) {
   const [progress, setProgress] = useState(null);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef();
+
+  const downloadSampleExcel = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      { 'Reg No': '2501289180', 'Name': 'AMAN PRADHAN', 'Roll No': '1', 'Branch': 'CSIT', 'Semester': '3', 'Section': 'CS-IT & CS(DS)', 'Lab Group': '1' },
+      { 'Reg No': '2501289181', 'Name': 'ASHUTOSH GHOSH', 'Roll No': '2', 'Branch': 'CSIT', 'Semester': '3', 'Section': 'CS-IT & CS(DS)', 'Lab Group': '1' }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sample_Format');
+    XLSX.writeFile(wb, 'student_import_sample.xlsx');
+  };
 
   const validRows = useMemo(() => {
     if (!mapping.regNo || !mapping.name) return rows;
@@ -806,16 +1029,23 @@ function ImportModal({ semesters, onClose, onImported }) {
         {step === 'input' && (
           <>
             {/* Tabs for Upload vs Paste */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  onClick={() => setImportMethod('upload')}
+                  style={{ padding: '10px 20px', background: 'none', border: 'none', color: importMethod === 'upload' ? '#3b82f6' : '#94a3b8', borderBottom: importMethod === 'upload' ? '2px solid #3b82f6' : '2px solid transparent', fontWeight: 600, cursor: 'pointer' }}>
+                  Upload File
+                </button>
+                <button 
+                  onClick={() => setImportMethod('paste')}
+                  style={{ padding: '10px 20px', background: 'none', border: 'none', color: importMethod === 'paste' ? '#3b82f6' : '#94a3b8', borderBottom: importMethod === 'paste' ? '2px solid #3b82f6' : '2px solid transparent', fontWeight: 600, cursor: 'pointer' }}>
+                  Copy & Paste
+                </button>
+              </div>
               <button 
-                onClick={() => setImportMethod('upload')}
-                style={{ padding: '10px 20px', background: 'none', border: 'none', color: importMethod === 'upload' ? '#3b82f6' : '#94a3b8', borderBottom: importMethod === 'upload' ? '2px solid #3b82f6' : '2px solid transparent', fontWeight: 600, cursor: 'pointer' }}>
-                Upload File
-              </button>
-              <button 
-                onClick={() => setImportMethod('paste')}
-                style={{ padding: '10px 20px', background: 'none', border: 'none', color: importMethod === 'paste' ? '#3b82f6' : '#94a3b8', borderBottom: importMethod === 'paste' ? '2px solid #3b82f6' : '2px solid transparent', fontWeight: 600, cursor: 'pointer' }}>
-                Copy & Paste
+                onClick={downloadSampleExcel}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', padding: '6px 12px', borderRadius: 8, cursor: 'pointer' }}>
+                <Download size={14} /> Sample Excel
               </button>
             </div>
 
@@ -1184,6 +1414,16 @@ export default function StudentDirectory() {
   const handleBulkStatus = async (newStatus) => {
     try {
       const ids = [...selected];
+      
+      const affectedCohorts = new Map();
+      ids.forEach(id => {
+        const student = students.find(s => s._id === id);
+        if (student && student.status !== newStatus) {
+            const key = `${student.semester}|${student.section}|${student.branch}`;
+            affectedCohorts.set(key, { semester: student.semester, section: student.section, branch: student.branch });
+        }
+      });
+      
       const chunks = chunkArray(ids, CHUNK_SIZE);
       for (const chunk of chunks) {
         const batch = writeBatch(db);
@@ -1192,6 +1432,10 @@ export default function StudentDirectory() {
       }
       toast.success(`${selected.size} students set to ${STATUS_CONFIG[newStatus]?.label}`);
       setSelected(new Set());
+      
+      for (const cohort of affectedCohorts.values()) {
+         rebalanceCohort(db, cohort.semester, cohort.section, cohort.branch).catch(err => console.error('Bulk rebalance failed:', err));
+      }
     } catch { toast.error('Bulk status update failed'); }
   };
 
@@ -1213,7 +1457,7 @@ export default function StudentDirectory() {
   const noFilter = !filterBatch && !filterSemester;
 
   return (
-    <div style={{ minHeight: '100vh', color: '#f1f5f9', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', color: '#f1f5f9', fontFamily: "'Inter', system-ui, sans-serif", padding: '16px 24px' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
@@ -1226,7 +1470,7 @@ export default function StudentDirectory() {
       `}</style>
 
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 28, marginLeft: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
           <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(59,130,246,0.4)' }}>
             <Users size={20} color="#fff" />
@@ -1535,7 +1779,9 @@ export default function StudentDirectory() {
         <AddEditModal
           student={editStudent}
           groups={groups}
+          availableBatches={availableBatches}
           semesters={semesters}
+          students={students}
           onClose={() => { setShowAddModal(false); setEditStudent(null); }}
           onSaved={() => { setShowAddModal(false); setEditStudent(null); }}
         />
