@@ -460,7 +460,7 @@ const StudentAttendance = () => {
                             <div id="print-header" style={{ display: 'flex', flexDirection: 'column' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid black' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', padding: '8px 10px', background: '#ffffff' }}>
-                                        <img src="/logo.png" alt="Logo" style={{ height: '35px', width: 'auto' }} />
+                                        <img src="/trident-logo.png" alt="Logo" style={{ height: '35px', width: 'auto' }} />
                                         <h1 style={{ textAlign: 'center', fontSize: '18px', fontWeight: '900', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>TRIDENT ACADEMY OF TECHNOLOGY, BBSR</h1>
                                     </div>
                                     <div style={{ borderTop: '1px solid black', background: '#e2e8f0', padding: '5px 0', textAlign: 'center' }}>
