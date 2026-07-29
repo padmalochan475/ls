@@ -163,10 +163,13 @@ const QuantumLoader = ({ size }) => {
     font-size: 2rem;
     font-weight: 800;
     letter-spacing: 0.2em;
+    margin-right: -0.2em; /* offset for letter-spacing to fix centering */
     background: linear-gradient(to right, #fff, #94a3b8);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    margin-left: 0;
     text-transform: uppercase;
     text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
 }
