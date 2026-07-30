@@ -2,6 +2,10 @@
 import admin from 'firebase-admin';
 import axios from 'axios';
 
+// Increase Vercel function timeout to 60 seconds (maximum for Hobby tier)
+// This gives the Render WhatsApp bot time to wake up from cold starts.
+export const maxDuration = 60;
+
 // Initialize Firebase Admin (Singleton)
 if (!admin.apps.length) {
     try {
