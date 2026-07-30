@@ -690,22 +690,6 @@ const AdminPanel = () => {
                         <ShieldAlert size={18} /> Dashboard
                     </button>
                     <button
-                        onClick={() => setActiveTab('suggestions')}
-                        style={{
-                            padding: '10px 20px',
-                            background: activeTab === 'suggestions' ? 'var(--color-accent)' : 'transparent',
-                            color: activeTab === 'suggestions' ? 'white' : 'var(--color-text-muted)',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        <MessageSquare size={18} /> Suggestions
-                    </button>
-                    <button
                         onClick={() => setActiveTab('substitutions')}
                         style={{
                             padding: '10px 20px',
@@ -722,22 +706,6 @@ const AdminPanel = () => {
                         <UserPlus size={18} /> Substitutions
                     </button>
                     <button
-                        onClick={() => setActiveTab('settings')}
-                        style={{
-                            padding: '10px 16px',
-                            background: activeTab === 'settings' ? 'var(--color-accent)' : 'transparent',
-                            color: activeTab === 'settings' ? 'white' : 'var(--color-text-muted)',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        <Settings size={18} /> Settings
-                    </button>
-                    <button
                         onClick={() => setActiveTab('syllabus')}
                         style={{
                             padding: '10px 16px',
@@ -752,6 +720,38 @@ const AdminPanel = () => {
                         }}
                     >
                         <BookOpen size={18} /> Syllabus Links
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('suggestions')}
+                        style={{
+                            padding: '10px 20px',
+                            background: activeTab === 'suggestions' ? 'var(--color-accent)' : 'transparent',
+                            color: activeTab === 'suggestions' ? 'white' : 'var(--color-text-muted)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <MessageSquare size={18} /> Suggestions
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        style={{
+                            padding: '10px 16px',
+                            background: activeTab === 'settings' ? 'var(--color-accent)' : 'transparent',
+                            color: activeTab === 'settings' ? 'white' : 'var(--color-text-muted)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <Settings size={18} /> Settings
                     </button>
                 </div>
             </div>
