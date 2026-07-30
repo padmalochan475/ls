@@ -672,7 +672,7 @@ const AdminPanel = () => {
                 </div>
 
                 {/* Tab Navigation */}
-                <div className="mobile-scroll-tabs" style={{ display: 'flex', flexWrap: 'nowrap', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '12px' }}>
+                <div className="mobile-scroll-tabs" style={{ display: 'flex', gap: '4px', flexWrap: 'nowrap', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '12px' }}>
                     <button
                         onClick={() => setActiveTab('dashboard')}
                         style={{
@@ -716,8 +716,7 @@ const AdminPanel = () => {
                             cursor: 'pointer',
                             fontWeight: 600,
                             display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease',
-                            borderLeft: '1px solid rgba(255,255,255,0.1)'
+                            transition: 'all 0.2s ease'
                         }}
                     >
                         <UserPlus size={18} /> Substitutions
@@ -733,8 +732,7 @@ const AdminPanel = () => {
                             cursor: 'pointer',
                             fontWeight: 600,
                             display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease',
-                            borderLeft: '1px solid rgba(255,255,255,0.1)'
+                            transition: 'all 0.2s ease'
                         }}
                     >
                         <Settings size={18} /> Settings
@@ -750,8 +748,7 @@ const AdminPanel = () => {
                             cursor: 'pointer',
                             fontWeight: 600,
                             display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease',
-                            borderLeft: '1px solid rgba(255,255,255,0.1)'
+                            transition: 'all 0.2s ease'
                         }}
                     >
                         <BookOpen size={18} /> Syllabus Links
