@@ -11,6 +11,7 @@ export const useScheduleContext = () => useContext(ScheduleContext);
 export const ScheduleProvider = ({ children }) => {
     const { currentUser, userProfile, activeAcademicYear, loading: authLoading } = useAuth();
     const [schedule, setSchedule] = useState([]);
+    const scheduleRef = React.useRef([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -24,10 +25,11 @@ export const ScheduleProvider = ({ children }) => {
 
             if (!activeAcademicYear || typeof activeAcademicYear !== 'string' || !currentUser) {
                 setSchedule([]);
+                scheduleRef.current = [];
                 setLoading(false); // ALWAYS drop loader if we abort
                 return;
             }
-            if (!schedule || schedule.length === 0) setLoading(true);
+            if (scheduleRef.current.length === 0) setLoading(true);
 
             try {
                 const baseYear = activeAcademicYear.replace(/ \((ODD|EVEN)\)/i, '').trim();
@@ -42,18 +44,19 @@ export const ScheduleProvider = ({ children }) => {
                 const isAdmin = userProfile?.role === 'admin';
                 const empId = userProfile?.empId;
                 let q;
-                const scheduleRef = collection(db, 'schedule');
+                const scheduleRefDb = collection(db, 'schedule');
 
                 // We query the entire schedule for the active academic year for ALL users.
                 // This is critical because:
                 // 1. Students need to see the full class schedule.
                 // 2. Local conflict detection requires the full schedule to prevent double-booking rooms/faculty.
-                q = query(scheduleRef, where('academicYear', 'in', searchYears));
+                q = query(scheduleRefDb, where('academicYear', 'in', searchYears));
 
                 unsubscribe = onSnapshot(q, (snapshot) => {
                     if (!isActive) return;
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setSchedule(data);
+                    scheduleRef.current = data;
                     setLoading(false);
                 }, (err) => {
                     console.error("Critical Schedule Snapshot Error:", err);
