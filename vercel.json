@@ -1,5 +1,9 @@
 {
     "functions": {
+        "api/check-classes.js": {
+            "memory": 1024,
+            "maxDuration": 60
+        },
         "api/**/*.js": {
             "memory": 1024,
             "maxDuration": 10
