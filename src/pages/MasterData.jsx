@@ -800,6 +800,44 @@ const MasterData = ({ initialTab }) => {
             for (const update of updates.values()) {
                 await addToBatch(update.ref, update.data);
             }
+
+            // Update substitution_requests and adjustments (Only if oldData had an empId)
+            if (oldData.empId) {
+                const subQ1 = query(collection(db, 'substitution_requests'), where('requesterId', '==', oldData.empId));
+                const subQ2 = query(collection(db, 'substitution_requests'), where('targetFacultyId', '==', oldData.empId));
+                const [subSnap1, subSnap2] = await Promise.all([getDocs(subQ1), getDocs(subQ2)]);
+                
+                subSnap1.docs.forEach(doc => {
+                    addToBatch(doc.ref, {
+                        requesterName: newData.name,
+                        requesterId: newData.empId || null
+                    });
+                });
+                subSnap2.docs.forEach(doc => {
+                    addToBatch(doc.ref, {
+                        targetFacultyName: newData.name,
+                        targetFacultyId: newData.empId || null
+                    });
+                });
+
+                // Update adjustments
+                const adjQ1 = query(collection(db, 'adjustments'), where('originalFacultyEmpId', '==', oldData.empId));
+                const adjQ2 = query(collection(db, 'adjustments'), where('substituteEmpId', '==', oldData.empId));
+                const [adjSnap1, adjSnap2] = await Promise.all([getDocs(adjQ1), getDocs(adjQ2)]);
+                
+                adjSnap1.docs.forEach(doc => {
+                    addToBatch(doc.ref, {
+                        originalFaculty: newData.name,
+                        originalFacultyEmpId: newData.empId || null
+                    });
+                });
+                adjSnap2.docs.forEach(doc => {
+                    addToBatch(doc.ref, {
+                        substituteName: newData.name,
+                        substituteEmpId: newData.empId || null
+                    });
+                });
+            }
         }
 
         // 3. Handle User Profile Linkage (Switching Users / Updating Details)
@@ -1050,13 +1088,17 @@ const MasterData = ({ initialTab }) => {
                         // Passive update: Check if exists first
                         const userSnap = await getDoc(userRef);
                         if (userSnap.exists()) {
-                            await updateDoc(userRef, {
+                            const userUpdates = {
                                 empId: formData.empId || null,
                                 isFaculty: true,
                                 dept: formData.department || formData.dept || null,
                                 mobile: formData.phone || null,
                                 whatsappEnabled: formData.whatsappEnabled !== false
-                            });
+                            };
+                            if (formData.designation) userUpdates.designation = formData.designation;
+                            if (formData.shortCode) userUpdates.shortCode = formData.shortCode;
+                            if (formData.photoURL) userUpdates.photoURL = formData.photoURL;
+                            await updateDoc(userRef, userUpdates);
                         }
                     } catch (uErr) {
                         console.warn("User Profile Sync Skipped:", uErr);
@@ -1088,13 +1130,17 @@ const MasterData = ({ initialTab }) => {
                         const userRef = doc(db, 'users', formData.uid);
                         const userSnap = await getDoc(userRef);
                         if (userSnap.exists()) {
-                            batch.update(userRef, {
+                            const userUpdates = {
                                 isFaculty: true,
                                 empId: formData.empId || null,
                                 dept: formData.department || formData.dept || null,
                                 mobile: formData.phone || null,
                                 whatsappEnabled: formData.whatsappEnabled !== false
-                            });
+                            };
+                            if (formData.designation) userUpdates.designation = formData.designation;
+                            if (formData.shortCode) userUpdates.shortCode = formData.shortCode;
+                            if (formData.photoURL) userUpdates.photoURL = formData.photoURL;
+                            batch.update(userRef, userUpdates);
                         }
 
                         // 2. Secure Lookup (Only if we have all data)

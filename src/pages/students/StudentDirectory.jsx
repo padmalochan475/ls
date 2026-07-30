@@ -1581,15 +1581,19 @@ export default function StudentDirectory() {
             {selected.size} student{selected.size !== 1 ? 's' : ''} selected
           </span>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <ControlSelect value={bulkStatus} onChange={setBulkStatus} style={{ minWidth: 160, background: 'rgba(0,0,0,0.3)' }}>
-                <option value="active">Set to Active</option>
-                <option value="alumni">Set to Alumni</option>
-                <option value="tc">Set to TC</option>
-              </ControlSelect>
-              <Btn variant="success" size="sm" icon={CheckCircle} onClick={() => handleBulkStatus(bulkStatus)}>Apply</Btn>
-            </div>
-            <Btn variant="danger" size="sm" icon={Trash2} onClick={handleBulkDelete}>Delete</Btn>
+            {isAdmin && (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <ControlSelect value={bulkStatus} onChange={setBulkStatus} style={{ minWidth: 160, background: 'rgba(0,0,0,0.3)' }}>
+                  <option value="active">Set to Active</option>
+                  <option value="alumni">Set to Alumni</option>
+                  <option value="tc">Set to TC</option>
+                </ControlSelect>
+                <Btn variant="success" size="sm" icon={CheckCircle} onClick={() => handleBulkStatus(bulkStatus)}>Apply</Btn>
+              </div>
+            )}
+            {isAdmin && (
+              <Btn variant="danger" size="sm" icon={Trash2} onClick={handleBulkDelete}>Delete</Btn>
+            )}
             <Btn variant="ghost" size="sm" icon={X} onClick={() => setSelected(new Set())}>Deselect All</Btn>
           </div>
         </div>
@@ -1634,13 +1638,15 @@ export default function StudentDirectory() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <th style={{ padding: '16px', textAlign: 'center', width: 40 }}>
-                    <input type="checkbox"
-                      checked={selected.size === filteredStudents.length && filteredStudents.length > 0}
-                      onChange={toggleAll}
-                      style={{ accentColor: '#3b82f6', width: 16, height: 16, cursor: 'pointer' }}
-                    />
-                  </th>
+                  {isAdmin && (
+                    <th style={{ padding: '16px', textAlign: 'center', width: 40 }}>
+                      <input type="checkbox"
+                        checked={selected.size === filteredStudents.length && filteredStudents.length > 0}
+                        onChange={toggleAll}
+                        style={{ accentColor: '#3b82f6', width: 16, height: 16, cursor: 'pointer' }}
+                      />
+                    </th>
+                  )}
                   {['#', 'Student', 'Reg No', 'Branch', 'Sem', 'Lab Batch', 'Status', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '16px', textAlign: 'left', color: '#94a3b8', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
@@ -1658,13 +1664,15 @@ export default function StudentDirectory() {
                     onMouseLeave={e => { if (!selected.has(student._id)) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = 'none'; } }}
                   >
                     {/* Checkbox */}
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <input type="checkbox"
-                        checked={selected.has(student._id)}
-                        onChange={() => toggleSelect(student._id)}
-                        style={{ accentColor: '#3b82f6', width: 15, height: 15, cursor: 'pointer' }}
-                      />
-                    </td>
+                    {isAdmin && (
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <input type="checkbox"
+                          checked={selected.has(student._id)}
+                          onChange={() => toggleSelect(student._id)}
+                          style={{ accentColor: '#3b82f6', width: 15, height: 15, cursor: 'pointer' }}
+                        />
+                      </td>
+                    )}
                     {/* # */}
                     <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>{idx + 1}</td>
                     {/* Student */}

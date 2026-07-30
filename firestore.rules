@@ -25,9 +25,10 @@ service cloud.firestore {
     match /syllabi/{docId}     { allow read: if isAuth(); allow write: if isAdmin(); }
     match /semesters/{docId}   { allow read: if isAuth(); allow write: if isAdmin(); }
     match /subjects/{docId}    { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /faculty/{docId}     { 
+    match /faculty/{docId} { 
         allow read: if isAuth(); 
-        allow write: if isAdmin() || 
+        allow create, delete: if isAdmin();
+        allow update: if isAdmin() || 
                      (isAuth() && resource.data.uid == request.auth.uid) ||
                      (isAuth() && (!("uid" in resource.data) || resource.data.uid == null) && request.resource.data.uid == request.auth.uid); 
     }
@@ -57,9 +58,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuth();
       
-      // Allow users to create their own profile. We can't strictly block 'admin' here because the first user needs to become admin, 
-      // but we block them from UPDATING their role/status later.
-      allow create: if isAuth() && request.auth.uid == userId;
+      // Security Fix: Block users from creating an 'admin' role directly. 
+      // The first user loophole is no longer needed since the system is already set up.
+      allow create: if isAuth() && request.auth.uid == userId && 
+                    (!('role' in request.resource.data) || request.resource.data.role == 'user' || request.resource.data.role == 'pending');
       
       // Allow admin to update anything. 
       // Allow users to update their own profile, BUT block changes to 'role' and 'status'.

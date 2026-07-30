@@ -140,6 +140,11 @@ export const AuthProvider = ({ children }) => {
 
         let linkedDept = null;
         let isFaculty = false;
+        let syncedPhotoURL = null;
+        let syncedDesignation = null;
+        let syncedShortCode = null;
+        let syncedMobile = mobileNumber;
+        
         try {
             let facultySnap = await getDocs(query(collection(db, 'faculty'), where('empId', '==', empId)));
             if (facultySnap.empty && recoveryEmail) {
@@ -150,6 +155,11 @@ export const AuthProvider = ({ children }) => {
                 const facData = facDoc.data();
                 linkedDept = facData.department || facData.dept;
                 isFaculty = true;
+                if (facData.photoURL) syncedPhotoURL = facData.photoURL;
+                if (facData.designation) syncedDesignation = facData.designation;
+                if (facData.shortCode) syncedShortCode = facData.shortCode;
+                if (facData.phone || facData.mobile) syncedMobile = facData.mobile || facData.phone;
+                
                 await updateDoc(doc(db, 'faculty', facDoc.id), {
                     uid: user.uid,
                     isRegistered: true,
@@ -165,7 +175,7 @@ export const AuthProvider = ({ children }) => {
             empId,
             name,
             email: recoveryEmail,
-            mobile: mobileNumber,
+            mobile: syncedMobile,
             role: isFirstUser ? 'admin' : 'user',
             status: isFirstUser ? 'approved' : 'pending',
             dept: linkedDept,
@@ -173,6 +183,9 @@ export const AuthProvider = ({ children }) => {
             whatsappEnabled: true,
             createdAt: new Date().toISOString()
         };
+        if (syncedPhotoURL) userProfileData.photoURL = syncedPhotoURL;
+        if (syncedDesignation) userProfileData.designation = syncedDesignation;
+        if (syncedShortCode) userProfileData.shortCode = syncedShortCode;
 
         // Always create user profile document in Firestore
         try {

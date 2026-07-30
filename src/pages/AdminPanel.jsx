@@ -507,6 +507,65 @@ const AdminPanel = () => {
                         batch.delete(doc(db, 'emp_lookups', editingUser.empId));
                     }
                 }
+                
+                // 4. Cascade to Schedule (If Name or EmpID Changed)
+                if (editingUser.name !== editForm.name || editingUser.empId !== editForm.empId) {
+                    let q1, q2;
+                    if (editingUser.empId) {
+                        q1 = query(collection(db, 'schedule'), where('facultyEmpId', '==', editingUser.empId));
+                        q2 = query(collection(db, 'schedule'), where('faculty2EmpId', '==', editingUser.empId));
+                    } else {
+                        q1 = query(collection(db, 'schedule'), where('faculty', '==', editingUser.name));
+                        q2 = query(collection(db, 'schedule'), where('faculty2', '==', editingUser.name));
+                    }
+                    
+                    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+                    const scheduleUpdates = new Map();
+                    
+                    snap1.docs.forEach(doc => {
+                        scheduleUpdates.set(doc.id, { ref: doc.ref, data: { faculty: editForm.name, facultyEmpId: editForm.empId || null } });
+                    });
+                    
+                    snap2.docs.forEach(doc => {
+                        const existing = scheduleUpdates.get(doc.id);
+                        const updateData = { faculty2: editForm.name, faculty2EmpId: editForm.empId || null };
+                        if (existing) {
+                            existing.data = { ...existing.data, ...updateData };
+                        } else {
+                            scheduleUpdates.set(doc.id, { ref: doc.ref, data: updateData });
+                        }
+                    });
+                    
+                    for (const update of scheduleUpdates.values()) {
+                        batch.update(update.ref, update.data);
+                    }
+                    
+                    // 5. Cascade to Substitution Requests
+                    if (editingUser.empId) {
+                        const subQ1 = query(collection(db, 'substitution_requests'), where('requesterId', '==', editingUser.empId));
+                        const subQ2 = query(collection(db, 'substitution_requests'), where('targetFacultyId', '==', editingUser.empId));
+                        const [subSnap1, subSnap2] = await Promise.all([getDocs(subQ1), getDocs(subQ2)]);
+                        
+                        subSnap1.docs.forEach(doc => {
+                            batch.update(doc.ref, { requesterName: editForm.name, requesterId: editForm.empId || null });
+                        });
+                        subSnap2.docs.forEach(doc => {
+                            batch.update(doc.ref, { targetFacultyName: editForm.name, targetFacultyId: editForm.empId || null });
+                        });
+                        
+                        // 6. Cascade to Adjustments
+                        const adjQ1 = query(collection(db, 'adjustments'), where('originalFacultyEmpId', '==', editingUser.empId));
+                        const adjQ2 = query(collection(db, 'adjustments'), where('substituteEmpId', '==', editingUser.empId));
+                        const [adjSnap1, adjSnap2] = await Promise.all([getDocs(adjQ1), getDocs(adjQ2)]);
+                        
+                        adjSnap1.docs.forEach(doc => {
+                            batch.update(doc.ref, { originalFaculty: editForm.name, originalFacultyEmpId: editForm.empId || null });
+                        });
+                        adjSnap2.docs.forEach(doc => {
+                            batch.update(doc.ref, { substituteName: editForm.name, substituteEmpId: editForm.empId || null });
+                        });
+                    }
+                }
                 await batch.commit();
             } else if (editingUser.empId !== editForm.empId) {
                 // If no faculty record yet, but ID changed, still update lookups
