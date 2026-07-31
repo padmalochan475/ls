@@ -59,6 +59,7 @@ export const MasterDataProvider = ({ children }) => {
         // and re-sync only when the user returns.
         let isActive = true;
         let setupTimer = null;
+        let masterSafetyTimer = null;
 
         const syncMasterData = () => {
             if (!currentUser) {
@@ -70,7 +71,7 @@ export const MasterDataProvider = ({ children }) => {
             }
 
             // TRY LOAD FROM CACHE FIRST (Instant UX)
-            // eslint-disable-next-line sonarjs/no-ignored-exceptions
+             
             try {
                 const cache = JSON.parse(localStorage.getItem(`lams_master_cache_${currentUser.uid}`) || '{}');
                 if (cache.faculty) {
@@ -92,11 +93,23 @@ export const MasterDataProvider = ({ children }) => {
                     groupsRef.current = cache.groups || [];
                     setHolidays(cache.holidays || []);
                     holidaysRef.current = cache.holidays || [];
-                    // We stay in "loading" state until live sync finishes, but UI has data!
+                    
+                    // IF CACHE SUCCEEDS, UNBLOCK UI IMMEDIATELY!
+                    setLoading(false);
                 }
             } catch (e) { console.warn("Cache load failed"); }
 
-            if (!departmentsRef.current || departmentsRef.current.length === 0) setLoading(true);
+            if (!departmentsRef.current || departmentsRef.current.length === 0) {
+                setLoading(true);
+                // Launch safety timer ONLY when we are actively showing a loader
+                if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
+                masterSafetyTimer = setTimeout(() => {
+                    setLoading(prev => {
+                        if (prev) console.warn("MasterData initialization timed out. Forcing degraded mode.");
+                        return false;
+                    });
+                }, 8000);
+            }
             cleanupListeners();
 
             const loadStatus = {
@@ -108,6 +121,7 @@ export const MasterDataProvider = ({ children }) => {
             const checkAllLoaded = () => {
                 const allLoaded = Object.values(loadStatus).every(s => s);
                 if (isActive && allLoaded) {
+                    if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
                     setLoading(false);
                     // UPDATE CACHE
                     const newCache = { 
@@ -210,13 +224,26 @@ export const MasterDataProvider = ({ children }) => {
             setupListener('settings', setHolidays, 'settings', query(collection(db, 'settings'), where('type', '==', 'holiday')));
         };
 
+        let suspendTimeout;
+
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                console.log("[MasterData] Focus detected. Resuming sync...");
-                syncMasterData();
+                if (suspendTimeout) {
+                    clearTimeout(suspendTimeout);
+                    suspendTimeout = null;
+                    console.log("[MasterData] Suspension aborted (rapid tab switch). Connection maintained.");
+                } else {
+                    console.log("[MasterData] Focus detected. Resuming sync...");
+                    syncMasterData();
+                }
             } else {
-                console.log("[MasterData] Background detected. Suspending sync for quota...");
-                cleanupListeners();
+                console.log("[MasterData] Background detected. Scheduling suspension in 30 seconds...");
+                suspendTimeout = setTimeout(() => {
+                    console.log("[MasterData] Suspending sync for quota conservation...");
+                    cleanupListeners();
+                    if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
+                    suspendTimeout = null;
+                }, 30000);
             }
         };
 
@@ -224,19 +251,12 @@ export const MasterDataProvider = ({ children }) => {
         syncMasterData();
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // SAFETY: If MasterData hangs (Limit Exhausted), force load after 8s to show cached data
-        const masterSafetyTimer = setTimeout(() => {
-            setLoading(prev => {
-                if (prev) console.warn("MasterData initialization timed out. Forcing degraded mode.");
-                return false;
-            });
-        }, 8000);
-
         return () => {
             isActive = false;
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (setupTimer) clearTimeout(setupTimer);
-            clearTimeout(masterSafetyTimer);
+            if (suspendTimeout) clearTimeout(suspendTimeout);
+            if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
             cleanupListeners();
         };
     }, [currentUser, authLoading, refreshTrigger]);

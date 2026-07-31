@@ -34,6 +34,9 @@ const AdminPanel = () => {
     const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'suggestions'
     const [suggestions, setSuggestions] = useState([]);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+    
+    // Popup state for stat cards
+    const [statPopup, setStatPopup] = useState(null);
 
     const getUserStatus = (u) => {
         if (u.status) return normalizeStr(u.status);
@@ -617,13 +620,49 @@ const AdminPanel = () => {
                     50% { opacity: 0.5; transform: scale(0.85); }
                     100% { opacity: 1; transform: scale(1); }
                 }
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
                 .pulse-card { animation: pulse-ring 2s infinite; }
+                
+                /* Premium Table Styling */
+                .premium-table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; }
+                .table-header-cell {
+                    padding: 1.25rem 1rem;
+                    color: #94a3b8;
+                    font-size: 0.75rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.1em;
+                    font-weight: 700;
+                    border-bottom: 1px solid rgba(255,255,255,0.05);
+                }
+                .table-cell {
+                    padding: 1.25rem 1rem;
+                    border-bottom: 1px solid rgba(255,255,255,0.03);
+                    vertical-align: middle;
+                }
+                .user-row-hover {
+                    transition: all 0.2s ease;
+                }
+                .user-row-hover:hover {
+                    background: rgba(255, 255, 255, 0.03);
+                    box-shadow: inset 4px 0 0 #8b5cf6;
+                }
+                .action-btn {
+                    width: 36px; height: 36px;
+                    border-radius: 50%;
+                    display: inline-flex; align-items: center; justify-content: center;
+                    border: none; cursor: pointer; transition: all 0.2s;
+                }
+                .action-btn:hover { transform: scale(1.1); }
 
                 .admin-header {
                     margin-bottom: 2rem;
                     display: flex;
-                    justify-content: space-between;
-                    align-items: flex-end;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 1.5rem;
                 }
                 .admin-stats-grid {
                     display: grid;
@@ -633,16 +672,69 @@ const AdminPanel = () => {
                 }
                 .admin-charts-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
                     gap: 1.5rem;
-                    margin-bottom: 3rem;
+                    margin-bottom: 2rem;
+                }
+                
+                /* Staggered Animations */
+                .stagger-1 { animation: fadeIn 0.5s ease 0.1s both; }
+                .stagger-2 { animation: fadeIn 0.5s ease 0.2s both; }
+                .stagger-3 { animation: fadeIn 0.5s ease 0.3s both; }
+                .stagger-4 { animation: fadeIn 0.5s ease 0.4s both; }
+                
+                /* Mobile Tabs Styling */
+                .mobile-scroll-tabs {
+                    display: flex;
+                    gap: 0.75rem;
+                    flex-wrap: nowrap;
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                    padding: 12px;
+                    padding-right: 24px; /* Fix for right side clipping */
+                    background: rgba(15, 23, 42, 0.4);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 16px;
+                    scrollbar-width: none; /* Firefox */
+                    max-width: 100%;
+                    backdrop-filter: blur(12px);
+                    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+                }
+                .mobile-scroll-tabs::-webkit-scrollbar {
+                    display: none; /* Chrome, Safari */
+                }
+                .mobile-scroll-tabs button {
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                    padding: 0.75rem 1.25rem;
+                    border-radius: 12px;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    position: relative;
+                    overflow: hidden;
+                    background: rgba(255, 255, 255, 0.03) !important;
+                    color: #cbd5e1 !important;
+                    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                    font-weight: 500;
+                }
+                .mobile-scroll-tabs button:hover:not(.active) {
+                    background: rgba(255, 255, 255, 0.08) !important;
+                    transform: translateY(-2px);
+                    border-color: rgba(255, 255, 255, 0.15) !important;
+                    color: white !important;
+                }
+                .mobile-scroll-tabs button.active {
+                    background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
+                    color: white !important;
+                    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                    border: 1px solid rgba(139, 92, 246, 0.5) !important;
+                    font-weight: 700;
+                    transform: translateY(-2px);
                 }
 
                 @media (max-width: 768px) {
                     .admin-header {
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 1rem;
+                        align-items: stretch;
+                        gap: 1.5rem;
                     }
                     .admin-charts-grid, .admin-stats-grid {
                         grid-template-columns: 1fr;
@@ -672,98 +764,113 @@ const AdminPanel = () => {
                 </div>
 
                 {/* Tab Navigation */}
-                <div className="mobile-scroll-tabs" style={{ display: 'flex', gap: '4px', flexWrap: 'nowrap', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '12px' }}>
+                <div className="mobile-scroll-tabs">
                     <button
                         onClick={() => setActiveTab('dashboard')}
-                        style={{
-                            padding: '10px 20px',
-                            background: activeTab === 'dashboard' ? 'var(--color-accent)' : 'transparent',
-                            color: activeTab === 'dashboard' ? 'white' : 'var(--color-text-muted)',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease'
-                        }}
+                        className={activeTab === 'dashboard' ? 'active' : ''}
+                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
-                        <ShieldAlert size={18} /> Dashboard
+                        <ShieldAlert size={18} /> Overview
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('users')}
+                        className={activeTab === 'users' ? 'active' : ''}
+                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                        <Users size={18} /> Users Directory
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('system')}
+                        className={activeTab === 'system' ? 'active' : ''}
+                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                        <Activity size={18} /> System Tools
                     </button>
                     <button
                         onClick={() => setActiveTab('substitutions')}
-                        style={{
-                            padding: '10px 20px',
-                            background: activeTab === 'substitutions' ? 'var(--color-accent)' : 'transparent',
-                            color: activeTab === 'substitutions' ? 'white' : 'var(--color-text-muted)',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease'
-                        }}
+                        className={activeTab === 'substitutions' ? 'active' : ''}
+                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                         <UserPlus size={18} /> Substitutions
                     </button>
                     <button
                         onClick={() => setActiveTab('syllabus')}
-                        style={{
-                            padding: '10px 16px',
-                            background: activeTab === 'syllabus' ? 'var(--color-accent)' : 'transparent',
-                            color: activeTab === 'syllabus' ? 'white' : 'var(--color-text-muted)',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease'
-                        }}
+                        className={activeTab === 'syllabus' ? 'active' : ''}
+                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                         <BookOpen size={18} /> Syllabus Links
                     </button>
                     <button
                         onClick={() => setActiveTab('suggestions')}
-                        style={{
-                            padding: '10px 20px',
-                            background: activeTab === 'suggestions' ? 'var(--color-accent)' : 'transparent',
-                            color: activeTab === 'suggestions' ? 'white' : 'var(--color-text-muted)',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease'
-                        }}
+                        className={activeTab === 'suggestions' ? 'active' : ''}
+                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                         <MessageSquare size={18} /> Suggestions
                     </button>
                     <button
                         onClick={() => setActiveTab('settings')}
-                        style={{
-                            padding: '10px 16px',
-                            background: activeTab === 'settings' ? 'var(--color-accent)' : 'transparent',
-                            color: activeTab === 'settings' ? 'white' : 'var(--color-text-muted)',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            transition: 'all 0.2s ease'
-                        }}
+                        className={activeTab === 'settings' ? 'active' : ''}
+                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                         <Settings size={18} /> Settings
                     </button>
                 </div>
             </div>
 
-            { }
-            {activeTab === 'substitutions' ? (
-                <SubstitutionManager />
-            ) : activeTab === 'settings' ? (
-                <SystemSettings />
-            ) : activeTab === 'syllabus' ? (
-                <SyllabusManager />
-            ) : activeTab === 'suggestions' ? ( // eslint-disable-line sonarjs/no-nested-conditional
+            {/* View Switching */}
+            <div style={{ marginTop: '1rem', animation: 'fadeIn 0.4s ease' }}>
+                {activeTab === 'substitutions' && (
+                    <div className="admin-section-divider">
+                        <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1.25rem', background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0%, transparent 100%)', padding: '1.5rem 2rem', borderRadius: '16px', borderLeft: '4px solid #f59e0b' }}>
+                            <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(245, 158, 11, 0.2)', color: '#fcd34d', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(245,158,11,0.3)' }}>
+                                <UserPlus size={32} />
+                            </div>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}>Substitution Manager</h2>
+                                <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '0.95rem' }}>Manage faculty load assignments, absences, and temporary schedule changes.</p>
+                            </div>
+                        </div>
+                        <div className="glass-panel" style={{ padding: '1rem' }}>
+                            <SubstitutionManager />
+                        </div>
+                    </div>
+                )}
+                
+                {activeTab === 'settings' && (
+                    <div className="admin-section-divider">
+                        <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1.25rem', background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%)', padding: '1.5rem 2rem', borderRadius: '16px', borderLeft: '4px solid #3b82f6' }}>
+                            <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.2)', color: '#93c5fd', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
+                                <Settings size={32} />
+                            </div>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}>Global Settings</h2>
+                                <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '0.95rem' }}>Configure academic years, OTP security, and other global platform preferences.</p>
+                            </div>
+                        </div>
+                        <div className="glass-panel" style={{ padding: '2rem' }}>
+                            <SystemSettings />
+                        </div>
+                    </div>
+                )}
+                
+                {activeTab === 'syllabus' && (
+                    <div className="admin-section-divider">
+                        <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1.25rem', background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%)', padding: '1.5rem 2rem', borderRadius: '16px', borderLeft: '4px solid #10b981' }}>
+                            <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(16,185,129,0.3)' }}>
+                                <BookOpen size={32} />
+                            </div>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}>Syllabus Repository</h2>
+                                <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '0.95rem' }}>Update course syllabus resources and external documentation links.</p>
+                            </div>
+                        </div>
+                        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                            <SyllabusManager />
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'suggestions' && (
                 /* Suggestions View */
                 <div className="glass-panel" style={{ padding: '2rem' }}>
                     <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -850,15 +957,17 @@ const AdminPanel = () => {
                         </div>
                     )}
                 </div>
-            ) : (
+                )}
+
+                {activeTab === 'dashboard' && (
                 /* Dashboard View START */
                 <>
 
                     {/* 1. Stat Cards Row */}
                     <div className="admin-stats-grid">
                         {/* Total Users */}
-                        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                            <div style={{ padding: '1rem', background: 'rgba(59, 130, 246, 0.2)', borderRadius: '12px', color: '#3b82f6' }}>
+                        <div className="glass-panel stagger-1" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', transition: 'transform 0.2s', cursor: 'pointer' }} onClick={() => setStatPopup('total')} onMouseEnter={e => e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}>
+                            <div style={{ padding: '1rem', background: 'rgba(59, 130, 246, 0.2)', borderRadius: '12px', color: '#3b82f6', boxShadow: '0 0 20px rgba(59, 130, 246, 0.2)' }}>
                                 <Users size={32} />
                             </div>
                             <div>
@@ -868,10 +977,11 @@ const AdminPanel = () => {
                         </div>
 
                         {/* Pending Actions - Pulsing if needed */}
-                        <div className={`glass-panel ${stats.pending > 0 ? 'pulse-card' : ''}`} style={{
+                        <div className={`glass-panel stagger-2 ${stats.pending > 0 ? 'pulse-card' : ''}`} style={{
                             padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem',
-                            border: stats.pending > 0 ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--glass-border)'
-                        }}>
+                            border: stats.pending > 0 ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--glass-border)',
+                            transition: 'transform 0.2s', cursor: 'pointer'
+                        }} onClick={() => setStatPopup('pending')} onMouseEnter={e => e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}>
                             <div style={{ padding: '1rem', background: 'rgba(245, 158, 11, 0.2)', borderRadius: '12px', color: '#f59e0b' }}>
                                 <UserPlus size={32} />
                             </div>
@@ -882,8 +992,8 @@ const AdminPanel = () => {
                         </div>
 
                         {/* Admins */}
-                        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                            <div style={{ padding: '1rem', background: 'rgba(139, 92, 246, 0.2)', borderRadius: '12px', color: '#8b5cf6' }}>
+                        <div className="glass-panel stagger-3" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', transition: 'transform 0.2s', cursor: 'pointer' }} onClick={() => setStatPopup('admins')} onMouseEnter={e => e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}>
+                            <div style={{ padding: '1rem', background: 'rgba(139, 92, 246, 0.2)', borderRadius: '12px', color: '#8b5cf6', boxShadow: '0 0 20px rgba(139, 92, 246, 0.2)' }}>
                                 <Shield size={32} />
                             </div>
                             <div>
@@ -893,8 +1003,8 @@ const AdminPanel = () => {
                         </div>
 
                         {/* Faculty/Active */}
-                        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                            <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.2)', borderRadius: '12px', color: '#10b981' }}>
+                        <div className="glass-panel stagger-4" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', transition: 'transform 0.2s', cursor: 'pointer' }} onClick={() => setStatPopup('faculty')} onMouseEnter={e => e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}>
+                            <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.2)', borderRadius: '12px', color: '#10b981', boxShadow: '0 0 20px rgba(16, 185, 129, 0.2)' }}>
                                 <GraduationCap size={32} />
                             </div>
                             <div>
@@ -958,26 +1068,50 @@ const AdminPanel = () => {
                                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <AreaChart data={realtimeData}>
                                         <defs>
+                                            {/* Vibrant Fill Gradient */}
                                             <linearGradient id="colorActivity" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
+                                                <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.15} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                             </linearGradient>
+                                            {/* Neon Stroke Gradient */}
+                                            <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
+                                                <stop offset="0%" stopColor="#3b82f6" />
+                                                <stop offset="50%" stopColor="#8b5cf6" />
+                                                <stop offset="100%" stopColor="#ec4899" />
+                                            </linearGradient>
+                                            {/* Intense Glow Filter */}
+                                            <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+                                                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur1" />
+                                                <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur2" />
+                                                <feMerge>
+                                                    <feMergeNode in="blur2" />
+                                                    <feMergeNode in="blur1" />
+                                                    <feMergeNode in="SourceGraphic" />
+                                                </feMerge>
+                                            </filter>
                                         </defs>
+                                        <CartesianGrid strokeDasharray="4 4" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                                        <YAxis hide domain={['auto', 'auto']} padding={{ top: 20, bottom: 0 }} />
                                         <Tooltip
-                                            contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(10px)' }}
+                                            contentStyle={{ background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(236, 72, 153, 0.3)', borderRadius: '12px', backdropFilter: 'blur(12px)', color: 'white', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(236, 72, 153, 0.4)' }}
                                             labelStyle={{ display: 'none' }}
-                                            itemStyle={{ color: '#c4b5fd' }}
-                                            formatter={(value) => [`${value}%`, 'System Load']}
+                                            itemStyle={{ color: '#fbcfe8', fontSize: '1.2rem', padding: '0.25rem 0' }}
+                                            formatter={(value) => [value, 'Active Users']}
+                                            cursor={{ stroke: 'rgba(236, 72, 153, 0.2)', strokeWidth: 2, strokeDasharray: '4 4' }}
                                         />
                                         <Area
-                                            type="monotone"
+                                            type="natural"
                                             dataKey="value"
-                                            stroke="#8b5cf6"
-                                            strokeWidth={3}
+                                            stroke="url(#lineGradient)"
+                                            strokeWidth={4}
                                             fillOpacity={1}
                                             fill="url(#colorActivity)"
+                                            style={{ filter: 'url(#neonGlow)' }}
                                             isAnimationActive={true}
-                                            animationDuration={1000}
+                                            animationDuration={1500}
+                                            animationEasing="ease-out"
+                                            activeDot={{ r: 7, fill: '#ec4899', stroke: '#fff', strokeWidth: 2, style: { filter: 'url(#neonGlow)' } }}
                                         />
                                     </AreaChart>
                                 </ResponsiveContainer>
@@ -1013,7 +1147,11 @@ const AdminPanel = () => {
                             </div>
                         </div>
                     </div>
+                </>
+                )}
 
+                {activeTab === 'users' && (
+                <>
                     {/* 3. Filters & Search */}
                     <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.25rem', borderRadius: '12px', flexWrap: 'wrap' }}>
@@ -1050,109 +1188,110 @@ const AdminPanel = () => {
                     </div>
 
                     {/* 4. Users Table */}
-                    <div className="glass-panel" style={{ overflowX: 'auto', marginBottom: '3rem' }}>
-                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', textAlign: 'left' }}>
+                    <div className="glass-panel" style={{ overflowX: 'auto', marginBottom: '3rem', padding: '0' }}>
+                        <table className="premium-table">
                             <thead>
-                                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                                    <th style={{ padding: '1.25rem', color: 'var(--color-text-muted)', fontWeight: 600, borderBottom: '1px solid var(--glass-border)' }}>User Profile</th>
-                                    <th style={{ padding: '1.25rem', color: 'var(--color-text-muted)', fontWeight: 600, borderBottom: '1px solid var(--glass-border)' }}>Emp ID</th>
-                                    <th style={{ padding: '1.25rem', color: 'var(--color-text-muted)', fontWeight: 600, borderBottom: '1px solid var(--glass-border)' }}>Status</th>
-                                    <th style={{ padding: '1.25rem', color: 'var(--color-text-muted)', fontWeight: 600, borderBottom: '1px solid var(--glass-border)' }}>Role</th>
-                                    <th style={{ padding: '1.25rem', color: 'var(--color-text-muted)', fontWeight: 600, borderBottom: '1px solid var(--glass-border)' }}>Actions</th>
+                                <tr style={{ background: 'rgba(255,255,255,0.01)' }}>
+                                    <th className="table-header-cell" style={{ paddingLeft: '1.5rem' }}>User Profile</th>
+                                    <th className="table-header-cell">Emp ID</th>
+                                    <th className="table-header-cell">Status</th>
+                                    <th className="table-header-cell">Role</th>
+                                    <th className="table-header-cell">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="6" style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading Users...</td></tr>
+                                    <tr><td colSpan="5" className="table-cell" style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading Users...</td></tr>
                                 ) : filteredUsers.length === 0 ? ( // eslint-disable-line sonarjs/no-nested-conditional
-                                    <tr><td colSpan="6" style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>No users found matching your criteria.</td></tr>
+                                    <tr><td colSpan="5" className="table-cell" style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>No users found matching your criteria.</td></tr>
                                 ) : (
                                     filteredUsers.map(user => (
-                                        <tr key={user.id} style={{ transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                            <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                        <tr key={user.id} className="user-row-hover">
+                                            <td className="table-cell" style={{ paddingLeft: '1.5rem' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                                     <div style={{
-                                                        width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden',
+                                                        width: '46px', height: '46px', borderRadius: '50%', overflow: 'hidden',
                                                         background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-                                                        border: '1px solid var(--glass-border)',
+                                                        border: '2px solid rgba(255,255,255,0.1)',
+                                                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                                                     }}>
                                                         {user.photoURL ? (
                                                             <img src={user.photoURL} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                         ) : (
-                                                            <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--color-text-muted)' }}>
+                                                            <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--color-text-muted)' }}>
                                                                 {user.name?.charAt(0)}
                                                             </span>
                                                         )}
                                                     </div>
                                                     <div>
-                                                        <div style={{ fontWeight: 600, color: 'white' }}>{user.name}</div>
-                                                        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{user.email || 'No Email'}</div>
+                                                        <div style={{ fontWeight: 600, color: 'white', fontSize: '1rem' }}>{user.name}</div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>{user.email || 'No Email'}</div>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)', color: '#94a3b8' }}>{user.empId}</td>
-                                            <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                            <td className="table-cell" style={{ color: '#94a3b8', fontFamily: 'monospace', fontSize: '0.9rem' }}>{user.empId}</td>
+                                            <td className="table-cell">
                                                 {(() => {
                                                     const uStatus = getUserStatus(user);
                                                     const isApproved = uStatus === 'approved';
                                                     return (
                                                         <span style={{
-                                                            padding: '0.35rem 0.75rem', borderRadius: '99px', fontSize: '0.8rem', fontWeight: 600,
-                                                            background: isApproved ? 'rgba(16, 185, 129, 0.15)' : 'rgba(251, 191, 36, 0.15)',
+                                                            padding: '0.4rem 0.75rem', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 700,
+                                                            background: isApproved ? 'rgba(16, 185, 129, 0.1)' : 'rgba(251, 191, 36, 0.1)',
                                                             color: isApproved ? '#34d399' : '#fbbf24',
                                                             border: isApproved ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(251, 191, 36, 0.2)',
-                                                            display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                                                            display: 'inline-flex', alignItems: 'center', gap: '0.35rem', letterSpacing: '0.5px'
                                                         }}>
-                                                            {isApproved ? <CheckCircle size={12} /> : <Activity size={12} />}
-                                                            {uStatus.charAt(0).toUpperCase() + uStatus.slice(1)}
+                                                            {isApproved ? <CheckCircle size={14} /> : <Activity size={14} />}
+                                                            {uStatus.toUpperCase()}
                                                         </span>
                                                     );
                                                 })()}
                                             </td>
-                                            <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                            <td className="table-cell">
                                                 <select
                                                     value={user.role}
                                                     onChange={(e) => handleRoleChange(user.id, e.target.value)}
                                                     className="glass-input"
-                                                    style={{ padding: '0.4rem', fontSize: '0.9rem', width: 'auto', background: 'rgba(0,0,0,0.2)', borderColor: 'transparent' }}
+                                                    style={{ padding: '0.4rem 0.5rem', fontSize: '0.85rem', width: 'auto', background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer' }}
                                                 >
-                                                    <option value="user" style={{ background: '#1e293b', color: 'white' }}>User</option>
-                                                    <option value="admin" style={{ background: '#1e293b', color: 'white' }}>Admin</option>
+                                                    <option value="user" style={{ background: '#0f172a', color: 'white' }}>User</option>
+                                                    <option value="admin" style={{ background: '#0f172a', color: 'white' }}>Admin</option>
                                                 </select>
                                             </td>
-                                            <td style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                            <td className="table-cell" style={{ paddingRight: '1.5rem' }}>
+                                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                                     {getUserStatus(user) === 'pending' && (
                                                         <button
                                                             onClick={() => handleStatusChange(user.id, 'approved')}
-                                                            className="btn"
-                                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: '#10b981', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)' }}
+                                                            className="action-btn"
+                                                            style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}
+                                                            title="Approve User"
                                                         >
-                                                            Approve
+                                                            <CheckCircle size={16} />
                                                         </button>
                                                     )}
                                                     <button
                                                         onClick={() => handleDeleteUser(user.id)}
-                                                        className="btn"
-                                                        style={{ padding: '0.4rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', opacity: user.id === userProfile?.uid ? 0.3 : 1 }}
-                                                        disabled={user.id === userProfile?.uid}
+                                                        className="action-btn"
+                                                        style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}
                                                         title="Delete User"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
                                                     <button
-                                                        onClick={() => openEditModal(user)}
-                                                        className="btn"
-                                                        style={{ padding: '0.4rem', background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24' }}
+                                                        onClick={() => setEditingUser(user)}
+                                                        className="action-btn"
+                                                        style={{ background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24' }}
                                                         title="Edit User"
                                                     >
                                                         <Settings size={16} />
                                                     </button>
                                                     <button
                                                         onClick={() => setSelectedUser(user)}
-                                                        className="btn"
-                                                        style={{ padding: '0.4rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}
+                                                        className="action-btn"
+                                                        style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}
                                                         title="View Details"
                                                     >
                                                         <Search size={16} />
@@ -1165,24 +1304,33 @@ const AdminPanel = () => {
                             </tbody>
                         </table>
                     </div>
+                </>
+                )}
 
+                {activeTab === 'system' && (
                     <div className="admin-section-divider">
-                        <h2 className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{ padding: '8px', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Settings size={24} />
+                        <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1.25rem', background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.1) 0%, transparent 100%)', padding: '1.5rem 2rem', borderRadius: '16px', borderLeft: '4px solid #8b5cf6' }}>
+                            <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(139, 92, 246, 0.2)', color: '#c4b5fd', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(139,92,246,0.3)' }}>
+                                <Settings size={32} />
                             </div>
-                            System Manager
-                        </h2>
-                        <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.02)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--glass-border)' }}>
-                            <NotificationManager users={users} />
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}>System Manager</h2>
+                                <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '0.95rem' }}>Configure global settings, push notifications, and automated celebrations.</p>
+                            </div>
                         </div>
 
-                        <div style={{ marginTop: '2rem', background: 'rgba(255,255,255,0.02)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--glass-border)' }}>
-                            <CelebrationManager />
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+                            <div className="glass-panel" style={{ padding: '2rem', transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 20px 40px -10px rgba(59,130,246,0.15)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                                <NotificationManager users={users} />
+                            </div>
+
+                            <div className="glass-panel" style={{ padding: '2rem', transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 20px 40px -10px rgba(236,72,153,0.15)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                                <CelebrationManager />
+                            </div>
                         </div>
                     </div>
-                </>
-            )}
+                )}
+            </div>
 
             {/* User Details Modal & Confirm Modal */}
             {selectedUser && createPortal(
@@ -1368,6 +1516,62 @@ const AdminPanel = () => {
                             >
                                 Save Changes
                             </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Stat Cards Info Popup */}
+            {statPopup && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+                }} onClick={() => setStatPopup(null)}>
+                    <div className="glass-panel" style={{
+                        width: '500px', maxWidth: '90%', maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+                        border: '1px solid rgba(255,255,255,0.1)', position: 'relative', overflow: 'hidden', padding: '2rem'
+                    }} onClick={e => e.stopPropagation()}>
+                        <button
+                            onClick={() => setStatPopup(null)}
+                            style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.5rem' }}
+                        >
+                            &times;
+                        </button>
+                        <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.5rem', color: 'var(--color-accent)' }}>
+                            {statPopup === 'total' && 'All Registered Users'}
+                            {statPopup === 'pending' && 'Pending Approvals'}
+                            {statPopup === 'admins' && 'System Administrators'}
+                            {statPopup === 'faculty' && 'Faculty Members'}
+                        </h2>
+                        
+                        <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {(() => {
+                                let popupUsers = [];
+                                if (statPopup === 'total') popupUsers = users;
+                                else if (statPopup === 'pending') popupUsers = users.filter(u => getUserStatus(u) === 'pending');
+                                else if (statPopup === 'admins') popupUsers = users.filter(u => u.role === 'admin');
+                                else if (statPopup === 'faculty') popupUsers = users.filter(u => (u.role ? normalizeStr(u.role) : 'user') === 'user');
+
+                                if (popupUsers.length === 0) {
+                                    return <div style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '2rem' }}>No users found in this category.</div>;
+                                }
+
+                                return popupUsers.map(user => (
+                                    <div key={user.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#a78bfa' }}>
+                                            {user.photoURL ? <img src={user.photoURL} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%' }} /> : user.name?.charAt(0)}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 600, fontSize: '1rem' }}>{user.name}</div>
+                                            <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{user.email || user.empId}</div>
+                                        </div>
+                                        <button onClick={() => { setStatPopup(null); setSelectedUser(user); }} style={{ padding: '0.4rem 0.75rem', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                                            View
+                                        </button>
+                                    </div>
+                                ));
+                            })()}
                         </div>
                     </div>
                 </div>,

@@ -142,7 +142,11 @@ export const NotificationProvider = ({ children }) => {
                         if (deviceId) {
                             updateData[`fcmDeviceTokens.${deviceId}`] = token;
                         }
-                        await updateDoc(doc(db, 'users', currentUser.uid), updateData);
+                        try {
+                            await updateDoc(doc(db, 'users', currentUser.uid), updateData);
+                        } catch (err) {
+                            console.warn("FCM token sync to user profile failed (Quota or Offline):", err);
+                        }
                     }
                 }
             } else if (lastLoginUid.current) {
@@ -173,7 +177,26 @@ export const NotificationProvider = ({ children }) => {
         syncUser();
     }, [currentUser, initialized, fcmToken, vapidKey]);
 
+    // Dynamic Logic: Detect iOS, Android, and PWA status
+    const isIOS = () => {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    };
+
+    const isAndroid = () => {
+        return /Android/.test(navigator.userAgent);
+    };
+    
+    const isStandalone = () => {
+        return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    };
+
     const registerForPush = useCallback(async () => {
+        // iOS requires the Web App to be added to the Home Screen to support Push Notifications (Apple Policy)
+        if (isIOS() && !isStandalone()) {
+            toast.error("To enable notifications on iPhone/iPad, tap the Share icon at the bottom of Safari and select 'Add to Home Screen'.", { duration: 8000, id: 'ios-push' });
+            return;
+        }
+
         if (!('Notification' in window) || !messaging) {
             toast.error("Push messaging not supported in this browser.");
             return;
@@ -219,12 +242,26 @@ export const NotificationProvider = ({ children }) => {
                         if (deviceId) {
                             updateData[`fcmDeviceTokens.${deviceId}`] = token;
                         }
-                        await updateDoc(doc(db, 'users', currentUser.uid), updateData);
+                        try {
+                            await updateDoc(doc(db, 'users', currentUser.uid), updateData);
+                            toast.success("Notifications Enabled!", { id: 'push-register' });
+                        } catch (err) {
+                            console.error("Manual push sync failed:", err);
+                            toast.error("Failed to sync token to profile. Check connection.", { id: 'push-register' });
+                        }
+                    } else {
+                        toast.success("Notifications Enabled Locally!", { id: 'push-register' });
                     }
-                    toast.success("Notifications Enabled!", { id: 'push-register' });
                 }
             } else {
-                toast.error("Permission Denied. Please unblock in browser settings.");
+                // Permission Denied Handling
+                if (isIOS()) {
+                    toast.error("Permission Denied. Please go to iPhone Settings > Safari > Advanced > Website Data to clear it, then try again.");
+                } else if (isAndroid()) {
+                    toast.error("Permission Denied. On Android, tap the lock icon 🔒 in the URL bar, go to Permissions, and allow Notifications.");
+                } else {
+                    toast.error("Permission Denied. Please click the lock icon in your URL bar to unblock notifications.");
+                }
             }
         } catch (e) { 
             console.error(e);

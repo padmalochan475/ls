@@ -418,11 +418,23 @@ const Dashboard = () => {
         return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
     };
 
+    const activeSessionStats = useMemo(() => {
+        if (!allData || !allData.length || !activeAcademicYear) return { faculty: 0, rooms: 0 };
+        const usedFaculty = new Set();
+        const usedRooms = new Set();
+        allData.forEach(item => {
+            if (item.faculty) usedFaculty.add(item.faculty.trim());
+            if (item.faculty2) usedFaculty.add(item.faculty2.trim());
+            if (item.room) usedRooms.add(item.room.trim());
+        });
+        return { faculty: usedFaculty.size, rooms: usedRooms.size };
+    }, [allData, activeAcademicYear]);
+
     // Dynamic Stats based on View Mode
     const stats = dashboardView === 'admin' ? [
         { title: 'Total Classes', value: totalClasses, icon: <BookOpen size={24} />, trend: 'This Year', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' },
-        { title: 'Active Faculty', value: facultyList.length, icon: <Users size={24} />, trend: 'Registered', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
-        { title: 'Lab Rooms', value: roomCount, icon: <Zap size={24} />, gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
+        { title: 'Active Faculty', value: `${activeSessionStats.faculty}/${facultyList.length}`, icon: <Users size={24} />, trend: 'Currently Teaching', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
+        { title: 'Lab Rooms', value: `${activeSessionStats.rooms}/${roomCount}`, icon: <Zap size={24} />, trend: 'Used in Schedule', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
         { title: 'Academic Year', value: activeAcademicYear || 'N/A', icon: <GraduationCap size={24} />, gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' },
     ] : [
         { title: `${getDateLabel(currentDate)}'s Classes`, value: isHoliday ? 0 : todaySchedule.length, icon: <Clock size={24} />, trend: getDateLabel(currentDate), gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' },
@@ -705,25 +717,41 @@ const Dashboard = () => {
         const isSystemToday = currentDate.toDateString() === new Date().toDateString();
         const isFuture = currentDate > new Date() && !isSystemToday;
 
-        // Find active or next class
-        let upcoming = null;
         const sortedClasses = todaySchedule
             .map(item => ({ ...item, startTime: parseTimeToDate(item.time, currentDate) }))
             .sort((a, b) => a.startTime - b.startTime);
 
-        if (isSystemToday) {
-            // If Today: Show next available class
-            upcoming = sortedClasses.find(item => item.startTime > new Date(new Date().getTime() - 60 * 60 * 1000));
-        } else if (isFuture) {
-            // If Future: Show the FIRST class of the day
-            upcoming = sortedClasses[0];
-        }
-        // If Past: upcoming remains null (caught up)
+        let displayClasses = [];
+        let sectionType = ''; // 'now' or 'next'
 
-        if (!upcoming) return (
+        if (isSystemToday) {
+            // Find ALL classes happening now
+            const happeningNow = sortedClasses.filter(item => getClassStatus(item.time).label === 'In Progress');
+            
+            if (happeningNow.length > 0) {
+                displayClasses = happeningNow;
+                sectionType = 'now';
+            } else {
+                // Find ALL classes in the next immediate time slot
+                const upcomingClasses = sortedClasses.filter(item => item.startTime > new Date());
+                if (upcomingClasses.length > 0) {
+                    const nextTimeSlot = upcomingClasses[0].time;
+                    displayClasses = upcomingClasses.filter(item => item.time === nextTimeSlot);
+                    sectionType = 'next';
+                }
+            }
+        } else if (isFuture) {
+            if (sortedClasses.length > 0) {
+                const firstTimeSlot = sortedClasses[0].time;
+                displayClasses = sortedClasses.filter(item => item.time === firstTimeSlot);
+                sectionType = 'next';
+            }
+        }
+
+        if (displayClasses.length === 0) return (
             <div className="glass-panel animate-fade-in" style={{
                 padding: '3rem 2rem',
-                background: 'linear-gradient(145deg, #0f172a 0%, #020617 100%)', // Ultra dark slate theme
+                background: 'linear-gradient(145deg, #0f172a 0%, #020617 100%)',
                 border: '1px solid rgba(30, 41, 59, 0.5)',
                 display: 'flex',
                 alignItems: 'center',
@@ -732,7 +760,6 @@ const Dashboard = () => {
                 overflow: 'hidden',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)'
             }}>
-                {/* Decorative Background Glows */}
                 <div style={{
                     position: 'absolute',
                     top: '-50%',
@@ -761,65 +788,83 @@ const Dashboard = () => {
                 </div>
 
                 <div style={{ zIndex: 2 }}>
-                    <h3 style={{
-                        margin: '0 0 0.5rem 0',
-                        fontSize: '2rem',
-                        fontWeight: 800,
-                        color: 'white',
-                        letterSpacing: '-0.5px'
-                    }}>
+                    <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '2rem', fontWeight: 800, color: 'white', letterSpacing: '-0.5px' }}>
                         {isFuture ? 'No Classes Scheduled' : 'All Caught Up!'}
                     </h3>
-                    <p style={{
-                        margin: 0,
-                        fontSize: '1.1rem',
-                        color: '#94a3b8',
-                        lineHeight: '1.6',
-                        fontWeight: 500
-                    }}>
+                    <p style={{ margin: 0, fontSize: '1.1rem', color: '#94a3b8', lineHeight: '1.6', fontWeight: 500 }}>
                         {isFuture ? `No classes found for ${currentDayName}.` : 'No more classes scheduled for this day.'}
                     </p>
                 </div>
             </div>
         );
 
-        const isNow = getClassStatus(upcoming.time).label === 'In Progress';
+        const isNow = sectionType === 'now';
 
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div className="next-class-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.5rem' }}>
-                    <div>
-                        <div style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-                            padding: '0.25rem 0.75rem', borderRadius: '20px',
-                            background: isNow ? 'rgba(245, 158, 11, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                            color: isNow ? '#fbbf24' : '#60a5fa',
-                            fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '1rem'
-                        }}>
-                            {isNow ? <Zap size={14} /> : <Calendar size={14} />}
-                            {isNow ? 'Happening Now' : 'Up Next'}
+                <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.25rem 0.75rem', borderRadius: '20px',
+                    background: isNow ? 'rgba(245, 158, 11, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                    color: isNow ? '#fbbf24' : '#60a5fa',
+                    fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', alignSelf: 'flex-start'
+                }}>
+                    {isNow ? <Zap size={14} /> : <Calendar size={14} />}
+                    {isNow ? 'Happening Now' : 'Up Next'}
+                </div>
+                
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                    gap: '1rem'
+                }}>
+                    {displayClasses.map((item, idx) => (
+                        <div 
+                            key={idx}
+                            onClick={() => setSelectedAssignment(item)}
+                            className="glass-panel"
+                            style={{ 
+                                padding: '1.25rem', 
+                                cursor: 'pointer', 
+                                transition: 'all 0.2s',
+                                border: isNow ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                                display: 'flex', flexDirection: 'column', gap: '0.75rem',
+                                background: isNow ? 'rgba(245, 158, 11, 0.03)' : 'rgba(255, 255, 255, 0.02)'
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.transform = 'translateY(-4px)';
+                                e.currentTarget.style.borderColor = isNow ? 'rgba(245, 158, 11, 0.6)' : 'rgba(59, 130, 246, 0.5)';
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.borderColor = isNow ? 'rgba(245, 158, 11, 0.3)' : 'rgba(255,255,255,0.05)';
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'white', lineHeight: 1.3 }}>{item.subject}</h3>
+                                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>
+                                        {item.time.split(' - ')[0].replace(/(AM|PM)/i, '').trim()}
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginLeft: '2px' }}>
+                                            {item.time.match(/(AM|PM)/i)?.[0] || ''}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                <div style={{ color: '#cbd5e1' }}>{item.dept} • {item.section}{item.group && item.group !== 'All' ? ` • ${item.group}` : ''} • Sem {item.sem}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <MapPin size={14} color="#f59e0b" />
+                                    <span>Room <span style={{ color: '#f59e0b', fontWeight: 600 }}>{item.room}</span></span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <Users size={14} color="#60a5fa" />
+                                    <span>{item.faculty}{item.faculty2 ? ` & ${item.faculty2}` : ''}</span>
+                                </div>
+                            </div>
                         </div>
-                        <h2 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.2 }}>
-                            {upcoming.subject}
-                        </h2>
-                        <div style={{ fontSize: '1.2rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
-                            {upcoming.dept} - {upcoming.section}{upcoming.group && upcoming.group !== 'All' ? ` - ${upcoming.group}` : ''} - {upcoming.sem}
-                        </div>
-                    </div>
-                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem', lineHeight: 1 }}>
-                            <span style={{ fontSize: '2.5rem', fontWeight: 700, color: 'white' }}>
-                                {upcoming.time.split(' - ')[0].replace(/(AM|PM)/i, '').trim()}
-                            </span>
-                            <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                                {upcoming.time.match(/(AM|PM)/i)?.[0] || ''}
-                            </span>
-                        </div>
-                        <div style={{ fontSize: '1.1rem', color: 'var(--color-text-muted)', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <MapPin size={16} />
-                            <span>Room <span style={{ color: '#f59e0b', fontWeight: 700 }}>{upcoming.room}</span></span>
-                        </div>
-                    </div>
+                    ))}
                 </div>
             </div>
         );

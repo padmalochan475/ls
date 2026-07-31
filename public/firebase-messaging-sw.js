@@ -24,31 +24,25 @@ const firebaseConfig = {
     appId: urlParams.get('appId'),
 };
 
-// Initialize Firebase App in the Service Worker only if config is present
+// Initialize Firebase App in the Service Worker ONLY if config is synchronously present
 if (firebaseConfig.projectId) {
     firebase.initializeApp(firebaseConfig);
     const messaging = firebase.messaging();
 
-    // Background message handler
+    // Background message handler (Registered SYNCHRONOUSLY so the browser doesn't drop the push event)
     messaging.onBackgroundMessage((payload) => {
         console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-        // If Firebase already received a 'notification' object, the FCM SDK automatically displays it.
-        // Trying to manually call showNotification here will cause duplicate popups or glitch out on Android/Windows.
-        if (payload.notification) {
-            console.log('FCM handles the display automatically because payload.notification exists.');
-            return;
-        }
-
-        // Only handle data-only messages manually
-        const notificationTitle = payload.data?.title || 'New Notification';
+        // CRITICAL FIX: Always manually handle the display and return the Promise
+        // If we don't return the promise, Android kills the background thread instantly before it displays.
+        const notificationTitle = payload.notification?.title || payload.data?.title || 'New Notification';
         const notificationOptions = {
-            body: payload.data?.body || '',
+            body: payload.notification?.body || payload.data?.body || '',
             icon: payload.data?.icon || 'https://cdn-icons-png.flaticon.com/512/2522/2522055.png',
             data: payload.data || {},
         };
 
-        self.registration.showNotification(notificationTitle, notificationOptions);
+        return self.registration.showNotification(notificationTitle, notificationOptions);
     });
 }
 

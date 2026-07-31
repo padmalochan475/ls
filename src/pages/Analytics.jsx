@@ -809,7 +809,7 @@ const Analytics = () => {
                 {/* Peak Hours Heatmap (Scatter) */}
                 <div className="chart-container glass-panel" style={{ gridColumn: '1 / -1' }}>
                     <h3>Peak Hours Heatmap (Day vs Time)</h3>
-                    <ResponsiveContainer width="100%" height={400}>
+                    <ResponsiveContainer minWidth={0} minHeight={0}>
                         <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis type="number" dataKey="day" name="Day" tickFormatter={d => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1]} stroke="#94a3b8" domain={[1, 7]} tickCount={7} />
@@ -824,7 +824,7 @@ const Analytics = () => {
                 {/* Top 5 Faculty (Mini Bar) */}
                 <div className="chart-container glass-panel">
                     <h3>Top 5 Busiest Faculty</h3>
-                    <ResponsiveContainer width="100%" height={250}>
+                    <ResponsiveContainer minWidth={0} minHeight={0}>
                         <BarChart data={stats.facultyWorkload.slice(0, 5)} layout="vertical">
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis type="number" stroke="#94a3b8" />
@@ -838,13 +838,27 @@ const Analytics = () => {
                 {/* Top 5 Rooms (Mini Bar) */}
                 <div className="chart-container glass-panel">
                     <h3>Top 5 Busiest Rooms</h3>
-                    <ResponsiveContainer width="100%" height={250}>
+                    <ResponsiveContainer minWidth={0} minHeight={0}>
                         <BarChart data={stats.roomUsage.slice(0, 5)} layout="vertical">
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis type="number" stroke="#94a3b8" />
                             <YAxis dataKey="name" type="category" stroke="#94a3b8" width={100} tick={{ fontSize: 12 }} />
                             <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
                             <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Top 5 Subjects (Mini Bar) */}
+                <div className="chart-container glass-panel">
+                    <h3>Top 5 Busiest Subjects</h3>
+                    <ResponsiveContainer minWidth={0} minHeight={0}>
+                        <BarChart data={stats.subjectFrequency.slice(0, 5)} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                            <XAxis type="number" stroke="#94a3b8" />
+                            <YAxis dataKey="name" type="category" stroke="#94a3b8" width={110} tick={{ fontSize: 10 }} />
+                            <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ background: '#1e293b', border: 'none', color: 'white' }} />
+                            <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -1442,7 +1456,7 @@ const Analytics = () => {
 
                 <div className="chart-container glass-panel" style={{ gridColumn: '1 / -1' }}>
                     <h3>Average Daily Workload (Stacked by Dept)</h3>
-                    <ResponsiveContainer width="100%" height={400}>
+                    <ResponsiveContainer minWidth={0} minHeight={0}>
                         <BarChart data={stats.workloadByDayData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                             <XAxis dataKey="name" stroke="#94a3b8" />
@@ -1607,7 +1621,7 @@ const Analytics = () => {
                 <div className="charts-grid">
                     <div className="chart-container glass-panel">
                         <h3>Top 10 Most Frequent Subjects (Load)</h3>
-                        <ResponsiveContainer width="100%" height={300}>
+                        <ResponsiveContainer minWidth={0} minHeight={0}>
                             <BarChart data={subjectMetrics.slice(0, 10)}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                 <XAxis
@@ -1627,7 +1641,7 @@ const Analytics = () => {
 
                     <div className="chart-container glass-panel">
                         <h3>Type Distribution</h3>
-                        <ResponsiveContainer width="100%" height={300}>
+                        <ResponsiveContainer minWidth={0} minHeight={0}>
                             <PieChart>
                                 <Pie
                                     data={[
@@ -1718,7 +1732,7 @@ const Analytics = () => {
 
             <div className="chart-container glass-panel">
                 <h3>Room Usage Frequency</h3>
-                <ResponsiveContainer width="100%" height={400}>
+                <ResponsiveContainer minWidth={0} minHeight={0}>
                     <BarChart data={stats.roomUsage}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                         <XAxis dataKey="name" stroke="#94a3b8" />
@@ -1730,7 +1744,7 @@ const Analytics = () => {
             </div>
             <div className="chart-container glass-panel">
                 <h3>Room Utilization Heatmap (Top 5 Rooms vs Time)</h3>
-                <ResponsiveContainer width="100%" height={400}>
+                <ResponsiveContainer minWidth={0} minHeight={0}>
                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                         <XAxis type="number" dataKey="time" name="Hour" unit=":00" stroke="#94a3b8" domain={[8, 18]} />

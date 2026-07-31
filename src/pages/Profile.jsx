@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { db } from '../lib/firebase';
-import { doc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, where, getDocs, getDoc, onSnapshot } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { User, Mail, Phone, BadgeCheck, Shield, Key, Edit2, Camera, X, Check, Eye, EyeOff, Bell, Calendar, Zap, Activity, Gift, Briefcase } from 'lucide-react';
 import Cropper from 'react-easy-crop';
@@ -158,10 +158,6 @@ const Profile = () => {
             if (data && data.lid && data.waVerifyCode === null) {
                 toast.success("WhatsApp Linked Successfully! 🎉");
                 setWaVerifyCode(null);
-                // Also update local profile state to reflect link instantly
-                if (userProfile) {
-                    setUserProfile(prev => ({ ...prev, lid: data.lid }));
-                }
             }
         });
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Confetti from 'react-confetti';
-import { X, Gift, Award, Coffee } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import Holidays from 'date-holidays';
 import { db } from '../lib/firebase';
 import { collection, query, where, doc, onSnapshot } from 'firebase/firestore';
@@ -70,12 +70,12 @@ const CelebrationCard = ({ userProfile, onClose }) => {
         const runChecks = () => {
             const today = new Date();
 
-            // A. Check Custom First (Priority)
             if (customEvents.length > 0) {
                 // Pick the first match (or priority based if we had it)
                 const data = customEvents[0];
-                let IconComp = Gift;
-                if (data.theme && data.theme.includes('Gold')) IconComp = Award;
+                
+                // Dynamically resolve icon from string, fallback to Gift
+                const IconComp = LucideIcons[data.iconName] || LucideIcons.Gift;
 
                 setCelebration({
                     type: 'custom',
@@ -102,7 +102,7 @@ const CelebrationCard = ({ userProfile, onClose }) => {
                         title: `Happy Birthday, ${userProfile.name}! 🎉`,
                         message: "Wishing you a fantastic day filled with joy and success.",
                         theme: 'linear-gradient(135deg, #f472b6 0%, #db2777 100%)',
-                        icon: <Gift size={32} />
+                        icon: <LucideIcons.Gift size={32} />
                     });
                     return;
                 }
@@ -118,7 +118,7 @@ const CelebrationCard = ({ userProfile, onClose }) => {
                             title: `Happy ${years}${getOrdinal(years)} Work Anniversary! 🏆`,
                             message: `Thank you for ${years} years of excellence and dedication.`,
                             theme: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
-                            icon: <Award size={32} />
+                            icon: <LucideIcons.Award size={32} />
                         });
                         return;
                     }
@@ -131,12 +131,12 @@ const CelebrationCard = ({ userProfile, onClose }) => {
                 const date = d.getDate();
                 const year = d.getFullYear();
 
-                if (m === 3 && date === 1) return { title: "Happy Utkala Dibasa! ⭕", message: "Celebrating the glory and heritage of Odisha. Bande Utkala Janani!", theme: 'linear-gradient(135deg, #ea580c 0%, #b45309 100%)', icon: <Award size={32} /> };
-                if (m === 2 && date === 20) return { title: "Happy Pakhala Dibasa! 🍚", message: "It's time to enjoy the soul food of Odisha. Stay cool and refreshed!", theme: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', icon: <Coffee size={32} /> };
-                if ((year === 2025 && m === 5 && date === 27) || (year === 2026 && m === 6 && date === 17)) return { title: "Jay Jagannath! 🙏", message: "May Lord Jagannath bless you with happiness and prosperity on this Ratha Yatra.", theme: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', icon: <Award size={32} /> };
-                if (m === 5 && date >= 14 && date <= 16) return { title: "Happy Raja Parba! 🪁", message: "Celebrating womanhood and the joy of monsoon. Enjoy the Poda Pitha!", theme: 'linear-gradient(135deg, #db2777 0%, #be185d 100%)', icon: <Gift size={32} /> };
-                if ((year === 2025 && m === 7 && date === 29) || (year === 2026 && m === 8 && date === 16)) return { title: "Nuakhai Juhar! 🌾", message: "Welcome the new harvest with gratitude. May your year be filled with abundance.", theme: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)', icon: <Gift size={32} /> };
-                if ((year === 2025 && m === 10 && date === 5) || (year === 2026 && m === 10 && date === 24)) return { title: "Happy Boita Bandana! ⛵", message: "Remembering our glorious maritime history. Aa Ka Ma Boi!", theme: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', icon: <Award size={32} /> };
+                if (m === 3 && date === 1) return { title: "Happy Utkala Dibasa! ⭕", message: "Celebrating the glory and heritage of Odisha. Bande Utkala Janani!", theme: 'linear-gradient(135deg, #ea580c 0%, #b45309 100%)', icon: <LucideIcons.Award size={32} /> };
+                if (m === 2 && date === 20) return { title: "Happy Pakhala Dibasa! 🍚", message: "It's time to enjoy the soul food of Odisha. Stay cool and refreshed!", theme: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', icon: <LucideIcons.Coffee size={32} /> };
+                if ((year === 2025 && m === 5 && date === 27) || (year === 2026 && m === 6 && date === 17)) return { title: "Jay Jagannath! 🙏", message: "May Lord Jagannath bless you with happiness and prosperity on this Ratha Yatra.", theme: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', icon: <LucideIcons.Award size={32} /> };
+                if (m === 5 && date >= 14 && date <= 16) return { title: "Happy Raja Parba! 🪁", message: "Celebrating womanhood and the joy of monsoon. Enjoy the Poda Pitha!", theme: 'linear-gradient(135deg, #db2777 0%, #be185d 100%)', icon: <LucideIcons.Gift size={32} /> };
+                if ((year === 2025 && m === 7 && date === 29) || (year === 2026 && m === 8 && date === 16)) return { title: "Nuakhai Juhar! 🌾", message: "Welcome the new harvest with gratitude. May your year be filled with abundance.", theme: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)', icon: <LucideIcons.Gift size={32} /> };
+                if ((year === 2025 && m === 10 && date === 5) || (year === 2026 && m === 10 && date === 24)) return { title: "Happy Boita Bandana! ⛵", message: "Remembering our glorious maritime history. Aa Ka Ma Boi!", theme: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', icon: <LucideIcons.Award size={32} /> };
 
                 return null;
             };
@@ -151,7 +151,7 @@ const CelebrationCard = ({ userProfile, onClose }) => {
             if (holidays && holidays[0] && holidays[0].type === 'public') {
                 const h = holidays[0];
                 let theme = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-                let icon = <Gift size={32} />;
+                let icon = <LucideIcons.Gift size={32} />;
 
                 if (h.name.includes('Diwali') || h.name.includes('Deepavali')) {
                     theme = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
@@ -247,7 +247,7 @@ const CelebrationCard = ({ userProfile, onClose }) => {
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
                 >
-                    <X size={20} />
+                    <LucideIcons.X size={20} />
                 </button>
             </div>
 

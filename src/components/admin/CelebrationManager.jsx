@@ -5,6 +5,7 @@ import Holidays from 'date-holidays';
 import toast from 'react-hot-toast';
 import { useWritePermission } from '../../hooks/useWritePermission'; // Import Hook
 import { Gift, Calendar, Settings, Pencil, Trash2, Award, Eye, EyeOff, Activity, ChevronRight } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const CelebrationManager = () => {
@@ -132,12 +133,33 @@ const CelebrationManager = () => {
         toast.success("Deleted");
     };
 
+    const availableIcons = ['Gift', 'Award', 'Coffee', 'Star', 'Heart', 'Sparkles', 'PartyPopper', 'Smile', 'Flame', 'Trophy', 'Crown', 'Rocket', 'Zap', 'Music', 'Sun'];
+
     const themes = [
+        // New Premium Animated Themes
+        { name: 'Cyberpunk Drive', value: 'theme-cyberpunk' },
+        { name: 'Neon Synthwave', value: 'theme-synthwave' },
+        { name: 'Inferno Fire', value: 'theme-fire' },
+        { name: 'Ocean Wave', value: 'theme-ocean-wave' },
+        { name: 'Cyan Hologram', value: 'theme-hologram' },
+        { name: 'The Matrix', value: 'theme-matrix' },
+        { name: 'RGB Glow', value: 'theme-rgb-glow' },
+        { name: 'Starlight Galaxy', value: 'theme-starlight' },
+        { name: 'Liquid Gold', value: 'theme-liquid-gold' },
+        { name: 'Digital Glitch', value: 'theme-glitch' },
+        { name: 'Blood Moon', value: 'theme-blood-moon' },
+        { name: 'Pastel Dream', value: 'theme-pastel-dream' },
+        { name: 'Electric Blue', value: 'theme-electric-blue' },
+        { name: 'Velvet Night', value: 'theme-velvet-night' },
+        { name: 'Northern Lights', value: 'theme-northern-lights' },
+        { name: 'Liquid Chrome', value: 'theme-chrome' },
+        // Existing Animated Themes
         { name: 'Galaxy Motion', value: 'theme-galaxy' },
         { name: 'Neon Pulse', value: 'theme-neon' },
         { name: 'Golden Hour', value: 'theme-golden' },
         { name: 'Aurora', value: 'theme-aurora' },
         { name: 'Midnight Frost', value: 'theme-frost' },
+        // Static Gradient Themes
         { name: 'Ocean Blue', value: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)' },
         { name: 'Festive Red', value: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)' },
         { name: 'Royal Gold', value: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)' },
@@ -267,6 +289,33 @@ const CelebrationManager = () => {
                                 </div>
                             </div>
 
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Select Icon</label>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    {availableIcons.map(iconName => {
+                                        const IconComp = LucideIcons[iconName];
+                                        return (
+                                            <div
+                                                key={iconName}
+                                                onClick={() => setForm({ ...form, iconName })}
+                                                style={{
+                                                    width: '42px', height: '42px', borderRadius: '10px',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    background: form.iconName === iconName ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)',
+                                                    border: form.iconName === iconName ? '2px solid white' : '1px solid rgba(255,255,255,0.1)',
+                                                    transition: 'all 0.2s',
+                                                    color: form.iconName === iconName ? 'white' : '#94a3b8'
+                                                }}
+                                                title={iconName}
+                                            >
+                                                {IconComp && <IconComp size={20} />}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             <button
                                 className="btn btn-primary"
                                 onClick={handleCreate}
@@ -305,7 +354,7 @@ const CelebrationManager = () => {
                                 }}>
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', position: 'relative', zIndex: 10 }}>
                                     <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.75rem', borderRadius: '12px', backdropFilter: 'blur(5px)' }}>
-                                        <Gift size={24} />
+                                        {React.createElement(LucideIcons[form.iconName] || LucideIcons.Gift, { size: 24 })}
                                     </div>
                                     <div>
                                         <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>{form.title || 'Event Title'}</h2>
@@ -315,7 +364,7 @@ const CelebrationManager = () => {
 
                                 {/* Mock Confetti/Decoration */}
                                 <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.3, transform: 'rotate(15deg)' }}>
-                                    <Gift size={100} />
+                                    {React.createElement(LucideIcons[form.iconName] || LucideIcons.Gift, { size: 100 })}
                                 </div>
                             </div>
                             <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem' }}>

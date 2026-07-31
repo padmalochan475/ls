@@ -18,8 +18,14 @@ export const ScheduleProvider = ({ children }) => {
     useEffect(() => {
         let unsubscribe = () => { };
         let isActive = true;
+        let suspendTimeout;
+        let scheduleSafetyTimer;
 
         const setupLiveSchedule = () => {
+            // Prevent memory leaks by unsubscribing any existing orphaned listeners before creating a new one
+            unsubscribe();
+            if (scheduleSafetyTimer) clearTimeout(scheduleSafetyTimer);
+            
             // Don't flip loading=false if auth is still settling — prevents flash
             if (authLoading) return;
 
@@ -29,7 +35,17 @@ export const ScheduleProvider = ({ children }) => {
                 setLoading(false); // ALWAYS drop loader if we abort
                 return;
             }
-            if (scheduleRef.current.length === 0) setLoading(true);
+            
+            if (scheduleRef.current.length === 0) {
+                setLoading(true);
+                // Launch safety timer ONLY when we are actively showing a loader
+                scheduleSafetyTimer = setTimeout(() => {
+                    setLoading(prev => {
+                        if (prev) console.warn("Schedule initialization timed out (Likely Firestore Limit). Forcing degraded mode.");
+                        return false;
+                    });
+                }, 9000);
+            }
 
             try {
                 const baseYear = activeAcademicYear.replace(/ \((ODD|EVEN)\)/i, '').trim();
@@ -41,8 +57,6 @@ export const ScheduleProvider = ({ children }) => {
                 }
                 searchYears = [...new Set(searchYears)];
 
-                const isAdmin = userProfile?.role === 'admin';
-                const empId = userProfile?.empId;
                 let q;
                 const scheduleRefDb = collection(db, 'schedule');
 
@@ -54,28 +68,47 @@ export const ScheduleProvider = ({ children }) => {
 
                 unsubscribe = onSnapshot(q, (snapshot) => {
                     if (!isActive) return;
+                    if (scheduleSafetyTimer) clearTimeout(scheduleSafetyTimer); // Data arrived, cancel rescue timer!
+                    
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setSchedule(data);
                     scheduleRef.current = data;
                     setLoading(false);
                 }, (err) => {
                     console.error("Critical Schedule Snapshot Error:", err);
+                    if (scheduleSafetyTimer) clearTimeout(scheduleSafetyTimer);
                     setLoading(false);
                 });
 
             } catch (e) {
                 console.error("Setup Error:", e);
+                if (scheduleSafetyTimer) clearTimeout(scheduleSafetyTimer);
                 setLoading(false);
             }
         };
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                console.log("[Schedule] Resuming live sync...");
-                setupLiveSchedule();
+                // User came back! Cancel the suspension if it's pending.
+                if (suspendTimeout) {
+                    clearTimeout(suspendTimeout);
+                    suspendTimeout = null;
+                    console.log("[Schedule] Suspension aborted (rapid tab switch). Connection maintained.");
+                } else {
+                    // It was fully suspended. Reconnect.
+                    console.log("[Schedule] Resuming live sync...");
+                    setupLiveSchedule();
+                }
             } else {
-                console.log("[Schedule] Suspending sync for quota conservation...");
-                unsubscribe();
+                // User left the tab. Don't disconnect instantly (prevents quota burn on rapid alt-tabbing).
+                // Wait 30 seconds before severing the Firebase connection.
+                console.log("[Schedule] Tab hidden. Scheduling suspension in 30 seconds...");
+                suspendTimeout = setTimeout(() => {
+                    console.log("[Schedule] Suspending sync for quota conservation...");
+                    unsubscribe();
+                    if (scheduleSafetyTimer) clearTimeout(scheduleSafetyTimer);
+                    suspendTimeout = null;
+                }, 30000);
             }
         };
 
@@ -85,9 +118,11 @@ export const ScheduleProvider = ({ children }) => {
         return () => {
             isActive = false;
             unsubscribe();
+            if (suspendTimeout) clearTimeout(suspendTimeout);
+            if (scheduleSafetyTimer) clearTimeout(scheduleSafetyTimer);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [activeAcademicYear, currentUser, userProfile?.role, userProfile?.empId, authLoading]);
+    }, [activeAcademicYear, currentUser, authLoading]);
 
     // Manual refresh is no longer needed with real-time listeners, 
     // but kept as a stub to prevent breaking components that call it.

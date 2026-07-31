@@ -639,7 +639,7 @@ The institute has no objection to ${pronoun.toLowerCase()} attending the same fo
                         {explorerLoading ? <QuantumLoader /> : (
                             <form onSubmit={handleGenericSave}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-                                    {/* eslint-disable-next-line react-hooks/exhaustive-deps */}
+                                    { }
                                     {explorerData.headers.filter(h => h && h !== '_row' && !h.toLowerCase().includes('timestamp')).map(h => (
                                         <div key={h}>
                                             <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: '6px', display: 'block', opacity: 0.6 }}>{h}</label>

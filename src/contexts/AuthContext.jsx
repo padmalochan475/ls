@@ -242,6 +242,7 @@ export const AuthProvider = ({ children }) => {
     // Switched to Real-Time (onSnapshot) to ensure new years appear instantly.
     useEffect(() => {
         if (!currentUser) return;
+        let syncTimer;
 
         const unsub = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
             try {
@@ -293,7 +294,8 @@ export const AuthProvider = ({ children }) => {
                     localStorage.setItem(STORAGE_KEYS.ALL_YEARS, JSON.stringify(finalYears));
 
                     // Short artificial delay to let contexts catch up visually
-                    setTimeout(() => setIsSystemSyncing(false), 800);
+                    if (syncTimer) clearTimeout(syncTimer);
+                    syncTimer = setTimeout(() => setIsSystemSyncing(false), 800);
                     setIsConfigLoaded(true);
 
                 } else {
@@ -307,7 +309,8 @@ export const AuthProvider = ({ children }) => {
                     if (cachedAllYears && cachedAllYears.length > 0) {
                         setAcademicYears(cachedAllYears);
                     }
-                    setTimeout(() => setIsSystemSyncing(false), 800);
+                    if (syncTimer) clearTimeout(syncTimer);
+                    syncTimer = setTimeout(() => setIsSystemSyncing(false), 800);
                     setIsConfigLoaded(true);
                 }
             } catch (err) {
@@ -327,7 +330,10 @@ export const AuthProvider = ({ children }) => {
             setIsConfigLoaded(true);
         });
 
-        return () => unsub();
+        return () => {
+            unsub();
+            if (syncTimer) clearTimeout(syncTimer);
+        };
     }, [currentUser]);
 
     // ENFORCE YEAR LOCK: Kick user back to Active Year if they are restricted
@@ -363,11 +369,9 @@ export const AuthProvider = ({ children }) => {
 
         // SAFETY: If Auth hangs (Limit Exhausted), force load after 7s to try offline mode
         const safetyTimer = setTimeout(() => {
-            setLoading(prev => {
-                if (prev) console.warn("Auth initialization timed out (Likely Firestore Limit). Forcing degraded mode.");
-                setIsConfigLoaded(true); // Must also force this to true, otherwise value.loading stays true forever
-                return false;
-            });
+            console.warn("Auth initialization timed out (Likely Firestore Limit). Forcing degraded mode.");
+            setIsConfigLoaded(true);
+            setLoading(false);
         }, 7000);
 
         return () => {
@@ -378,15 +382,25 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         let unsubscribeProfile = () => { };
+        let profileSafetyTimer = null;
 
         if (currentUser) {
             // Using onSnapshot for Real-Time Role/Profile Updates
             // This allows Admins to Ban/Promote users instantly.
-            if (!userProfile) setLoading(true);
+            if (!userProfile) {
+                setLoading(true);
+                profileSafetyTimer = setTimeout(() => {
+                    setLoading(prev => {
+                        if (prev) console.warn("Profile fetch timed out (Quota limit). Continuing offline.");
+                        return false;
+                    });
+                }, 8000);
+            }
             const docRef = doc(db, 'users', currentUser.uid);
 
             unsubscribeProfile = onSnapshot(docRef,
                 (docSnap) => {
+                    if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
                     if (docSnap.exists()) {
                         const newData = docSnap.data();
                         setUserProfile(prev => {
@@ -418,6 +432,7 @@ export const AuthProvider = ({ children }) => {
                 },
                 (err) => {
                     console.error("Profile Sync Error:", err);
+                    if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
                     setLoading(false);
                 }
             );
@@ -426,7 +441,10 @@ export const AuthProvider = ({ children }) => {
             setUserProfile(null);
         }
 
-        return () => unsubscribeProfile();
+        return () => {
+            unsubscribeProfile();
+            if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
+        };
     }, [currentUser]);
 
     const value = useMemo(() => ({

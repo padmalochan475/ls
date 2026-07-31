@@ -978,6 +978,154 @@ select.glass-input option {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.theme-cyberpunk {
+  background: linear-gradient(45deg, #fceb00, #ff007f, #00f0ff);
+  background-size: 400% 400%;
+  animation: galaxy-flow 6s linear infinite;
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  box-shadow: 0 0 20px rgba(255, 0, 127, 0.3);
+}
+
+.theme-synthwave {
+  background: linear-gradient(180deg, #2b0f54 0%, #ff007a 50%, #ffd000 100%);
+  background-size: 100% 400%;
+  animation: galaxy-flow 10s ease infinite;
+  border: 1px solid #ff007a;
+  position: relative;
+}
+
+.theme-fire {
+  background: linear-gradient(0deg, #7a0000, #ff4500, #ff8c00, #ffd700);
+  background-size: 400% 400%;
+  animation: galaxy-flow 3s ease infinite;
+  border: 1px solid rgba(255, 69, 0, 0.4);
+}
+
+.theme-ocean-wave {
+  background: linear-gradient(135deg, #000b18, #004369, #01949a, #004369, #000b18);
+  background-size: 400% 400%;
+  animation: galaxy-flow 12s ease-in-out infinite;
+  border: 1px solid rgba(1, 148, 154, 0.3);
+}
+
+.theme-hologram {
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 150, 255, 0.2), rgba(0, 255, 255, 0.1));
+  background-size: 200% 200%;
+  animation: pulse-glow 4s infinite alternate;
+  border: 1px solid rgba(0, 255, 255, 0.4);
+  box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.2), 0 0 15px rgba(0, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.theme-matrix {
+  background: radial-gradient(circle at 50% 50%, #003300 0%, #000000 100%);
+  border: 1px solid #00ff00;
+  box-shadow: inset 0 0 30px rgba(0, 255, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-matrix::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 0, 0.1) 3px, rgba(0, 255, 0, 0.1) 3px);
+  pointer-events: none;
+}
+
+.theme-rgb-glow {
+  background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+  background-size: 400% 400%;
+  animation: galaxy-flow 10s linear infinite;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 25px rgba(255, 0, 200, 0.4);
+}
+
+.theme-starlight {
+  background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.theme-starlight::after {
+  content: '';
+  position: absolute;
+  width: 2px; height: 2px;
+  background: transparent;
+  box-shadow: 20px 20px #FFF, 80px 40px #FFF, 150px 80px #FFF, 250px 30px #FFF, 320px 90px #FFF, 400px 50px #FFF, 50px 120px #FFF, 200px 150px #FFF, 350px 180px #FFF;
+  animation: pulse-glow 2s infinite alternate;
+  pointer-events: none;
+}
+
+.theme-liquid-gold {
+  background: linear-gradient(45deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+  background-size: 200% 200%;
+  animation: galaxy-flow 4s ease-in-out infinite alternate;
+  border: 1px solid #ffe259;
+  box-shadow: inset 0 0 30px rgba(170, 119, 28, 0.6);
+}
+
+.theme-glitch {
+  background: #050505;
+  border: 1px solid #ff003c;
+  box-shadow: 3px 3px 0 #00e6f6;
+  position: relative;
+  overflow: hidden;
+}
+.theme-glitch::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(0, 230, 246, 0.1) 10px, rgba(0, 230, 246, 0.1) 20px);
+  animation: pulse-glow 0.3s infinite alternate;
+  pointer-events: none;
+}
+
+.theme-blood-moon {
+  background: radial-gradient(circle at 50% 100%, #8a0303 0%, #1a0000 60%, #000000 100%);
+  border: 1px solid #ff1a1a;
+  box-shadow: inset 0 -30px 50px -20px #ff0000;
+  animation: pulse-glow 6s infinite alternate;
+}
+
+.theme-pastel-dream {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+  background-size: 400% 400%;
+  animation: galaxy-flow 15s ease infinite;
+  border: 1px solid #ffc3a0;
+  color: #333 !important; /* Force darker text for contrast */
+}
+
+.theme-electric-blue {
+  background: linear-gradient(135deg, #000428, #004e92);
+  border: 1px solid #00c6ff;
+  box-shadow: 0 0 20px #00c6ff, inset 0 0 30px #0072ff;
+  animation: pulse-glow 1.5s infinite alternate;
+}
+
+.theme-velvet-night {
+  background: linear-gradient(135deg, #1f005c, #5b0060, #870160, #ac255e, #ca485c, #e16b5c, #f39060, #ffb56b);
+  background-size: 400% 400%;
+  animation: galaxy-flow 20s ease infinite;
+  border: 1px solid #ca485c;
+}
+
+.theme-northern-lights {
+  background: linear-gradient(45deg, #00223E, #1D976C, #93F9B9, #00223E);
+  background-size: 400% 400%;
+  animation: galaxy-flow 12s ease infinite;
+  border: 1px solid #1D976C;
+}
+
+.theme-chrome {
+  background: linear-gradient(135deg, #ece9e6 0%, #ffffff 25%, #a1a1a1 50%, #ffffff 75%, #ece9e6 100%);
+  background-size: 300% 300%;
+  animation: galaxy-flow 8s ease-in-out infinite;
+  border: 1px solid #ccc;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.15);
+  color: #111 !important;
+}
+
 .celebration-interactive {
   transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
   cursor: default;

@@ -35,20 +35,60 @@ const StatCard = ({ icon, label, value, color }) => {
 
 const TabBtn = ({ id, icon, label, count, activeTab, setActiveTab }) => {
     const Icon = icon;
+    const isActive = activeTab === id;
+    
     return (
         <button
             type="button"
             onClick={() => setActiveTab(id)}
             style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                padding: '12px', border: 'none', background: activeTab === id ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                borderBottom: activeTab === id ? '2px solid #3b82f6' : '2px solid transparent',
-                color: activeTab === id ? '#3b82f6' : '#94a3b8',
-                fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
+                padding: '0.85rem 1.5rem', 
+                border: 'none',
+                background: isActive ? 'linear-gradient(135deg, #ec4899, #8b5cf6)' : 'transparent',
+                boxShadow: isActive ? '0 8px 25px -5px rgba(236, 72, 153, 0.6)' : 'none',
+                borderRadius: '16px',
+                color: isActive ? '#ffffff' : '#94a3b8',
+                fontWeight: isActive ? '800' : '600',
+                letterSpacing: '0.5px',
+                cursor: 'pointer', 
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                flexShrink: 0,
+                transform: isActive ? 'scale(1.02) translateY(-2px)' : 'scale(1)',
+                position: 'relative',
+                overflow: 'hidden'
+            }}
+            onMouseEnter={e => {
+                if (!isActive) {
+                    e.currentTarget.style.color = '#ffffff';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                }
+            }}
+            onMouseLeave={e => {
+                if (!isActive) {
+                    e.currentTarget.style.color = '#94a3b8';
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.transform = 'scale(1)';
+                }
             }}
         >
-            <Icon size={18} /> {label}
-            {count > 0 && <span style={{ background: '#ef4444', color: 'white', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px' }}>{count}</span>}
+            <Icon size={18} color={isActive ? '#ffffff' : 'currentColor'} style={{ transition: 'color 0.3s' }} />
+            <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
+            {count > 0 && (
+                <span style={{ 
+                    background: isActive ? '#ffffff' : '#ef4444', 
+                    color: isActive ? '#ec4899' : '#ffffff', 
+                    fontSize: '0.8rem', 
+                    padding: '2px 8px', 
+                    borderRadius: '12px',
+                    fontWeight: '900',
+                    boxShadow: isActive ? 'none' : '0 0 12px rgba(239, 68, 68, 0.6)',
+                    marginLeft: '4px'
+                }}>
+                    {count}
+                </span>
+            )}
         </button>
     );
 };
@@ -492,11 +532,17 @@ const SubstitutionManager = () => {
                 </div>
             </div>
 
-            <div className="glass-panel mobile-scroll-tabs" style={{ padding: 0, marginBottom: '2rem', flexWrap: 'nowrap' }}>
+            <div style={{ 
+                display: 'flex', gap: '0.5rem', marginBottom: '3rem', overflowX: 'auto', 
+                padding: '0.5rem', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none',
+                background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(16px)', 
+                border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '20px',
+                boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)', width: 'fit-content', margin: '0 auto 3rem auto'
+            }}>
                 <TabBtn id="overview" icon={LayoutDashboard} label="Overview" activeTab={activeTab} setActiveTab={setActiveTab} />
                 <TabBtn id="manual" icon={UserX} label="Manual Entry" activeTab={activeTab} setActiveTab={setActiveTab} />
                 <TabBtn id="requests" icon={RefreshCw} label="Approval Queue" count={stats.pendingTotal} activeTab={activeTab} setActiveTab={setActiveTab} />
-                <TabBtn id="history" icon={History} label="History" activeTab={activeTab} setActiveTab={setActiveTab} />
+                <TabBtn id="history" icon={History} label="History Log" activeTab={activeTab} setActiveTab={setActiveTab} />
             </div>
 
             <div style={{ minHeight: '400px' }}>
