@@ -40,6 +40,7 @@ export const ScheduleProvider = ({ children }) => {
                 setLoading(true);
                 // Launch safety timer ONLY when we are actively showing a loader
                 scheduleSafetyTimer = setTimeout(() => {
+                    if (!isActive) return; // Guard: ignore if this effect instance is already torn down
                     setLoading(prev => {
                         if (prev) console.warn("Schedule initialization timed out (Likely Firestore Limit). Forcing degraded mode.");
                         return false;

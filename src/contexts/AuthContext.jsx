@@ -383,6 +383,7 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         let unsubscribeProfile = () => { };
         let profileSafetyTimer = null;
+        let isActive = true;
 
         if (currentUser) {
             // Using onSnapshot for Real-Time Role/Profile Updates
@@ -400,14 +401,13 @@ export const AuthProvider = ({ children }) => {
 
             unsubscribeProfile = onSnapshot(docRef,
                 (docSnap) => {
+                    if (!isActive) return; // Guard: ignore if unmounted
                     if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
                     if (docSnap.exists()) {
                         const newData = docSnap.data();
                         setUserProfile(prev => {
                             if (!prev) return newData;
                             
-                            // Prevent re-renders from background 'lastSeen' updates (Heartbeat)
-                            // We ignore 'lastSeen', 'sessions', and 'isOnline'
                             const ignoreKeys = ['lastSeen', 'sessions', 'isOnline'];
                             const keys1 = Object.keys(prev).filter(k => !ignoreKeys.includes(k));
                             const keys2 = Object.keys(newData).filter(k => !ignoreKeys.includes(k));
@@ -431,6 +431,7 @@ export const AuthProvider = ({ children }) => {
                     setLoading(false);
                 },
                 (err) => {
+                    if (!isActive) return; // Guard: ignore if unmounted
                     console.error("Profile Sync Error:", err);
                     if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
                     setLoading(false);
@@ -442,6 +443,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         return () => {
+            isActive = false;
             unsubscribeProfile();
             if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
         };

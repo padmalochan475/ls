@@ -59,6 +59,7 @@ export const MasterDataProvider = ({ children }) => {
         // and re-sync only when the user returns.
         let isActive = true;
         let setupTimer = null;
+        // Hoisted to useEffect scope so visibilitychange handler can clear it
         let masterSafetyTimer = null;
 
         const syncMasterData = () => {
@@ -95,16 +96,17 @@ export const MasterDataProvider = ({ children }) => {
                     holidaysRef.current = cache.holidays || [];
                     
                     // IF CACHE SUCCEEDS, UNBLOCK UI IMMEDIATELY!
-                    setLoading(false);
+                    // isActive guard: prevent state update if component unmounted before cache loaded
+                    if (isActive) setLoading(false);
                 }
             } catch (e) { console.warn("Cache load failed"); }
 
             if (!departmentsRef.current || departmentsRef.current.length === 0) {
-                setLoading(true);
+                if (isActive) setLoading(true);
                 // Launch safety timer ONLY when we are actively showing a loader
                 if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
                 masterSafetyTimer = setTimeout(() => {
-                    setLoading(prev => {
+                    if (isActive) setLoading(prev => {
                         if (prev) console.warn("MasterData initialization timed out. Forcing degraded mode.");
                         return false;
                     });
@@ -241,7 +243,8 @@ export const MasterDataProvider = ({ children }) => {
                 suspendTimeout = setTimeout(() => {
                     console.log("[MasterData] Suspending sync for quota conservation...");
                     cleanupListeners();
-                    if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
+                    // masterSafetyTimer is now hoisted — can be cleared here safely
+                    if (masterSafetyTimer) { clearTimeout(masterSafetyTimer); masterSafetyTimer = null; }
                     suspendTimeout = null;
                 }, 30000);
             }
