@@ -173,8 +173,10 @@ const AdminPanel = () => {
     // Real-Time Users Listener
     useEffect(() => {
         if (!userProfile || userProfile.role !== 'admin') return;
-        setTimeout(() => setLoading(true), 0);
+        let isActive = true;
+        setLoading(true);
         const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+            if (!isActive) return; // Guard: prevent update on unmounted component
             const usersList = [];
             snapshot.forEach((doc) => {
                 usersList.push({ id: doc.id, ...doc.data() });
@@ -182,11 +184,12 @@ const AdminPanel = () => {
             setUsers(usersList);
             setLoading(false);
         }, (error) => {
+            if (!isActive) return;
             console.error("Error fetching users:", error);
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        return () => { isActive = false; unsubscribe(); };
     }, [userProfile?.role]);
 
     // Suggestions Listener (Always Active for Instant Switching)

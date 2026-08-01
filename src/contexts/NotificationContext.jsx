@@ -55,6 +55,7 @@ export const NotificationProvider = ({ children }) => {
     const [permission, setPermission] = useState('Notification' in window ? Notification.permission : 'denied');
     const [fcmToken, setFcmToken] = useState(null);
     const lastLoginUid = useRef(null);
+    const didSyncRef = useRef(false); // Prevents re-running syncUser when fcmToken state updates
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
     // Helper: Register SW with config params and wait until active
@@ -105,6 +106,8 @@ export const NotificationProvider = ({ children }) => {
 
         const syncUser = async () => {
             if (currentUser?.uid) {
+                // If we already synced for this user, skip to avoid extra Firestore writes
+                if (didSyncRef.current === currentUser.uid) return;
                 lastLoginUid.current = currentUser.uid;
 
                 // Auto-Heal: If permission is already granted, silently get token
@@ -133,6 +136,7 @@ export const NotificationProvider = ({ children }) => {
 
                     if (token) {
                         setFcmToken(token);
+                        didSyncRef.current = currentUser.uid; // Mark as synced for this user
                         let deviceId = localStorage.getItem('lams_device_id');
                         const updateData = {
                             fcmTokens: arrayUnion(token),
@@ -150,6 +154,8 @@ export const NotificationProvider = ({ children }) => {
                     }
                 }
             } else if (lastLoginUid.current) {
+                // Logout: reset the sync flag so next login triggers a fresh sync
+                didSyncRef.current = false;
                 // Logout logic: Delete the token locally and remotely
                 try {
                     if (messaging && fcmToken) {
@@ -175,7 +181,9 @@ export const NotificationProvider = ({ children }) => {
         };
 
         syncUser();
-    }, [currentUser, initialized, fcmToken, vapidKey]);
+    // Intentionally excludes fcmToken — adding it creates a re-run loop (token set → effect runs → token already set → no-op write)
+    // didSyncRef handles the "already synced" case without needing fcmToken in deps.
+    }, [currentUser, initialized, vapidKey]);
 
     // Dynamic Logic: Detect iOS, Android, and PWA status
     const isIOS = () => {

@@ -408,7 +408,10 @@ export const AuthProvider = ({ children }) => {
                         setUserProfile(prev => {
                             if (!prev) return newData;
                             
-                            const ignoreKeys = ['lastSeen', 'sessions', 'isOnline'];
+                            // Prevent re-renders from background 'lastSeen' updates (Heartbeat)
+                            // Also ignore FCM token fields — NotificationContext writes these on every login,
+                            // and they should not cause a full profile state update / re-render cascade.
+                            const ignoreKeys = ['lastSeen', 'sessions', 'isOnline', 'fcmTokens', 'fcmDeviceTokens', 'webPushActive'];
                             const keys1 = Object.keys(prev).filter(k => !ignoreKeys.includes(k));
                             const keys2 = Object.keys(newData).filter(k => !ignoreKeys.includes(k));
                             
