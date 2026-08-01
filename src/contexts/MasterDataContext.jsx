@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useRef, useCallback } from 'react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 import { useAuth } from './AuthContext';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 import { parseTimeToDate } from '../utils/timeUtils';
 
 const MasterDataContext = createContext();
@@ -39,107 +40,73 @@ export const MasterDataProvider = ({ children }) => {
     const groupsRef = useRef([]);
     const holidaysRef = useRef([]);
 
-    // Use a ref to track active unsubscribers so we can safely tear them down
-    const unsubsRef = useRef([]);
+    // --- DYNAMIC QUOTA & CACHE HUB ---
+    useDynamicListener((isActiveRef) => {
+        if (!currentUser) {
+            setDepartments([]); setSemesters([]); setSubjects([]); setFaculty([]);
+            setRooms([]); setDays([]); setTimeSlots([]); setGroups([]); setHolidays([]);
+            setLoading(false);
+            return;
+        }
 
-    // Cleanup helper — call before setting up new listeners
-    const cleanupListeners = () => {
-        unsubsRef.current.forEach(u => {
-            // eslint-disable-next-line sonarjs/no-ignored-exceptions, no-unused-vars
-            try { u(); } catch (e) { /* ignore cleanup errors */ }
-        });
-        unsubsRef.current = [];
-    };
-
-    useEffect(() => {
-        if (authLoading) return;
-
-        // --- DYNAMIC HIBERNATION LOGIC ---
-        // We stop all listeners when the tab is hidden to prevent "background leaks"
-        // and re-sync only when the user returns.
-        let isActive = true;
-        let setupTimer = null;
-        // Hoisted to useEffect scope so visibilitychange handler can clear it
         let masterSafetyTimer = null;
+        let unsubs = [];
 
-        const syncMasterData = () => {
-            if (!currentUser) {
-                cleanupListeners();
-                setDepartments([]); setSemesters([]); setSubjects([]); setFaculty([]);
-                setRooms([]); setDays([]); setTimeSlots([]); setGroups([]); setHolidays([]);
-                setLoading(false);
-                return;
+        // 1. Initial Local Cache Load
+        try {
+            const cached = localStorage.getItem(`lams_master_cache_${currentUser.uid}`);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                setDepartments(parsed.departments || []); departmentsRef.current = parsed.departments || [];
+                setSemesters(parsed.semesters || []); semestersRef.current = parsed.semesters || [];
+                setSubjects(parsed.subjects || []); subjectsRef.current = parsed.subjects || [];
+                setFaculty(parsed.faculty || []); facultyRef.current = parsed.faculty || [];
+                setRooms(parsed.rooms || []); roomsRef.current = parsed.rooms || [];
+                setDays(parsed.days || []); daysRef.current = parsed.days || [];
+                setTimeSlots(parsed.timeSlots || []); timeSlotsRef.current = parsed.timeSlots || [];
+                setGroups(parsed.groups || []); groupsRef.current = parsed.groups || [];
+                setHolidays(parsed.holidays || []); holidaysRef.current = parsed.holidays || [];
+                if (isActiveRef.current) setLoading(false);
             }
+        } catch (e) { console.warn("Cache load failed"); }
 
-            // TRY LOAD FROM CACHE FIRST (Instant UX)
-             
-            try {
-                const cache = JSON.parse(localStorage.getItem(`lams_master_cache_${currentUser.uid}`) || '{}');
-                if (cache.faculty) {
-                    setDepartments(cache.departments || []);
-                    departmentsRef.current = cache.departments || [];
-                    setSemesters(cache.semesters || []);
-                    semestersRef.current = cache.semesters || [];
-                    setSubjects(cache.subjects || []);
-                    subjectsRef.current = cache.subjects || [];
-                    setFaculty(cache.faculty || []);
-                    facultyRef.current = cache.faculty || [];
-                    setRooms(cache.rooms || []);
-                    roomsRef.current = cache.rooms || [];
-                    setDays(cache.days || []);
-                    daysRef.current = cache.days || [];
-                    setTimeSlots(cache.timeSlots || []);
-                    timeSlotsRef.current = cache.timeSlots || [];
-                    setGroups(cache.groups || []);
-                    groupsRef.current = cache.groups || [];
-                    setHolidays(cache.holidays || []);
-                    holidaysRef.current = cache.holidays || [];
-                    
-                    // IF CACHE SUCCEEDS, UNBLOCK UI IMMEDIATELY!
-                    // isActive guard: prevent state update if component unmounted before cache loaded
-                    if (isActive) setLoading(false);
-                }
-            } catch (e) { console.warn("Cache load failed"); }
+        if (!departmentsRef.current || departmentsRef.current.length === 0) {
+            if (isActiveRef.current) setLoading(true);
+            // Launch safety timer ONLY when we are actively showing a loader
+            masterSafetyTimer = setTimeout(() => {
+                if (isActiveRef.current) setLoading(prev => {
+                    if (prev) console.warn("MasterData initialization timed out. Forcing degraded mode.");
+                    return false;
+                });
+            }, 8000);
+        }
 
-            if (!departmentsRef.current || departmentsRef.current.length === 0) {
-                if (isActive) setLoading(true);
-                // Launch safety timer ONLY when we are actively showing a loader
+        const loadStatus = {
+            departments: false, semesters: false, subjects: false, 
+            faculty: false, rooms: false, days: false, 
+            timeslots: false, groups: false, settings: false
+        };
+
+        const checkAllLoaded = () => {
+            const allLoaded = Object.values(loadStatus).every(s => s);
+            if (isActiveRef.current && allLoaded) {
                 if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
-                masterSafetyTimer = setTimeout(() => {
-                    if (isActive) setLoading(prev => {
-                        if (prev) console.warn("MasterData initialization timed out. Forcing degraded mode.");
-                        return false;
-                    });
-                }, 8000);
+                setLoading(false);
+                // UPDATE CACHE
+                const newCache = { 
+                    departments: departmentsRef.current, 
+                    semesters: semestersRef.current, 
+                    subjects: subjectsRef.current, 
+                    faculty: facultyRef.current, 
+                    rooms: roomsRef.current, 
+                    days: daysRef.current, 
+                    timeSlots: timeSlotsRef.current, 
+                    groups: groupsRef.current, 
+                    holidays: holidaysRef.current 
+                };
+                localStorage.setItem(`lams_master_cache_${currentUser.uid}`, JSON.stringify(newCache));
             }
-            cleanupListeners();
-
-            const loadStatus = {
-                departments: false, semesters: false, subjects: false, 
-                faculty: false, rooms: false, days: false, 
-                timeslots: false, groups: false, settings: false
-            };
-
-            const checkAllLoaded = () => {
-                const allLoaded = Object.values(loadStatus).every(s => s);
-                if (isActive && allLoaded) {
-                    if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
-                    setLoading(false);
-                    // UPDATE CACHE
-                    const newCache = { 
-                        departments: departmentsRef.current, 
-                        semesters: semestersRef.current, 
-                        subjects: subjectsRef.current, 
-                        faculty: facultyRef.current, 
-                        rooms: roomsRef.current, 
-                        days: daysRef.current, 
-                        timeSlots: timeSlotsRef.current, 
-                        groups: groupsRef.current, 
-                        holidays: holidaysRef.current 
-                    };
-                    localStorage.setItem(`lams_master_cache_${currentUser.uid}`, JSON.stringify(newCache));
-                }
-            };
+        };
 
             const naturalSort = (a, b) => {
                 const splitAlphaNum = (str) => {
@@ -155,119 +122,91 @@ export const MasterDataProvider = ({ children }) => {
                 return aSuf.localeCompare(bSuf);
             };
 
-            const setupListener = (collectionName, setState, statusKey, customQuery = null) => {
-                const q = customQuery || query(collection(db, collectionName));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    if (!isActive) return;
-                    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    
-                    // --- INTELLIGENT MASTER HUB SORT ---
-                    if (statusKey === 'days') {
-                        items.sort((a, b) => (a.order || 0) - (b.order || 0));
-                    } else if (statusKey === 'timeslots') {
-                        items.sort((a, b) => {
-                            const t1 = parseTimeToDate(a.startTime).getTime();
-                            const t2 = parseTimeToDate(b.startTime).getTime();
-                            if (t1 !== t2) return t1 - t2;
-                            return naturalSort(a.name || '', b.name || '');
-                        });
-                    } else if (statusKey === 'faculty') {
-                        items.sort((a, b) => {
-                            if (a.slNo !== undefined && b.slNo !== undefined) return a.slNo - b.slNo;
-                            return naturalSort(a.name || '', b.name || '');
-                        });
-                    } else {
-                        items.sort((a, b) => naturalSort(a.name || '', b.name || ''));
-                    }
-                    
-                    // Check if data actually changed to prevent violent React re-renders on boot
-                    let prevItems = [];
-                    if (statusKey === 'departments') prevItems = departmentsRef.current;
-                    else if (statusKey === 'semesters') prevItems = semestersRef.current;
-                    else if (statusKey === 'subjects') prevItems = subjectsRef.current;
-                    else if (statusKey === 'faculty') prevItems = facultyRef.current;
-                    else if (statusKey === 'rooms') prevItems = roomsRef.current;
-                    else if (statusKey === 'days') prevItems = daysRef.current;
-                    else if (statusKey === 'timeslots') prevItems = timeSlotsRef.current;
-                    else if (statusKey === 'groups') prevItems = groupsRef.current;
-                    else if (statusKey === 'settings') prevItems = holidaysRef.current;
-
-                    if (JSON.stringify(prevItems) !== JSON.stringify(items)) {
-                        setState(items);
-                        if (statusKey === 'departments') departmentsRef.current = items;
-                        if (statusKey === 'semesters') semestersRef.current = items;
-                        if (statusKey === 'subjects') subjectsRef.current = items;
-                        if (statusKey === 'faculty') facultyRef.current = items;
-                        if (statusKey === 'rooms') roomsRef.current = items;
-                        if (statusKey === 'days') daysRef.current = items;
-                        if (statusKey === 'timeslots') timeSlotsRef.current = items;
-                        if (statusKey === 'groups') groupsRef.current = items;
-                        if (statusKey === 'settings') holidaysRef.current = items;
-                    }
-
-                    loadStatus[statusKey] = true;
-                    checkAllLoaded();
-                }, (error) => {
-                    console.warn(`[MasterData] Listener failed for ${collectionName}:`, error.code);
-                    loadStatus[statusKey] = true;
-                    checkAllLoaded();
-                });
-                unsubsRef.current.push(unsubscribe);
-            };
-
-            setupListener('departments', setDepartments, 'departments');
-            setupListener('semesters', setSemesters, 'semesters');
-            setupListener('subjects', setSubjects, 'subjects');
-            setupListener('faculty', setFaculty, 'faculty');
-            setupListener('rooms', setRooms, 'rooms');
-            setupListener('days', setDays, 'days');
-            setupListener('timeslots', setTimeSlots, 'timeslots');
-            setupListener('groups', setGroups, 'groups');
-            setupListener('settings', setHolidays, 'settings', query(collection(db, 'settings'), where('type', '==', 'holiday')));
-        };
-
-        let suspendTimeout;
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                if (suspendTimeout) {
-                    clearTimeout(suspendTimeout);
-                    suspendTimeout = null;
-                    console.log("[MasterData] Suspension aborted (rapid tab switch). Connection maintained.");
+        const setupListener = (collectionName, setState, statusKey, customQuery = null) => {
+            const q = customQuery || query(collection(db, collectionName));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                if (!isActiveRef.current) return;
+                const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // --- INTELLIGENT MASTER HUB SORT ---
+                if (statusKey === 'days') {
+                    items.sort((a, b) => (a.order || 0) - (b.order || 0));
+                } else if (statusKey === 'timeslots') {
+                    items.sort((a, b) => {
+                        const t1 = parseTimeToDate(a.startTime).getTime();
+                        const t2 = parseTimeToDate(b.startTime).getTime();
+                        if (t1 !== t2) return t1 - t2;
+                        return naturalSort(a.name || '', b.name || '');
+                    });
+                } else if (statusKey === 'faculty') {
+                    items.sort((a, b) => {
+                        if (a.slNo !== undefined && b.slNo !== undefined) return a.slNo - b.slNo;
+                        return naturalSort(a.name || '', b.name || '');
+                    });
                 } else {
-                    console.log("[MasterData] Focus detected. Resuming sync...");
-                    syncMasterData();
+                    items.sort((a, b) => naturalSort(a.name || '', b.name || ''));
                 }
-            } else {
-                console.log("[MasterData] Background detected. Scheduling suspension in 30 seconds...");
-                suspendTimeout = setTimeout(() => {
-                    console.log("[MasterData] Suspending sync for quota conservation...");
-                    cleanupListeners();
-                    // masterSafetyTimer is now hoisted — can be cleared here safely
-                    if (masterSafetyTimer) { clearTimeout(masterSafetyTimer); masterSafetyTimer = null; }
-                    suspendTimeout = null;
-                }, 30000);
-            }
+                
+                // Check if data actually changed to prevent violent React re-renders on boot
+                let prevItems = [];
+                if (statusKey === 'departments') prevItems = departmentsRef.current;
+                else if (statusKey === 'semesters') prevItems = semestersRef.current;
+                else if (statusKey === 'subjects') prevItems = subjectsRef.current;
+                else if (statusKey === 'faculty') prevItems = facultyRef.current;
+                else if (statusKey === 'rooms') prevItems = roomsRef.current;
+                else if (statusKey === 'days') prevItems = daysRef.current;
+                else if (statusKey === 'timeslots') prevItems = timeSlotsRef.current;
+                else if (statusKey === 'groups') prevItems = groupsRef.current;
+                else if (statusKey === 'settings') prevItems = holidaysRef.current;
+
+                if (JSON.stringify(prevItems) !== JSON.stringify(items)) {
+                    setState(items);
+                    if (statusKey === 'departments') departmentsRef.current = items;
+                    if (statusKey === 'semesters') semestersRef.current = items;
+                    if (statusKey === 'subjects') subjectsRef.current = items;
+                    if (statusKey === 'faculty') facultyRef.current = items;
+                    if (statusKey === 'rooms') roomsRef.current = items;
+                    if (statusKey === 'days') daysRef.current = items;
+                    if (statusKey === 'timeslots') timeSlotsRef.current = items;
+                    if (statusKey === 'groups') groupsRef.current = items;
+                    if (statusKey === 'settings') holidaysRef.current = items;
+                }
+
+                loadStatus[statusKey] = true;
+                checkAllLoaded();
+            }, (error) => {
+                console.warn(`[MasterData] Listener failed for ${collectionName}:`, error.code);
+                loadStatus[statusKey] = true;
+                checkAllLoaded();
+            });
+            unsubs.push(unsubscribe);
         };
 
-        // Initial Start
-        syncMasterData();
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        setupListener('departments', setDepartments, 'departments');
+        setupListener('semesters', setSemesters, 'semesters');
+        setupListener('subjects', setSubjects, 'subjects');
+        setupListener('faculty', setFaculty, 'faculty');
+        setupListener('rooms', setRooms, 'rooms');
+        setupListener('days', setDays, 'days');
+        setupListener('timeslots', setTimeSlots, 'timeslots');
+        setupListener('groups', setGroups, 'groups');
+        setupListener('settings', setHolidays, 'settings', query(collection(db, 'settings'), where('type', '==', 'holiday')));
 
         return () => {
-            isActive = false;
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            if (setupTimer) clearTimeout(setupTimer);
-            if (suspendTimeout) clearTimeout(suspendTimeout);
+            unsubs.forEach(u => u());
             if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
-            cleanupListeners();
         };
-    }, [currentUser, authLoading, refreshTrigger]);
+    }, [currentUser, authLoading, refreshTrigger], {
+        enabled: !authLoading && currentUser,
+        suspendOnHidden: true,
+        suspendDelayMs: 30000
+    });
+
 
     // Force a re-fetch of all master data
-    const refreshMasterData = async () => {
+    const refreshMasterData = useCallback(async () => {
         setRefreshTrigger(prev => prev + 1);
-    };
+    }, []); // Stable reference — setRefreshTrigger never changes
 
     const value = useMemo(() => ({
         departments,
@@ -291,7 +230,8 @@ export const MasterDataProvider = ({ children }) => {
         timeSlots,
         groups,
         holidays,
-        loading
+        loading,
+        refreshMasterData
     ]);
 
     return (

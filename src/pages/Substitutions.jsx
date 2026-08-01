@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, getDoc, runTransaction, and, or } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 import { useScheduleContext } from '../contexts/ScheduleContext';
 import { useMasterData } from '../contexts/MasterDataContext';
 import { UserPlus, Calendar, Clock, Check, X, Search, AlertCircle, ArrowRight, Loader, Ghost, ChevronLeft, MapPin, Inbox, Send, ThumbsUp, ThumbsDown, History, Users, CheckCircle, ShieldAlert, MessageSquare } from 'lucide-react';
@@ -46,9 +47,8 @@ const Substitutions = () => {
     const [searchQuery, setSearchQuery] = useState(''); // New search state
 
     // 1. Fetch Outgoing Requests (I asked someone)
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!userProfile?.empId || !currentUser) return;
-
         const q = query(
             collection(db, 'substitution_requests'),
             and(
@@ -56,23 +56,23 @@ const Substitutions = () => {
                 where('requesterId', '==', userProfile.empId)
             )
         );
-        const unsub = onSnapshot(q,
+        return onSnapshot(q,
             (snap) => {
+                if (!isActiveRef.current) return;
                 const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 setOutgoingRequests(data);
             },
             (err) => {
+                if (!isActiveRef.current) return;
                 console.error("Outgoing Requests Sync Error:", err.code, err.message);
             }
         );
-        return unsub;
-    }, [userProfile?.empId, currentUser]);
+    }, [userProfile?.empId, currentUser, activeAcademicYear]);
 
     // 2. Fetch Incoming Requests (Someone asked me)
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!userProfile?.empId || !currentUser) return;
-
         // Note: Using EmpID match. Ensure targetFacultyId is stored as EmpID.
         const q = query(
             collection(db, 'substitution_requests'),
@@ -81,21 +81,22 @@ const Substitutions = () => {
                 where('targetFacultyId', '==', userProfile.empId)
             )
         );
-        const unsub = onSnapshot(q,
+        return onSnapshot(q,
             (snap) => {
+                if (!isActiveRef.current) return;
                 const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 setIncomingRequests(data);
             },
             (err) => {
+                if (!isActiveRef.current) return;
                 console.error("Incoming Requests Sync Error:", err.code, err.message);
             }
         );
-        return unsub;
-    }, [userProfile?.empId, currentUser]);
+    }, [userProfile?.empId, currentUser, activeAcademicYear]);
 
     // 3. Fetch Outgoing Adjustments (I am absent, assigned by Admin or Request)
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!userProfile?.empId || !currentUser) return;
         const q = query(
             collection(db, 'adjustments'),
@@ -104,16 +105,16 @@ const Substitutions = () => {
                 where('originalFacultyEmpId', '==', userProfile.empId)
             )
         );
-        const unsub = onSnapshot(q, (snap) => {
+        return onSnapshot(q, (snap) => {
+            if (!isActiveRef.current) return;
             const data = snap.docs.map(d => ({ id: d.id, ...d.data(), isAdjustment: true }));
             data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setOutgoingAdjustments(data);
-        }, (err) => console.error(err));
-        return unsub;
-    }, [userProfile?.empId, currentUser]);
+        }, (err) => { if (!isActiveRef.current) return; console.error(err); });
+    }, [userProfile?.empId, currentUser, activeAcademicYear]);
 
     // 4. Fetch Incoming Adjustments (I am covering, assigned by Admin or Request)
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!userProfile?.empId || !currentUser) return;
         const q = query(
             collection(db, 'adjustments'),
@@ -122,13 +123,13 @@ const Substitutions = () => {
                 where('substituteEmpId', '==', userProfile.empId)
             )
         );
-        const unsub = onSnapshot(q, (snap) => {
+        return onSnapshot(q, (snap) => {
+            if (!isActiveRef.current) return;
             const data = snap.docs.map(d => ({ id: d.id, ...d.data(), isAdjustment: true }));
             data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setIncomingAdjustments(data);
-        }, (err) => console.error(err));
-        return unsub;
-    }, [userProfile?.empId, currentUser]);
+        }, (err) => { if (!isActiveRef.current) return; console.error(err); });
+    }, [userProfile?.empId, currentUser, activeAcademicYear]);
 
     // Combined Unified Streams
     const unifiedIncoming = useMemo(() => {

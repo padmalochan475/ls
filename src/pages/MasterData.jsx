@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import { useWritePermission } from '../hooks/useWritePermission';
 import { normalizeStr, parseTimeToDate } from '../utils/timeUtils';
 import { FacultyCard, DepartmentCard, SubjectCard, RoomCard, GroupCard, DayCard, TimeSlotCard, SemesterCard, HolidayCard } from '../components/MasterDataCards';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 
 const GroupFields = ({ formData, setFormData }) => {
     const handleAddSubGroup = () => {
@@ -130,10 +131,11 @@ const MasterData = ({ initialTab }) => {
                 }
             });
 
-            const batch = writeBatch(db);
+            let currentBatch = writeBatch(db);
             let updateCount = 0;
+            let totalUpdates = 0;
 
-            facultySnap.forEach(f => {
+            for (const f of facultySnap.docs) {
                 const fd = f.data();
                 const userMatch = (fd.uid && usersMap.get(fd.uid)) || 
                                  (fd.empId && usersMap.get(fd.empId.toString().trim().toLowerCase()));
@@ -142,7 +144,7 @@ const MasterData = ({ initialTab }) => {
                     const updates = {};
                     
                     // Sync Phone if missing
-                    if (!fd.phone || !fd.phone.trim() || fd.phone === '--') {
+                    if ((!fd.phone || !fd.phone.trim() || fd.phone === '--') && userMatch.mobile) {
                         updates.phone = userMatch.mobile;
                     }
                     
@@ -157,15 +159,26 @@ const MasterData = ({ initialTab }) => {
                     }
 
                     if (Object.keys(updates).length > 0) {
-                        batch.update(f.ref, updates);
+                        currentBatch.update(f.ref, updates);
                         updateCount++;
+                        totalUpdates++;
+
+                        // Firebase batch limit is 500, chunk at 400 for safety
+                        if (updateCount >= 400) {
+                            await currentBatch.commit();
+                            currentBatch = writeBatch(db);
+                            updateCount = 0;
+                        }
                     }
                 }
-            });
+            }
 
             if (updateCount > 0) {
-                await batch.commit();
-                toast.success(`Background Sync: Updated ${updateCount} missing faculty phone numbers.`, { duration: 4000 });
+                await currentBatch.commit();
+            }
+            
+            if (totalUpdates > 0) {
+                toast.success(`Background Sync: Updated ${totalUpdates} missing faculty records.`, { duration: 4000 });
             }
         } catch (err) {
             console.warn("Silent Sync Background Error:", err);
@@ -252,26 +265,27 @@ const MasterData = ({ initialTab }) => {
     }, [activeTab]);
 
     // Real-Time Data Listener - Optimised to consume global context
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!activeCollection || !userProfile || userProfile.role !== 'admin') return;
-        setLoading(true);
-
+        
         if (activeTab === 'settings') {
+            setLoading(true);
             const docRef = doc(db, 'settings', 'config');
-            const unsubscribe = onSnapshot(docRef,
+            return onSnapshot(docRef,
                 (docSnap) => {
+                    if (!isActiveRef.current) return;
                     if (docSnap.exists()) {
                         setData([{ id: 'config', ...docSnap.data() }]);
                     }
                     setLoading(false);
                 },
                 (err) => {
+                    if (!isActiveRef.current) return;
                     console.error("Config listener error:", err);
                     toast.error(`Sync error: ${err.code}`);
                     setLoading(false);
                 }
             );
-            return () => unsubscribe();
         } else {
             // Map activeTab to MasterDataContext arrays
             const contextMap = {
@@ -292,23 +306,29 @@ const MasterData = ({ initialTab }) => {
             setData([...contextData]);
             setLoading(false);
         }
-    }, [activeTab, activeCollection, userProfile?.role, masterData]);
-
-    const fetchDependencies = async () => {
-        try {
-            const [deptSnap, usersSnap] = await Promise.all([
-                getDocs(collection(db, 'departments')),
-                getDocs(collection(db, 'users'))
-            ]);
-            setDeptOptions(deptSnap.docs.map(d => d.data().name));
-            setUsersList(usersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (e) {
-            console.error("Error fetching dependencies:", e);
-        }
-    };
+    }, [activeTab, activeCollection, userProfile?.role, masterData], {
+        suspendOnHidden: true,
+        suspendDelayMs: 30000
+    });
 
     useEffect(() => {
+        let isActive = true;
+        const fetchDependencies = async () => {
+            try {
+                const [deptSnap, usersSnap] = await Promise.all([
+                    getDocs(collection(db, 'departments')),
+                    getDocs(collection(db, 'users'))
+                ]);
+                if (!isActive) return;
+                setDeptOptions(deptSnap.docs.map(d => d.data().name));
+                setUsersList(usersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (e) {
+                console.error("Error fetching dependencies:", e);
+            }
+        };
+
         if (isModalOpen) fetchDependencies();
+        return () => { isActive = false; };
     }, [isModalOpen]);
 
     const handleUpdateConfig = async (year, newLoad) => {
@@ -696,26 +716,25 @@ const MasterData = ({ initialTab }) => {
 
         // Construct all possible "Old Time Strings" that might exist in DB
         const queries = [];
-        oldStartVariants.forEach(s => {
-            oldEndVariants.forEach(e => {
+        for (const s of oldStartVariants) {
+            for (const e of oldEndVariants) {
                 queries.push(`${s} - ${e}`);
-            });
-        });
+            }
+        }
 
         const uniqueOldStrings = [...new Set(queries)];
 
-        for (const oldStr of uniqueOldStrings) {
-            if (oldStr === newTimeStr) continue; // Skip if no change for this exact formatting
+        const searchStrings = uniqueOldStrings.filter(s => s !== newTimeStr);
+        if (searchStrings.length === 0) return;
 
-            console.log(`Cascade: Checking for assignments with time "${oldStr}" -> "${newTimeStr}"`);
-            const q = query(collection(db, 'schedule'), where('time', '==', oldStr));
-            const snap = await getDocs(q);
+        // Firebase 'in' queries allow up to 30 items. We only have 4 variants max.
+        // This dynamically condenses 4 sequential queries into a single fast query.
+        const q = query(collection(db, 'schedule'), where('time', 'in', searchStrings));
+        const snap = await getDocs(q);
 
-            if (!snap.empty) {
-                console.log(`Found ${snap.size} docs to update from "${oldStr}"`);
-                for (const doc of snap.docs) {
-                    await addToBatch(doc.ref, { time: newTimeStr });
-                }
+        if (!snap.empty) {
+            for (const doc of snap.docs) {
+                await addToBatch(doc.ref, { time: newTimeStr });
             }
         }
     };
@@ -807,36 +826,36 @@ const MasterData = ({ initialTab }) => {
                 const subQ2 = query(collection(db, 'substitution_requests'), where('targetFacultyId', '==', oldData.empId));
                 const [subSnap1, subSnap2] = await Promise.all([getDocs(subQ1), getDocs(subQ2)]);
                 
-                subSnap1.docs.forEach(doc => {
-                    addToBatch(doc.ref, {
+                for (const doc of subSnap1.docs) {
+                    await addToBatch(doc.ref, {
                         requesterName: newData.name,
                         requesterId: newData.empId || null
                     });
-                });
-                subSnap2.docs.forEach(doc => {
-                    addToBatch(doc.ref, {
+                }
+                for (const doc of subSnap2.docs) {
+                    await addToBatch(doc.ref, {
                         targetFacultyName: newData.name,
                         targetFacultyId: newData.empId || null
                     });
-                });
+                }
 
                 // Update adjustments
                 const adjQ1 = query(collection(db, 'adjustments'), where('originalFacultyEmpId', '==', oldData.empId));
                 const adjQ2 = query(collection(db, 'adjustments'), where('substituteEmpId', '==', oldData.empId));
                 const [adjSnap1, adjSnap2] = await Promise.all([getDocs(adjQ1), getDocs(adjQ2)]);
                 
-                adjSnap1.docs.forEach(doc => {
-                    addToBatch(doc.ref, {
+                for (const doc of adjSnap1.docs) {
+                    await addToBatch(doc.ref, {
                         originalFaculty: newData.name,
                         originalFacultyEmpId: newData.empId || null
                     });
-                });
-                adjSnap2.docs.forEach(doc => {
-                    addToBatch(doc.ref, {
+                }
+                for (const doc of adjSnap2.docs) {
+                    await addToBatch(doc.ref, {
                         substituteName: newData.name,
                         substituteEmpId: newData.empId || null
                     });
-                });
+                }
             }
         }
 
@@ -913,15 +932,17 @@ const MasterData = ({ initialTab }) => {
                 // Users
                 const userQ = query(collection(db, 'users'), where('dept', '==', oldData.name));
                 const userSnap = await getDocs(userQ);
-                userSnap.forEach(u => {
-                    addToBatch(u.ref, { dept: newData.name });
+                for (const u of userSnap.docs) {
+                    await addToBatch(u.ref, { dept: newData.name });
                     processedUserIds.add(u.id);
-                });
+                }
 
                 // Faculty
                 const facQ = query(collection(db, 'faculty'), where('department', '==', oldData.name));
                 const facSnap = await getDocs(facQ);
-                facSnap.forEach(f => addToBatch(f.ref, { department: newData.name }));
+                for (const f of facSnap.docs) {
+                    await addToBatch(f.ref, { department: newData.name });
+                }
             }
 
             // CASCADE CODE CHANGE
@@ -938,11 +959,11 @@ const MasterData = ({ initialTab }) => {
                 // Users (checking code usage)
                 const userQ = query(collection(db, 'users'), where('dept', '==', oldData.code));
                 const userSnap = await getDocs(userQ);
-                userSnap.forEach(u => {
+                for (const u of userSnap.docs) {
                     if (!processedUserIds.has(u.id)) {
-                        addToBatch(u.ref, { dept: newData.code });
+                        await addToBatch(u.ref, { dept: newData.code });
                     }
-                });
+                }
             }
         } else if (collectionName === 'semesters') {
             await updateScheduleRef('sem', oldData.name, newData.name);

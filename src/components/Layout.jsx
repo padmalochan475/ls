@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 import {
     LayoutDashboard,
     FilePlus,
@@ -185,11 +186,10 @@ const Layout = ({ children }) => {
     const [pendingCount, setPendingCount] = useState(0);
 
     // Fetch Pending Substitutions Count (Source: incomingRequests)
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!currentUser || !userProfile?.empId) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setPendingCount(0);
-            return;
+            return () => {};
         }
 
         // We fetch all requests for this faculty and filter in memory to avoid index requirements
@@ -198,19 +198,20 @@ const Layout = ({ children }) => {
             where('targetFacultyId', '==', userProfile.empId)
         );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        return onSnapshot(q, (snapshot) => {
+            if (!isActiveRef.current) return;
             const pending = snapshot.docs.filter(doc => {
                 const data = doc.data();
                 return data.status === 'pending' && !data.targetResponse;
             }).length;
             setPendingCount(pending);
         }, (err) => {
+            if (!isActiveRef.current) return;
             console.error("Sidebar Badge Sync Error:", err);
             setPendingCount(0);
         });
-
-        return () => unsubscribe();
     }, [currentUser, userProfile?.empId]);
+
 
     const navItems = [
         { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },

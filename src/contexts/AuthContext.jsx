@@ -8,9 +8,9 @@ import {
     sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
-// FlaskConical and Logo removed (unused)
 import toast from 'react-hot-toast';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 
 const AuthContext = createContext({
     currentUser: null,
@@ -239,12 +239,12 @@ export const AuthProvider = ({ children }) => {
     const [allowUserYearChange, setAllowUserYearChange] = useState(false);
 
     // --- LOGIC: SYNC WITH SERVER CONFIG (The Single Source of Truth) ---
-    // Switched to Real-Time (onSnapshot) to ensure new years appear instantly.
-    useEffect(() => {
-        if (!currentUser) return;
+    // Switched to Real-Time (useDynamicListener) to ensure new years appear instantly and conserve quota.
+    useDynamicListener((isActiveRef) => {
         let syncTimer;
 
         const unsub = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
+            if (!isActiveRef.current) return;
             try {
                 if (docSnap.exists()) {
                     setIsSystemSyncing(true); // TRIGGER LOADERS
@@ -274,8 +274,6 @@ export const AuthProvider = ({ children }) => {
                     }
 
                     // NEW ROBUST SYNC: Prevent Race Conditions across Tabs
-                    // We compare against a Ref (memory) instead of localStorage (disk) inside the callback.
-                    // This ensures EVERY active tab detects the change independently, even if another tab updated storage first.
                     if (previousSystemYear.current && previousSystemYear.current !== fetchedSystemYear) {
                         console.log(`System Year Change Detected (Ref): ${previousSystemYear.current} -> ${fetchedSystemYear}`);
                         setSelectedAcademicYear(null);
@@ -295,7 +293,9 @@ export const AuthProvider = ({ children }) => {
 
                     // Short artificial delay to let contexts catch up visually
                     if (syncTimer) clearTimeout(syncTimer);
-                    syncTimer = setTimeout(() => setIsSystemSyncing(false), 800);
+                    syncTimer = setTimeout(() => {
+                        if (isActiveRef.current) setIsSystemSyncing(false);
+                    }, 800);
                     setIsConfigLoaded(true);
 
                 } else {
@@ -310,15 +310,17 @@ export const AuthProvider = ({ children }) => {
                         setAcademicYears(cachedAllYears);
                     }
                     if (syncTimer) clearTimeout(syncTimer);
-                    syncTimer = setTimeout(() => setIsSystemSyncing(false), 800);
+                    syncTimer = setTimeout(() => {
+                        if (isActiveRef.current) setIsSystemSyncing(false);
+                    }, 800);
                     setIsConfigLoaded(true);
                 }
             } catch (err) {
                 console.error("Global Config Sync Error:", err);
                 const cachedSysYear = localStorage.getItem(STORAGE_KEYS.SYSTEM_YEAR);
                 if (cachedSysYear) setSystemAcademicYear(cachedSysYear);
-                setIsSystemSyncing(false); // Force dismiss loader on error
-                setIsConfigLoaded(true);
+                if (isActiveRef.current) setIsSystemSyncing(false); // Force dismiss loader on error
+                if (isActiveRef.current) setIsConfigLoaded(true);
             }
         }, (err) => {
             console.error("Config Snapshot Error:", err);
@@ -326,15 +328,19 @@ export const AuthProvider = ({ children }) => {
             const cachedAllYears = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_YEARS) || '[]');
             if (cachedSysYear) setSystemAcademicYear(cachedSysYear);
             if (cachedAllYears && cachedAllYears.length > 0) setAcademicYears(cachedAllYears);
-            setIsSystemSyncing(false); // Force dismiss loader on snapshot error
-            setIsConfigLoaded(true);
+            if (isActiveRef.current) setIsSystemSyncing(false); // Force dismiss loader on snapshot error
+            if (isActiveRef.current) setIsConfigLoaded(true);
         });
 
         return () => {
             unsub();
             if (syncTimer) clearTimeout(syncTimer);
         };
-    }, [currentUser]);
+    }, [currentUser], {
+        enabled: !!currentUser,
+        suspendOnHidden: true,
+        suspendDelayMs: 30000
+    });
 
     // ENFORCE YEAR LOCK: Kick user back to Active Year if they are restricted
     useEffect(() => {
@@ -380,10 +386,8 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
-    useEffect(() => {
-        let unsubscribeProfile = () => { };
+    useDynamicListener((isActiveRef) => {
         let profileSafetyTimer = null;
-        let isActive = true;
 
         if (currentUser) {
             // Using onSnapshot for Real-Time Role/Profile Updates
@@ -391,17 +395,19 @@ export const AuthProvider = ({ children }) => {
             if (!userProfile) {
                 setLoading(true);
                 profileSafetyTimer = setTimeout(() => {
-                    setLoading(prev => {
-                        if (prev) console.warn("Profile fetch timed out (Quota limit). Continuing offline.");
-                        return false;
-                    });
+                    if (isActiveRef.current) {
+                        setLoading(prev => {
+                            if (prev) console.warn("Profile fetch timed out (Quota limit). Continuing offline.");
+                            return false;
+                        });
+                    }
                 }, 8000);
             }
             const docRef = doc(db, 'users', currentUser.uid);
 
-            unsubscribeProfile = onSnapshot(docRef,
+            const unsubscribeProfile = onSnapshot(docRef,
                 (docSnap) => {
-                    if (!isActive) return; // Guard: ignore if unmounted
+                    if (!isActiveRef.current) return;
                     if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
                     if (docSnap.exists()) {
                         const newData = docSnap.data();
@@ -409,8 +415,6 @@ export const AuthProvider = ({ children }) => {
                             if (!prev) return newData;
                             
                             // Prevent re-renders from background 'lastSeen' updates (Heartbeat)
-                            // Also ignore FCM token fields — NotificationContext writes these on every login,
-                            // and they should not cause a full profile state update / re-render cascade.
                             const ignoreKeys = ['lastSeen', 'sessions', 'isOnline', 'fcmTokens', 'fcmDeviceTokens', 'webPushActive'];
                             const keys1 = Object.keys(prev).filter(k => !ignoreKeys.includes(k));
                             const keys2 = Object.keys(newData).filter(k => !ignoreKeys.includes(k));
@@ -434,23 +438,26 @@ export const AuthProvider = ({ children }) => {
                     setLoading(false);
                 },
                 (err) => {
-                    if (!isActive) return; // Guard: ignore if unmounted
+                    if (!isActiveRef.current) return;
                     console.error("Profile Sync Error:", err);
                     if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
                     setLoading(false);
                 }
             );
 
+            return () => {
+                unsubscribeProfile();
+                if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
+            };
         } else {
             setUserProfile(null);
+            return () => {};
         }
-
-        return () => {
-            isActive = false;
-            unsubscribeProfile();
-            if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
-        };
-    }, [currentUser]);
+    }, [currentUser], {
+        enabled: true,
+        suspendOnHidden: true,
+        suspendDelayMs: 30000
+    });
 
     const value = useMemo(() => ({
         currentUser,

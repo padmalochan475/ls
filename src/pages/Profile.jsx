@@ -4,6 +4,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, query, collection, where, getDocs, getDoc, onSnapshot } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 import { User, Mail, Phone, BadgeCheck, Shield, Key, Edit2, Camera, X, Check, Eye, EyeOff, Bell, Calendar, Zap, Activity, Gift, Briefcase } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../utils/cropImage';
@@ -111,10 +112,12 @@ const Profile = () => {
 
     // Fetch Dynamic Bot Number from System Settings
     useEffect(() => {
+        let isActive = true;
         const fetchBotSettings = async () => {
             try {
                 const settingsRef = doc(db, 'settings', 'whatsapp');
                 const snap = await getDoc(settingsRef);
+                if (!isActive) return;
                 if (snap.exists() && snap.data().botNumber) {
                     setBotNumber(snap.data().botNumber);
                 }
@@ -123,6 +126,7 @@ const Profile = () => {
             }
         };
         fetchBotSettings();
+        return () => { isActive = false; };
     }, []);
 
     const handleGeneratewaVerifyCode = async () => {
@@ -148,11 +152,12 @@ const Profile = () => {
     };
 
     // --- PERSISTENT REAL-TIME SUCCESS LISTENER ---
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!currentUser || !waVerifyCode) return;
         
         const userRef = doc(db, 'users', currentUser.uid);
-        const unsub = onSnapshot(userRef, (doc) => {
+        return onSnapshot(userRef, (doc) => {
+            if (!isActiveRef.current) return;
             const data = doc.data();
             // If ID is linked and code is cleared (means bot successfully verified)
             if (data && data.lid && data.waVerifyCode === null) {
@@ -160,9 +165,7 @@ const Profile = () => {
                 setWaVerifyCode(null);
             }
         });
-
-        return () => unsub(); // Cleanup on unmount or code change
-    }, [waVerifyCode, currentUser, userProfile]);
+    }, [waVerifyCode, currentUser]);
 
     const onCropComplete = (croppedArea, croppedAreaPixels) => {
         setCroppedAreaPixels(croppedAreaPixels);

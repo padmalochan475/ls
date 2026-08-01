@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMasterData } from '../../contexts/MasterDataContext';
+import { useDynamicListener } from '../../hooks/useDynamicListener';
 import {
   Plus, Search, Edit2, Trash2, Users, Upload, Download, Eye,
   CheckCircle, X, Clock, BookOpen, Filter, UserCheck, UserX,
@@ -503,11 +504,14 @@ function AddEditModal({ student, groups, availableBatches, semesters, students, 
       return;
     }
 
+    let isActive = true;
+
     const fetchBatches = async () => {
       setLoadingBatches(true);
       try {
         const q = query(collection(db, 'students'), where('semester', '==', form.semester));
         const snap = await getDocs(q);
+        if (!isActive) return;
         const secSet = new Set();
         const grpSet = new Set(['1', '2']);
         snap.forEach(doc => {
@@ -523,11 +527,12 @@ function AddEditModal({ student, groups, availableBatches, semesters, students, 
       } catch (err) {
         console.error("Error fetching sections/groups:", err);
       } finally {
-        setLoadingBatches(false);
+        if (isActive) setLoadingBatches(false);
       }
     };
 
     fetchBatches();
+    return () => { isActive = false; };
   }, [form.semester, students]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -1258,6 +1263,7 @@ export default function StudentDirectory() {
 
   // ── Fetch stats on mount ──
   useEffect(() => {
+    let isActive = true;
     const fetchStats = async () => {
       setStatsLoading(true);
       try {
@@ -1267,6 +1273,7 @@ export default function StudentDirectory() {
           getCountFromServer(query(col, where('status', '==', 'alumni'))),
           getCountFromServer(query(col, where('status', '==', 'tc'))),
         ]);
+        if (!isActive) return;
         setStats({
           active: activeSnap.data().count,
           groups: groups.length,
@@ -1276,19 +1283,20 @@ export default function StudentDirectory() {
       } catch (err) {
         console.error('Stats fetch error:', err);
       } finally {
-        setStatsLoading(false);
+        if (isActive) setStatsLoading(false);
       }
     };
     fetchStats();
+    return () => { isActive = false; };
   }, [groups.length]);
 
   // ── Real-time query ──
-  useEffect(() => {
+  useDynamicListener((isActiveRef) => {
     if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
     if (!filterBatch && !filterSemester) {
       setStudents([]);
       setLoading(false);
-      return;
+      return () => {};
     }
     setLoading(true);
     setSelected(new Set());
@@ -1296,17 +1304,18 @@ export default function StudentDirectory() {
     let constraints = [];
     if (filterSemester) constraints.push(where('semester', '==', filterSemester));
     const q = query(col, ...constraints);
-    unsubRef.current = onSnapshot(q, (snap) => {
+    return onSnapshot(q, (snap) => {
+      if (!isActiveRef.current) return;
       const data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
       data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setStudents(data);
       setLoading(false);
     }, (err) => {
+      if (!isActiveRef.current) return;
       console.error('Student query error:', err);
       toast.error('Failed to load students');
       setLoading(false);
     });
-    return () => { if (unsubRef.current) unsubRef.current(); };
   }, [filterBatch, filterSemester]);
 
   // ── Filtered list ──

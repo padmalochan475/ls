@@ -64,6 +64,7 @@ const StudentPromotions = () => {
     const [loadingBatches, setLoadingBatches] = useState(false);
 
     React.useEffect(() => {
+        let isActive = true;
         if (!fromSem) {
             setDbSections([]);
             return;
@@ -73,6 +74,7 @@ const StudentPromotions = () => {
             try {
                 const q = query(collection(db, 'students'), where('semester', '==', fromSem.toString()), where('status', '==', 'active'));
                 const snap = await getDocs(q);
+                if (!isActive) return;
                 const secSet = new Set();
                 snap.forEach(doc => {
                     const s = doc.data();
@@ -84,10 +86,11 @@ const StudentPromotions = () => {
             } catch (err) {
                 console.error(err);
             } finally {
-                setLoadingBatches(false);
+                if (isActive) setLoadingBatches(false);
             }
         };
         fetchSections();
+        return () => { isActive = false; };
     }, [fromSem]);
 
     const handleFetchEligible = async () => {

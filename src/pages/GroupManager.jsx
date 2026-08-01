@@ -3,6 +3,7 @@ import { db } from '../lib/firebase';
 import { writeBatch, doc, collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 import { Save, Plus, Trash2, GripVertical, AlertTriangle, Layers, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,25 +28,26 @@ const GroupManager = () => {
     const [filterSection, setFilterSection] = useState('');
     const [filterGroup, setFilterGroup] = useState('1');
 
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!filterSem) {
             setAllStudents([]);
             setLoading(false);
-            return;
+            return () => {};
         }
         setLoading(true);
         const col = collection(db, 'students');
         const q = query(col, where('semester', '==', filterSem));
-        const unsub = onSnapshot(q, (snap) => {
+        return onSnapshot(q, (snap) => {
+            if (!isActiveRef.current) return;
             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setAllStudents(data);
             setLoading(false);
         }, (err) => {
+            if (!isActiveRef.current) return;
             console.error('Failed to fetch students for GroupManager:', err);
             toast.error('Failed to load students');
             setLoading(false);
         });
-        return () => unsub();
     }, [filterSem]);
 
 
@@ -73,9 +75,7 @@ const GroupManager = () => {
         return [...groups].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     }, [allStudents, filterSem, filterSection]);
 
-    // Reset downstream filters if upstream changes
-    useEffect(() => { setFilterSection(''); }, [filterSem]);
-    useEffect(() => { setFilterGroup(availableGroups.includes(filterGroup) ? filterGroup : '1'); }, [filterSection, availableGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Downstream filters are reset synchronously via onChange handlers
 
     // ── derived cohort ────────────────────────────────────────────────────────
     const cohort = useMemo(() => {
@@ -98,8 +98,13 @@ const GroupManager = () => {
 
     // ── local SL-No ordered list (editable) ───────────────────────────────────
     const [localList, setLocalList] = useState(null); 
+    const [prevCohort, setPrevCohort] = useState(cohort);
+
+    if (cohort !== prevCohort) {
+        setLocalList(null);
+        setPrevCohort(cohort);
+    }
     const displayList = localList ?? cohort;
-    React.useEffect(() => { setLocalList(null); }, [cohort]);
 
     // ── add student at position ───────────────────────────────────────────────
     const [addModalOpen, setAddModalOpen] = useState(false);
@@ -382,7 +387,11 @@ const GroupManager = () => {
                     {/* Semester */}
                     <div>
                         <label style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>Semester</label>
-                        <select className="glass-select" value={filterSem} onChange={e => setFilterSem(e.target.value)}>
+                        <select className="glass-select" value={filterSem} onChange={e => {
+                            setFilterSem(e.target.value);
+                            setFilterSection('');
+                            setFilterGroup('1');
+                        }}>
                             <option value="">-- Select Sem --</option>
                             {semesters.map(s => <option key={s.id} value={s.number}>Sem {s.number}</option>)}
                         </select>
@@ -390,7 +399,10 @@ const GroupManager = () => {
                     {/* Section */}
                     <div>
                         <label style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>Section</label>
-                        <select className="glass-select" value={filterSection} onChange={e => setFilterSection(e.target.value)} disabled={!filterSem}>
+                        <select className="glass-select" value={filterSection} onChange={e => {
+                            setFilterSection(e.target.value);
+                            setFilterGroup('1');
+                        }} disabled={!filterSem}>
                             <option value="">-- Select Section --</option>
                             {availableSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
                         </select>

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, deleteDoc, updateDoc, doc, onSnapshot, serverTimestamp, getDoc, setDoc, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import { useMasterData } from '../contexts/MasterDataContext';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 import { useScheduleContext } from '../contexts/ScheduleContext';
 import {
     LayoutDashboard, UserX, History, AlertOctagon, BarChart2, Trash2,
@@ -167,67 +169,64 @@ const SubstitutionManager = () => {
     useEffect(() => {
         if (!activeAcademicYear || !userProfile || userProfile.role !== 'admin') return;
 
-        let unsubAdj = () => { };
-        let unsubReq = () => { };
         let active = true;
-
-        const handleAdjSnap = (snap) => {
-            setAdjustments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        };
-
-        const handleAdjError = (err) => {
-            console.error("Adjustments listener error:", err.code);
-            if (err.code !== 'permission-denied') {
-                toast.error(`Adjustments sync failed: ${err.code}`);
-            }
-        };
-
-        const handleReqSnap = (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            setRequests(data);
-        };
-
-        const handleReqError = (err) => {
-            console.error("Requests listener error:", err.code);
-            if (err.code !== 'permission-denied') {
-                toast.error(`Requests sync failed: ${err.code}`);
-            }
-        };
-
         const fetchFaculty = async () => {
             try {
                 const snap = await getDocs(collection(db, 'faculty'));
+                if (!active) return;
                 const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
                 setFaculty(data);
             } catch (err) { console.error("Error fetching faculty:", err); }
         };
 
-        const fetchAdjustments = () => {
-            const q = query(collection(db, 'adjustments'), where('academicYear', '==', activeAcademicYear));
-            return onSnapshot(q, handleAdjSnap, handleAdjError);
-        };
-
-        const fetchRequests = () => {
-            const q = query(collection(db, 'substitution_requests'), where('academicYear', '==', activeAcademicYear));
-            return onSnapshot(q, handleReqSnap, handleReqError);
-        };
-
-        // Small delay ensures Auth state has fully propagated to internal Firestore engine
         const timeout = setTimeout(() => {
             if (!active) return;
             fetchFaculty();
-            unsubAdj = fetchAdjustments();
-            unsubReq = fetchRequests();
         }, 500);
 
         return () => {
             active = false;
             clearTimeout(timeout);
-            unsubAdj();
-            unsubReq();
         };
+    }, [activeAcademicYear, userProfile]);
+
+    useDynamicListener((isActiveRef) => {
+        if (!activeAcademicYear || !userProfile || userProfile.role !== 'admin') return;
+        const q = query(collection(db, 'adjustments'), where('academicYear', '==', activeAcademicYear));
+        return onSnapshot(q, 
+            (snap) => {
+                if (!isActiveRef.current) return;
+                setAdjustments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            }, 
+            (err) => {
+                if (!isActiveRef.current) return;
+                console.error("Adjustments listener error:", err.code);
+                if (err.code !== 'permission-denied') {
+                    toast.error(`Adjustments sync failed: ${err.code}`);
+                }
+            }
+        );
+    }, [activeAcademicYear, userProfile]);
+
+    useDynamicListener((isActiveRef) => {
+        if (!activeAcademicYear || !userProfile || userProfile.role !== 'admin') return;
+        const q = query(collection(db, 'substitution_requests'), where('academicYear', '==', activeAcademicYear));
+        return onSnapshot(q, 
+            (snap) => {
+                if (!isActiveRef.current) return;
+                const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                setRequests(data);
+            }, 
+            (err) => {
+                if (!isActiveRef.current) return;
+                console.error("Requests listener error:", err.code);
+                if (err.code !== 'permission-denied') {
+                    toast.error(`Requests sync failed: ${err.code}`);
+                }
+            }
+        );
     }, [activeAcademicYear, userProfile]);
 
     // --- METRICS CALCULATION ---

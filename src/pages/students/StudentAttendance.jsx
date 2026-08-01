@@ -34,6 +34,7 @@ const StudentAttendance = () => {
 
     // Auto-fetch students when semester changes
     useEffect(() => {
+        let isActive = true;
         const fetchStudentsForSem = async () => {
             if (!config.semester) {
                 setSemesterStudents([]);
@@ -46,6 +47,7 @@ const StudentAttendance = () => {
                 const studentRef = collection(db, 'students');
                 const q = query(studentRef, where('semester', '==', config.semester.toString()));
                 const snapshot = await getDocs(q);
+                if (!isActive) return;
                 let data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 
                 // Filter out transferred/alumni
@@ -58,11 +60,12 @@ const StudentAttendance = () => {
                 console.error("Error fetching students", error);
                 toast.error("Failed to load students for semester.");
             } finally {
-                setLoadingSem(false);
+                if (isActive) setLoadingSem(false);
             }
         };
 
         fetchStudentsForSem();
+        return () => { isActive = false; };
     }, [config.semester]);
 
     // Smart Group Discovery

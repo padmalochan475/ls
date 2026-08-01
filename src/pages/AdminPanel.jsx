@@ -19,6 +19,7 @@ import AdminOtpModal from '../components/admin/AdminOtpModal';
 import SystemSettings from '../components/admin/SystemSettings';
 import SyllabusManager from '../components/admin/SyllabusManager';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const AdminPanel = () => {
     const { userProfile } = useAuth();
@@ -171,12 +172,11 @@ const AdminPanel = () => {
     const COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981'];
 
     // Real-Time Users Listener
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!userProfile || userProfile.role !== 'admin') return;
-        let isActive = true;
         setLoading(true);
-        const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
-            if (!isActive) return; // Guard: prevent update on unmounted component
+        return onSnapshot(collection(db, 'users'), (snapshot) => {
+            if (!isActiveRef.current) return; // Guard: prevent update on unmounted component
             const usersList = [];
             snapshot.forEach((doc) => {
                 usersList.push({ id: doc.id, ...doc.data() });
@@ -184,20 +184,19 @@ const AdminPanel = () => {
             setUsers(usersList);
             setLoading(false);
         }, (error) => {
-            if (!isActive) return;
+            if (!isActiveRef.current) return;
             console.error("Error fetching users:", error);
             setLoading(false);
         });
-
-        return () => { isActive = false; unsubscribe(); };
-    }, [userProfile?.role]);
+    }, [userProfile?.role], { suspendOnHidden: true, suspendDelayMs: 30000 });
 
     // Suggestions Listener (Always Active for Instant Switching)
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!userProfile || userProfile.role !== 'admin') return;
         setSuggestionsLoading(true);
         const q = collection(db, 'suggestions');
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        return onSnapshot(q, (snapshot) => {
+            if (!isActiveRef.current) return; // Guard: prevent update on unmounted component
             const list = [];
             snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
             // Sort by date desc
@@ -205,11 +204,11 @@ const AdminPanel = () => {
             setSuggestions(list);
             setSuggestionsLoading(false);
         }, (err) => {
+            if (!isActiveRef.current) return;
             console.error("Suggestions Sync Error:", err);
             setSuggestionsLoading(false);
         });
-        return () => unsubscribe();
-    }, [userProfile?.role]);
+    }, [userProfile?.role], { suspendOnHidden: true, suspendDelayMs: 30000 });
 
     const updateSuggestionStatus = async (id, status) => {
         // STRICT PERMISSION CHECK

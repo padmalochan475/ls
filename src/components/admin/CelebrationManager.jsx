@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
+import { useDynamicListener } from '../../hooks/useDynamicListener';
 import Holidays from 'date-holidays';
 import toast from 'react-hot-toast';
 import { useWritePermission } from '../../hooks/useWritePermission'; // Import Hook
@@ -38,11 +39,11 @@ const CelebrationManager = () => {
         } catch { toast.error("Failed to save"); }
     };
 
-    useEffect(() => {
-        const unsub = onSnapshot(collection(db, 'celebrations'), (snap) => {
+    useDynamicListener((isActiveRef) => {
+        return onSnapshot(collection(db, 'celebrations'), (snap) => {
+            if (!isActiveRef.current) return;
             setCelebrations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-        return unsub;
     }, []);
 
     // eslint-disable-next-line sonarjs/cognitive-complexity

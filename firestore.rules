@@ -1,141 +1,122 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- Helper Functions ---
-    
-    // Check if user is authenticated
-    function isAuth() {
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Check if user is Admin
-    // We look up the 'users' collection for the current user's ID and check the 'role' field
-    function isAdmin() {
-      return isAuth() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // --- Collection Rules ---
-
-    // 1. Master Data Collections
-    // Everyone (Auth) can READ to populate dropdowns.
-    // Only ADMIN can WRITE (Add/Edit/Delete).
-    match /departments/{docId} { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /syllabi/{docId}     { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /semesters/{docId}   { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /subjects/{docId}    { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /faculty/{docId} { 
-        allow read: if isAuth(); 
-        allow create, delete: if isAdmin();
-        allow update: if isAdmin() || 
-                     (isAuth() && resource.data.uid == request.auth.uid) ||
-                     (isAuth() && (!("uid" in resource.data) || resource.data.uid == null) && request.resource.data.uid == request.auth.uid); 
-    }
-    match /rooms/{docId}       { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /groups/{docId}      { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /days/{docId}        { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /timeslots/{docId}   { allow read: if isAuth(); allow write: if isAdmin(); }
-// ...
-
-    // 2. Schedule Collection
-    // Auth users can READ (View Only).
-    // Only ADMIN can CREATE/UPDATE/DELETE.
-    match /schedule/{docId} {
-      allow read: if isAuth();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // 4. User Profiles
-    // SECURED: Only authenticated users can read profiles.
-    match /users/{userId} {
-      allow read: if isAuth();
-      
-      // Security Fix: Block users from creating an 'admin' role directly. 
-      // The first user loophole is no longer needed since the system is already set up.
-      allow create: if isAuth() && request.auth.uid == userId && 
-                    (!('role' in request.resource.data) || request.resource.data.role == 'user' || request.resource.data.role == 'pending');
-      
-      // Allow admin to update anything. 
-      // Allow users to update their own profile, BUT block changes to 'role' and 'status'.
-      allow update: if isAdmin() || (
-          isAuth() && request.auth.uid == userId 
-          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']))
-      );
-      
-      // Only admins can delete users.
-      allow delete: if isAdmin();
-      
-      // Free Tier Notification System:
-      // Allow any auth user to DROP a message into another user's mailbox.
-      // They cannot read other people's messages, only write new ones.
-      match /notifications/{notifId} {
-        allow read: if isAuth() && request.auth.uid == userId;
-        allow create: if isAuth() && 
-                      request.resource.data.title is string && request.resource.data.title.size() < 150 &&
-                      request.resource.data.body is string && request.resource.data.body.size() < 1000;
-        allow update: if isAuth() && request.auth.uid == userId; // User can mark as read
-        allow delete: if isAuth() && request.auth.uid == userId; // User can delete
-      }
-    }
-
-    // 5. Secure Login Lookup (The "Best Logic" Pattern)
-    // Allows looking up an EMAIL by EmpID without exposing the list of users.
-    // - allow get: Permits reading a single file if you know its ID (the EmpID).
-    // - allow list: false (Denies browsing/scraping the collection).
-    match /emp_lookups/{empId} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
-    }
-
-    // 6. Config/Settings
-    match /settings/{docId} {
-        allow read: if true; // Public access for Active Year config
-        allow write: if isAdmin();
+    // Helper function to get the current user's profile data
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     
-    // 7. Manual Notifications Outbox
-    match /outbox_notifications/{docId} {
-        allow create: if isAdmin();
-        allow read: if isAdmin();
-        allow update: if isAdmin(); // For status updates if done by client-side admin logic (though optimized for CF)
+    // Helper function to check if the user is an admin
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+    
+    // Helper function to check if the user is a teacher (or admin)
+    function isTeacher() {
+      return isAuthenticated() && (getUserData().role == 'teacher' || getUserData().role == 'admin');
     }
 
-    // 8. Suggestions Box
-    match /suggestions/{docId} {
-        allow create: if isAuth();
-        allow read: if isAdmin() || (isAuth() && resource.data.userId == request.auth.uid);
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
-    }
-    // 9. Celebrations
-    match /celebrations/{docId} {
-        allow read: if isAuth();
-        allow write: if isAdmin();
+    // 1. Users Collection
+    // Anyone authenticated can read their own user document.
+    // Admins can read/write all user documents.
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
     }
 
-    // 10. Substitutions & Adjustments
+    // 2. Students Collection
+    // Teachers and Admins can read student data.
+    // Only Admins can modify student records (promotions, edits, adds).
+    match /students/{studentId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+
+    // 3. Faculty / Departments / Subjects / Rooms (Master Data)
+    // Teachers need to read these to use the app.
+    // Only Admins can modify master data.
+    match /faculty/{docId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+    match /departments/{docId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+    match /subjects/{docId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+    match /rooms/{docId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+    match /groups/{docId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+    match /semesters/{docId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+    match /days/{docId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+    match /timeslots/{docId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+
+    // 4. Schedule
+    // Teachers and Admins can read the schedule.
+    // Only Admins (or designated schedule managers) can write.
+    match /schedule/{scheduleId} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+
+    // 5. Attendance & Adjustments (Substitutions)
+    // Teachers can write attendance and request substitutions.
+    match /attendance/{docId} {
+      allow read, write: if isTeacher();
+    }
     match /adjustments/{docId} {
-      allow read: if isAuth();
-      // Allow faculty to CREATE adjustments when accepting substitution requests
-      // Only admins can UPDATE or DELETE
-      allow create: if isAuth();
+      allow read, write: if isTeacher();
+    }
+
+    // 6. Settings (Config, Holidays, Celebration)
+    // Settings control the academic year and global toggles.
+    // Teachers can read, only Admins can write.
+    match /settings/{document=**} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+    match /celebrations/{document=**} {
+      allow read: if isTeacher();
+      allow write: if isAdmin();
+    }
+
+    // 7. Suggestions
+    // Any authenticated user can create a suggestion.
+    // Only admins can update or delete them.
+    match /suggestions/{suggestionId} {
+      allow read: if isTeacher();
+      allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
     }
-
-    match /substitution_requests/{docId} {
-      allow read: if isAuth();
-      allow create, update: if isAuth();
-      allow delete: if isAdmin() || (isAuth() && resource.data.requesterUid == request.auth.uid && resource.data.status == 'pending');
-    }
-
-    // 11. Students
-    match /students/{docId} {
-      allow read: if isAuth();
+    
+    // 8. Syllabi
+    // Any authenticated user can read syllabi. Admins can manage.
+    match /syllabi/{docId} {
+      allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
   }

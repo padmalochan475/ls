@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot, or, orderBy, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { useScheduleData } from '../hooks/useScheduleData';
+import { useScheduleContext } from '../contexts/ScheduleContext';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 import { useMasterData } from '../contexts/MasterDataContext';
 import { Users, Clock, MapPin, CalendarDays, Zap, BookOpen, GraduationCap, ChevronLeft, ChevronRight, LayoutTemplate, UserCircle, Check, CalendarOff, Coffee, RefreshCw, Calendar, FlaskConical } from 'lucide-react';
 import CelebrationCard from '../components/CelebrationCard';
@@ -182,7 +183,7 @@ const Dashboard = () => {
     const { userProfile, activeAcademicYear } = useAuth();
     // Schedules derived via useMemo
     const [roomCount, setRoomCount] = useState(0);
-    const { schedule: allData = [], loading: scheduleLoading, refreshSchedule } = useScheduleData() || {};
+    const { schedule: allData = [], loading: scheduleLoading, refreshSchedule } = useScheduleContext() || {};
     const totalClasses = allData ? allData.length : 0; // Derived instead
     const [facultyList, setFacultyList] = useState([]);
     const [selectedFaculty, setSelectedFaculty] = useState('');
@@ -275,7 +276,6 @@ const Dashboard = () => {
         return { label: 'Upcoming', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' };
     };
 
-    // Removed duplicate useScheduleData call
     // Use Real-Time Master Data Context instead of manual fetch
     const {
         faculty: masterFaculty = [],
@@ -285,11 +285,6 @@ const Dashboard = () => {
         subjects: masterSubjects = [],
         loading: masterLoading
     } = useMasterData() || {};
-
-    // Auto-Refresh Schedule Data on Mount is no longer needed since it's live-synced
-    useEffect(() => {
-        refreshSchedule();
-    }, [refreshSchedule]);
 
     const loading = scheduleLoading || masterLoading; // Unified loading state
     const [weekDates, setWeekDates] = useState([]);
@@ -342,10 +337,8 @@ const Dashboard = () => {
     }, [masterDays, currentDate, setWeekDates]);
 
     // Fetch Adjustments (Surgical Real-Time Sync)
-    const [adjustments, setAdjustments] = useState([]);
-    useEffect(() => {
-        let unsubscribe = () => { };
-
+    const [adjustments, setAdjustments] = useState([]);    // Real-time listener for today's adjustments
+    useDynamicListener((isActiveRef) => {
         if (activeAcademicYear && userProfile?.empId) {
             const targetDateStr = formatDateLocal(currentDate);
             const adjustmentsRef = collection(db, 'adjustments');
@@ -373,18 +366,20 @@ const Dashboard = () => {
                 );
             }
 
-            unsubscribe = onSnapshot(q, (snap) => {
+            return onSnapshot(q, (snap) => {
+                if (!isActiveRef.current) return;
                 const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setAdjustments(data);
             }, (err) => {
+                if (!isActiveRef.current) return;
                 console.error("Dashboard Adjustments Sync Error:", err);
             });
         } else {
             setAdjustments([]);
+            return () => {};
         }
-
-        return () => unsubscribe();
     }, [activeAcademicYear, userProfile?.empId, dashboardView, selectedFaculty, currentDate]);
+
 
     // Derived Schedules (Memoized)
     const { todaySchedule, weeklySchedule } = useMemo(() => {

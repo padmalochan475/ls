@@ -4,6 +4,7 @@ import * as LucideIcons from 'lucide-react';
 import Holidays from 'date-holidays';
 import { db } from '../lib/firebase';
 import { collection, query, where, doc, onSnapshot } from 'firebase/firestore';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 
 const CelebrationCard = ({ userProfile, onClose }) => {
     const [celebration, setCelebration] = useState(null);
@@ -26,8 +27,9 @@ const CelebrationCard = ({ userProfile, onClose }) => {
     const [customEvents, setCustomEvents] = useState([]);
 
     // 1. Listen to Settings
-    useEffect(() => {
-        const unsub = onSnapshot(doc(db, 'settings', 'celebration'), (docSnap) => {
+    useDynamicListener((isActiveRef) => {
+        return onSnapshot(doc(db, 'settings', 'celebration'), (docSnap) => {
+            if (!isActiveRef.current) return;
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setSettings({
@@ -35,28 +37,26 @@ const CelebrationCard = ({ userProfile, onClose }) => {
                     systemEnabled: data.systemEnabled ?? true
                 });
             }
-        }, (err) => console.error("Settings listener error", err));
-        return () => unsub();
+        }, (err) => { if (!isActiveRef.current) return; console.error("Settings listener error", err); });
     }, []);
 
     // 2. Listen to Active Custom Celebrations
-    useEffect(() => {
+    useDynamicListener((isActiveRef) => {
         if (!settings.masterEnabled) {
-            setTimeout(() => setCustomEvents([]), 0);
-            return;
+            setCustomEvents([]);
+            return () => {};
         }
 
         const todayStr = new Date().toLocaleDateString('en-CA');
         const q = query(collection(db, 'celebrations'), where('isActive', '==', true));
 
-        const unsub = onSnapshot(q, (snap) => {
+        return onSnapshot(q, (snap) => {
+            if (!isActiveRef.current) return;
             const matches = snap.docs
                 .map(d => d.data())
                 .filter(data => data.startDate <= todayStr && data.endDate >= todayStr);
             setCustomEvents(matches);
-        }, (err) => console.error("Custom celebrations listener error", err));
-
-        return () => unsub();
+        }, (err) => { if (!isActiveRef.current) return; console.error("Custom celebrations listener error", err); });
     }, [settings.masterEnabled]);
 
     // 3. Main Logic (Re-runs when data or user changes)

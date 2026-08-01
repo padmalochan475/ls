@@ -1,19 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BookOpen, ExternalLink, FileText, GraduationCap, Loader2 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { useDynamicListener } from '../hooks/useDynamicListener';
 
 const Syllabus = () => {
     const [activeTab, setActiveTab] = useState('');
     const [syllabusData, setSyllabusData] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const unsubscribe = onSnapshot(collection(db, 'syllabi'), (snap) => {
+    useDynamicListener((isActiveRef) => {
+        return onSnapshot(collection(db, 'syllabi'), (snap) => {
+            if (!isActiveRef.current) return;
             if (!snap.empty) {
                 const depts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.order - b.order);
                 setSyllabusData(depts);
-                if (depts.length > 0) {
+                if (depts.length > 0 && !activeTab) {
                     setActiveTab(depts[0].id);
                 }
             } else {
@@ -21,11 +23,10 @@ const Syllabus = () => {
             }
             setLoading(false);
         }, (error) => {
+            if (!isActiveRef.current) return;
             console.error("Error fetching syllabi:", error);
             setLoading(false);
         });
-
-        return () => unsubscribe();
     }, []);
 
     if (loading) {
