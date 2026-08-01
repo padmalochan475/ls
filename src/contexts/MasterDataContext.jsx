@@ -197,7 +197,7 @@ export const MasterDataProvider = ({ children }) => {
             if (masterSafetyTimer) clearTimeout(masterSafetyTimer);
         };
     }, [currentUser, authLoading, refreshTrigger], {
-        enabled: !authLoading && currentUser,
+        enabled: !authLoading,
         suspendOnHidden: true,
         suspendDelayMs: 30000
     });
