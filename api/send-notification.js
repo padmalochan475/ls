@@ -2,6 +2,7 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
+import { getAuth } from 'firebase-admin/auth';
 
 // Singleton Initialization
 if (!getApps().length) {
@@ -19,7 +20,7 @@ if (!getApps().length) {
             console.log("Firebase Admin Initialized Successfully from ENV");
         } else {
             // Fallback to Application Default Credentials
-            admin.initializeApp();
+            initializeApp();
             console.log("Firebase Admin Initialized Successfully with Default Credentials");
         }
     } catch (error) {
@@ -63,11 +64,11 @@ export default async function handler(req, res) {
         console.log("API: send-notification (FCM) called.");
         const { targetUids, title, body, data, targetType } = req.body;
 
-        if (!admin.apps.length) {
+        if (!getApps().length) {
             throw new Error("Firebase Admin not initialized");
         }
 
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const decodedToken = await getAuth().verifyIdToken(idToken);
         const callerUid = decodedToken.uid;
         
         // Ensure caller is authorized (exists in users collection)

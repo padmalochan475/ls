@@ -55,9 +55,8 @@ const Cache = {
 async function sendFCM(target, title, body, data, targetType = 'external_id', options = {}) {
     if (!target) return false;
     if (Array.isArray(target) && target.length === 0) return false;
-    const db = getDb();
-
     try {
+        const db = getDb();
         console.log(`Sending FCM... Target: ${Array.isArray(target) ? target.length + ' IDs' : target} (${targetType})`);
 
         let tokens = [];
@@ -195,9 +194,8 @@ export default async function handler(req, res) {
     if (req.method !== 'GET' && req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
-    const db = getDb();
-
     try {
+        const db = getDb();
         // 1. Determine Current Time in IST immediately
         const nowUTC = new Date();
         const istOffset = 5.5 * 60 * 60 * 1000;
@@ -660,9 +658,8 @@ export default async function handler(req, res) {
 async function getFacultyData(targets, existingUsers = null, existingFaculty = null) {
     if (!targets || targets.length === 0) return [];
     let discoveredUsers = [];
-    const db = getDb();
-
     try {
+        const db = getDb();
         // Use provided cache OR fetch fresh if necessary
         let allUsers = existingUsers;
         let allFaculty = existingFaculty;
