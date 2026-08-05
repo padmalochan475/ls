@@ -55,6 +55,7 @@ const Cache = {
 async function sendFCM(target, title, body, data, targetType = 'external_id', options = {}) {
     if (!target) return false;
     if (Array.isArray(target) && target.length === 0) return false;
+    const db = getDb();
 
     try {
         console.log(`Sending FCM... Target: ${Array.isArray(target) ? target.length + ' IDs' : target} (${targetType})`);
@@ -194,6 +195,7 @@ export default async function handler(req, res) {
     if (req.method !== 'GET' && req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
+    const db = getDb();
 
     try {
         // 1. Determine Current Time in IST immediately
@@ -237,7 +239,7 @@ export default async function handler(req, res) {
         }
 
         const activeAcademicYear = configData.activeAcademicYear || null;
-        const notifSettings = notifSnap.exists ? notifSnap.data() : {};
+
         const warn1Min = parseInt(notifSettings.firstWarning) || 15;
         const warn2Min = parseInt(notifSettings.secondWarning) || 5;
         const holidayTime = notifSettings.holidayTime || '09:00';
@@ -431,7 +433,6 @@ export default async function handler(req, res) {
 
             if (!alreadySentSummary.exists) {
                 try {
-                    const db = getDb();
         
                     // 1. Fetch Today's Master Schedule for today
                     const dayScheduleSnap = await db.collection('schedule')
@@ -659,6 +660,7 @@ export default async function handler(req, res) {
 async function getFacultyData(targets, existingUsers = null, existingFaculty = null) {
     if (!targets || targets.length === 0) return [];
     let discoveredUsers = [];
+    const db = getDb();
 
     try {
         // Use provided cache OR fetch fresh if necessary
