@@ -43,13 +43,13 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // 🔒 SECURITY: Shared Secret Check
-    const SECURITY_KEY = process.env.LAMS_SECRET || process.env.VITE_LAMS_SECRET || 'lams_secure_notification_v1';
-
-    if (req.headers['x-secret-key'] !== SECURITY_KEY) {
-        console.warn("Unauthorized API Access Attempt");
-        return res.status(401).json({ error: 'Unauthorized' });
+    // 🔒 SECURITY: Verify Firebase Auth Token instead of relying on a shared secret
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing or invalid authorization header' });
     }
+    const idToken = authHeader.split('Bearer ')[1];
+
 
     try {
         console.log("API: send-notification (FCM) called.");
@@ -57,6 +57,15 @@ export default async function handler(req, res) {
 
         if (!admin.apps.length) {
             throw new Error("Firebase Admin not initialized");
+        }
+
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const callerUid = decodedToken.uid;
+        
+        // Ensure caller is authorized (exists in users collection)
+        const callerDoc = await admin.firestore().collection('users').doc(callerUid).get();
+        if (!callerDoc.exists) {
+            return res.status(403).json({ error: 'Forbidden' });
         }
 
         if (targetUids !== 'ALL' && (!targetUids || !Array.isArray(targetUids) || targetUids.length === 0)) {

@@ -1,4 +1,4 @@
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { sendWhatsAppNotification } from './whatsappUtils';
 
@@ -137,7 +137,7 @@ export const sendNotification = async ({
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-secret-key': import.meta.env.VITE_LAMS_SECRET || 'lams_secure_notification_v1'
+                    'Authorization': auth.currentUser ? `Bearer ${await auth.currentUser.getIdToken()}` : ''
                 },
                 body: JSON.stringify({
                     targetUids,

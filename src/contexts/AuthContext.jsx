@@ -63,6 +63,7 @@ export const AuthProvider = ({ children }) => {
 
     const [currentUser, setCurrentUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
+    const [profileMissing, setProfileMissing] = useState(false);
 
     // 3. State: Academic Years List (STRICT SERVER MODE)
     // IMPROVED: Try to hydrate from cache first to avoid content flashing, fall back to prediction.
@@ -394,6 +395,7 @@ export const AuthProvider = ({ children }) => {
             // This allows Admins to Ban/Promote users instantly.
             if (!userProfile) {
                 setLoading(true);
+                setProfileMissing(false);
                 profileSafetyTimer = setTimeout(() => {
                     if (isActiveRef.current) {
                         setLoading(prev => {
@@ -410,6 +412,7 @@ export const AuthProvider = ({ children }) => {
                     if (!isActiveRef.current) return;
                     if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
                     if (docSnap.exists()) {
+                        setProfileMissing(false);
                         const newData = docSnap.data();
                         setUserProfile(prev => {
                             if (!prev) return newData;
@@ -434,6 +437,7 @@ export const AuthProvider = ({ children }) => {
                     } else {
                         console.warn("User Profile Missing!");
                         setUserProfile(null);
+                        setProfileMissing(true);
                     }
                     setLoading(false);
                 },
@@ -451,6 +455,7 @@ export const AuthProvider = ({ children }) => {
             };
         } else {
             setUserProfile(null);
+            setProfileMissing(false);
             return () => {};
         }
     }, [currentUser], {
@@ -473,7 +478,8 @@ export const AuthProvider = ({ children }) => {
         logout,
         loading: loading || (currentUser && !isConfigLoaded),
         isSystemSyncing,
-        allowUserYearChange // Expose the new setting
+        allowUserYearChange,
+        profileMissing
     }), [
         currentUser,
         userProfile,

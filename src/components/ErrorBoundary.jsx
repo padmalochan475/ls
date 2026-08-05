@@ -8,20 +8,24 @@ class ErrorBoundary extends React.Component {
     }
 
     static getDerivedStateFromError(error) {
-        const message = error?.message || '';
+        const message = error?.message ? String(error.message) : '';
         const isFirestoreError =
             message.includes('INTERNAL ASSERTION FAILED') ||
             message.includes('Unexpected state') ||
             (message.includes('FIRESTORE') && message.includes('INTERNAL'));
 
-        return { hasError: true, isFirestoreError };
+        const isDynamicImportError = message.includes('Failed to fetch dynamically imported module') || 
+                                     message.includes('Importing a module script failed') || 
+                                     message.includes('Unable to preload CSS');
+
+        return { hasError: true, isFirestoreError, isDynamicImportError };
     }
 
     componentDidCatch(error, errorInfo) {
         console.error("Uncaught error:", error, errorInfo);
         this.setState({ error, errorInfo });
 
-        const message = error?.message || '';
+        const message = error?.message ? String(error.message) : '';
         const isFirestore =
             message.includes('INTERNAL ASSERTION FAILED') ||
             message.includes('Unexpected state') ||
@@ -30,6 +34,21 @@ class ErrorBoundary extends React.Component {
         if (isFirestore) {
             console.warn('[ErrorBoundary] Firestore SDK error detected. Auto-reloading in 2.5s...');
             this.reloadTimer = setTimeout(() => window.location.reload(), 2500);
+        }
+        
+        const isDynamicImportError = message.includes('Failed to fetch dynamically imported module') || 
+                                     message.includes('Importing a module script failed') ||
+                                     message.includes('Unable to preload CSS');
+        if (isDynamicImportError) {
+            const hasReloaded = sessionStorage.getItem('vite_hmr_reloaded');
+            if (!hasReloaded) {
+                sessionStorage.setItem('vite_hmr_reloaded', 'true');
+                console.warn('[ErrorBoundary] Dynamic import error detected. Auto-reloading immediately...');
+                window.location.reload();
+            } else {
+                sessionStorage.removeItem('vite_hmr_reloaded');
+                console.error('[ErrorBoundary] Infinite reload detected! Stopping auto-reload.');
+            }
         }
     }
 

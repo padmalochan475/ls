@@ -459,7 +459,7 @@ function ProfileModal({ student, onClose }) {
 // ─────────────────────────────────────────────
 // Add / Edit Modal
 // ─────────────────────────────────────────────
-function AddEditModal({ student, groups, availableBatches, semesters, students, onClose, onSaved }) {
+function AddEditModal({ student, groups, availableBatches, semesters, students, activeAcademicYear, onClose, onSaved }) {
   const isEdit = !!student;
   const [form, setForm] = useState({
     regNo: student?.regNo || '',
@@ -564,6 +564,7 @@ function AddEditModal({ student, groups, availableBatches, semesters, students, 
         rollNo: form.rollNo.trim(),
         status: form.status,
         isLateral: form.isLateral,
+        academicYear: activeAcademicYear,
         updatedAt: new Date().toISOString(),
       };
       const docId = form.regNo.trim().toLowerCase().replace(/\s+/g, '_');
@@ -803,7 +804,7 @@ function StatusPopover({ student, onClose, onChanged }) {
 const IMPORT_FIELDS = ['regNo', 'name', 'branch', 'semester', 'section', 'group', 'rollNo'];
 const FIELD_LABELS = { regNo: 'Reg No', name: 'Name', branch: 'Branch', semester: 'Semester', section: 'Section', group: 'Lab Group', rollNo: 'Roll No' };
 
-function ImportModal({ semesters, onClose, onImported }) {
+function ImportModal({ semesters, activeAcademicYear, onClose, onImported }) {
   const [importMethod, setImportMethod] = useState('upload'); // upload | paste
   const [pasteData, setPasteData] = useState('');
   const [globalSemester, setGlobalSemester] = useState('');
@@ -975,21 +976,18 @@ function ImportModal({ semesters, onClose, onImported }) {
     }
     setImporting(true);
     try {
-      const mapped = validRows.map(r => {
-        const student = {
-          regNo: String(r[mapping.regNo] || '').trim(),
-          name: String(r[mapping.name] || '').trim(),
-          status: 'active',
-          updatedAt: new Date().toISOString(),
-        };
-        // Only include fields that were explicitly mapped (or fallback targets)
-        if (mapping.branch) student.branch = String(r[mapping.branch] || '').trim();
-        if (mapping.semester || globalSemester) student.semester = String(r[mapping.semester] || globalSemester).trim();
-        if (mapping.section) student.section = String(r[mapping.section] || '').trim();
-        if (mapping.group) student.group = String(r[mapping.group] || '1').trim();
-        if (mapping.rollNo) student.rollNo = String(r[mapping.rollNo] || '').trim();
-        return student;
-      }).filter(r => r.regNo && r.name);
+      const mapped = validRows.map(r => ({
+        regNo: String(r[mapping.regNo] || '').trim(),
+        name: String(r[mapping.name] || '').trim(),
+        branch: mapping.branch ? String(r[mapping.branch] || '').trim() : '',
+        semester: mapping.semester ? String(r[mapping.semester] || '').trim() : globalSemester,
+        section: mapping.section ? String(r[mapping.section] || '').trim() : '',
+        group: mapping.group ? String(r[mapping.group] || '1').trim() : '1',
+        rollNo: mapping.rollNo ? String(r[mapping.rollNo] || '').trim() : '',
+        academicYear: activeAcademicYear,
+        status: 'active',
+        updatedAt: new Date().toISOString(),
+      })).filter(r => r.regNo && r.name);
 
       const chunks = chunkArray(mapped, CHUNK_SIZE);
       let done = 0;
@@ -1217,7 +1215,7 @@ function ImportModal({ semesters, onClose, onImported }) {
 // Main Component
 // ─────────────────────────────────────────────
 export default function StudentDirectory() {
-  const { userProfile } = useAuth();
+  const { userProfile, activeAcademicYear } = useAuth();
   const isAdmin = userProfile?.role === 'admin';
   const { groups = [], semesters = [] } = useMasterData();
 
@@ -1799,6 +1797,7 @@ export default function StudentDirectory() {
           availableBatches={availableBatches}
           semesters={semesters}
           students={students}
+          activeAcademicYear={activeAcademicYear}
           onClose={() => { setShowAddModal(false); setEditStudent(null); }}
           onSaved={() => { setShowAddModal(false); setEditStudent(null); }}
         />
@@ -1807,6 +1806,7 @@ export default function StudentDirectory() {
       {showImport && (
         <ImportModal
           semesters={semesters}
+          activeAcademicYear={activeAcademicYear}
           onClose={() => setShowImport(false)}
           onImported={() => setShowImport(false)}
         />

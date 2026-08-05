@@ -17,6 +17,22 @@ if ('serviceWorker' in navigator) {
     }
   });
 }
+// Catch Vite chunk load errors globally
+window.addEventListener('error', (e) => {
+  const message = e.message || '';
+  if (
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('Unable to preload CSS')
+  ) {
+    const hasReloaded = sessionStorage.getItem('vite_hmr_reloaded');
+    if (!hasReloaded) {
+      sessionStorage.setItem('vite_hmr_reloaded', 'true');
+      console.warn('[Global] Dynamic import error detected. Auto-reloading immediately...');
+      window.location.reload();
+    }
+  }
+});
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

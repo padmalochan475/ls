@@ -9,7 +9,7 @@ import '../styles/design-system.css';
 import Logo from '../components/Logo';
 
 const Login = () => {
-  const { login, signup, resetPassword, currentUser } = useAuth();
+  const { login, signup, resetPassword, currentUser, userProfile, loading, logout, profileMissing } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -31,12 +31,17 @@ const Login = () => {
   const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
   const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
-  // Redirect if already logged in
+  // Redirect if already logged in and profile is loaded
   useEffect(() => {
-    if (currentUser) {
+    if (loading) return; // Wait for AuthContext to finish loading
+
+    if (currentUser && userProfile) {
       navigate('/');
+    } else if (currentUser && profileMissing) {
+      setError("Your profile is incomplete or missing. Please register again or contact Admin.");
+      logout().catch(console.error);
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, userProfile, profileMissing, loading, navigate, logout]);
 
   // Forgot Password States
   const [resetEmpId, setResetEmpId] = useState('');
