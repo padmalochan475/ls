@@ -41,6 +41,17 @@ function getDb() {
     return dbInstance;
 }
 
+// In-Memory Cache to save Firebase Quota on Vercel warm starts
+const Cache = {
+    date: null,
+    settings: null,
+    schedule: null,
+    users: null,
+    faculty: null,
+    lastFetchTime: 0,
+    TTL: 10 * 60 * 1000 // 10 minutes cache
+};
+
 async function sendFCM(target, title, body, data, targetType = 'external_id', options = {}) {
     if (!target) return false;
     if (Array.isArray(target) && target.length === 0) return false;
@@ -198,22 +209,40 @@ export default async function handler(req, res) {
         // No more opening the browser manually!
         axios.get('https://lams-whatsapp-bot.onrender.com/').catch(() => {});
 
-        // 2. Parallel Fetch of settings and today's holiday status
-        const [configSnap, notifSnap, holidaySnap, templateSnap] = await Promise.all([
-            db.collection('settings').doc('config').get(),
-            db.collection('settings').doc('notifications').get(),
-            db.collection('settings').where('date', '==', todayDateStr).get(),
-            db.collection('settings').doc('templates').get()
-        ]);
+        // 2. Parallel Fetch of settings and today's holiday status (with 10-min Cache)
+        const currentTimeMs = Date.now();
+        const isCacheValid = Cache.date === todayDateStr && (currentTimeMs - Cache.lastFetchTime < Cache.TTL);
+        
+        let configData, notifSettings, holidayDocs, tplData;
 
-        const activeAcademicYear = (configSnap.exists && configSnap.data().activeAcademicYear) ? configSnap.data().activeAcademicYear : null;
+        if (isCacheValid && Cache.settings) {
+            ({ configData, notifSettings, holidayDocs, tplData } = Cache.settings);
+            console.log("Using cached Settings");
+        } else {
+            const [configSnap, notifSnap, holidaySnap, templateSnap] = await Promise.all([
+                getDb().collection('settings').doc('config').get(),
+                getDb().collection('settings').doc('notifications').get(),
+                getDb().collection('settings').where('date', '==', todayDateStr).get(),
+                getDb().collection('settings').doc('templates').get()
+            ]);
+            
+            configData = configSnap.exists ? configSnap.data() : {};
+            notifSettings = notifSnap.exists ? notifSnap.data() : {};
+            holidayDocs = holidaySnap.docs.map(d => d.data());
+            tplData = templateSnap.exists ? templateSnap.data() : {};
+            
+            Cache.settings = { configData, notifSettings, holidayDocs, tplData };
+            Cache.date = todayDateStr;
+            Cache.lastFetchTime = currentTimeMs;
+        }
+
+        const activeAcademicYear = configData.activeAcademicYear || null;
         const notifSettings = notifSnap.exists ? notifSnap.data() : {};
         const warn1Min = parseInt(notifSettings.firstWarning) || 15;
         const warn2Min = parseInt(notifSettings.secondWarning) || 5;
         const holidayTime = notifSettings.holidayTime || '09:00';
 
         // 2.5 Template Engine
-        const tplData = templateSnap.exists ? templateSnap.data() : {};
         const formatMsg = (key, defaultText, vars) => {
             let str = tplData[key] || defaultText;
             for (const [vKey, vVal] of Object.entries(vars)) {
@@ -223,7 +252,7 @@ export default async function handler(req, res) {
         };
 
         // 3. CHECK HOLIDAYS
-        const holidayDoc = holidaySnap.docs.find(d => d.data().type === 'holiday');
+        const holidayDoc = holidayDocs.find(d => d.type === 'holiday');
 
         if (holidayDoc) {
             const h = holidayDoc.data();
@@ -487,12 +516,20 @@ export default async function handler(req, res) {
         }
 
         // 5. CACHE DATA FOR REMINDERS (Fetch once to save Firebase Reads/Costs)
-        const scheduleSnap = await db.collection('schedule')
-            .where('academicYear', '==', activeAcademicYear)
-            .where('day', '==', dayName)
-            .get();
+        let allTodaysClasses = [];
+        if (isCacheValid && Cache.schedule) {
+            allTodaysClasses = Cache.schedule;
+            console.log("Using cached Schedule");
+        } else {
+            const scheduleSnap = await getDb().collection('schedule')
+                .where('academicYear', '==', activeAcademicYear)
+                .where('day', '==', dayName)
+                .get();
+            allTodaysClasses = scheduleSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            Cache.schedule = allTodaysClasses;
+        }
 
-        if (scheduleSnap.empty) {
+        if (allTodaysClasses.length === 0) {
             return res.status(200).json({ success: true, checked: 0, message: 'No classes today.' });
         }
 
@@ -504,8 +541,7 @@ export default async function handler(req, res) {
         const lookaheadMinutes = warn1Min + 15;
 
         // Filter Upcoming Classes
-        for (const doc of scheduleSnap.docs) {
-            const data = doc.data();
+        for (const data of allTodaysClasses) {
             if (!data.time) continue;
             const [startStr] = data.time.split(' - ');
             if (!startStr) continue;
@@ -514,18 +550,25 @@ export default async function handler(req, res) {
             const diffMinutes = (classTime.getTime() - nowIST.getTime()) / 60000;
 
             if (diffMinutes > 0 && diffMinutes <= lookaheadMinutes) {
-                upcomingClasses.push({ id: doc.id, ...data, startTime: classTime });
+                upcomingClasses.push({ ...data, startTime: classTime });
             }
         }
 
         if (upcomingClasses.length > 0) {
-            // Fetch Directory ONCE for all upcoming classes
-            const [uSnap, fSnap] = await Promise.all([
-                db.collection('users').get(),
-                db.collection('faculty').get()
-            ]);
-            cachedUsers = uSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
-            cachedFaculty = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            if (isCacheValid && Cache.users && Cache.faculty) {
+                cachedUsers = Cache.users;
+                cachedFaculty = Cache.faculty;
+                console.log("Using cached Directory");
+            } else {
+                const [uSnap, fSnap] = await Promise.all([
+                    getDb().collection('users').get(),
+                    getDb().collection('faculty').get()
+                ]);
+                cachedUsers = uSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+                cachedFaculty = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                Cache.users = cachedUsers;
+                Cache.faculty = cachedFaculty;
+            }
         }
 
         // 6. Send Notifications
@@ -599,7 +642,7 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
             success: true,
-            checked: scheduleSnap.size,
+            checked: allTodaysClasses.length,
             upcoming: upcomingClasses.length,
             sent: sentCount,
             academicYear: activeAcademicYear,
@@ -623,12 +666,19 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
         let allFaculty = existingFaculty;
 
         if (!allUsers || !allFaculty) {
-            const [uSnap, fSnap] = await Promise.all([
-                db.collection('users').get(),
-                db.collection('faculty').get()
-            ]);
-            allUsers = uSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
-            allFaculty = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            if (Cache.users && Cache.faculty && Cache.date) {
+                allUsers = Cache.users;
+                allFaculty = Cache.faculty;
+            } else {
+                const [uSnap, fSnap] = await Promise.all([
+                    getDb().collection('users').get(),
+                    getDb().collection('faculty').get()
+                ]);
+                allUsers = uSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+                allFaculty = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                Cache.users = allUsers;
+                Cache.faculty = allFaculty;
+            }
         }
 
         targets.forEach(target => {
