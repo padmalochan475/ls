@@ -1,5 +1,7 @@
 /* eslint-env node */
-import admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 import axios from 'axios';
 
 // Increase Vercel function timeout to 60 seconds (maximum for Hobby tier)
@@ -7,8 +9,7 @@ import axios from 'axios';
 export const maxDuration = 60;
 
 // Initialize Firebase Admin (Singleton)
-const apps = admin.apps || (typeof admin.getApps === 'function' ? admin.getApps() : []);
-if (!apps.length) {
+if (!getApps().length) {
     try {
         let serviceAccount = null;
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -21,8 +22,8 @@ if (!apps.length) {
         }
 
         if (serviceAccount) {
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount),
+            initializeApp({
+                credential: cert(serviceAccount),
             });
         } else {
             console.warn("FIREBASE_SERVICE_ACCOUNT env var missing. Notifications will fail.");
@@ -32,7 +33,13 @@ if (!apps.length) {
     }
 }
 
-const db = admin.firestore();
+let dbInstance = null;
+function getDb() {
+    if (!dbInstance) {
+        dbInstance = getFirestore();
+    }
+    return dbInstance;
+}
 
 async function sendFCM(target, title, body, data, targetType = 'external_id', options = {}) {
     if (!target) return false;
@@ -136,7 +143,7 @@ async function sendFCM(target, title, body, data, targetType = 'external_id', op
         for (let i = 0; i < tokens.length; i += chunkSize) {
             const chunk = tokens.slice(i, i + chunkSize);
             const chunkMessage = { ...message, tokens: chunk };
-            const response = await admin.messaging().sendEachForMulticast(chunkMessage);
+            const response = await getMessaging().sendEachForMulticast(chunkMessage);
             successCount += response.successCount;
             failureCount += response.failureCount;
         }
@@ -380,7 +387,7 @@ export default async function handler(req, res) {
                             await sendWhatsApp(target.mobile, previewMsg);
                         }
                     }));
-                    await db.collection('sent_notifications').doc(weeklySentId).set({ sentAt: new Date(), type: 'weekly_preview' });
+                    await getDb().collection('sent_notifications').doc(weeklySentId).set({ sentAt: new Date(), type: 'weekly_preview' });
                 } catch (wErr) { console.error("Weekly Preview Error:", wErr); }
             }
         }
@@ -395,7 +402,9 @@ export default async function handler(req, res) {
 
             if (!alreadySentSummary.exists) {
                 try {
-                    // Fetch all schedule for today
+                    const db = getDb();
+        
+                    // 1. Fetch Today's Master Schedule for today
                     const dayScheduleSnap = await db.collection('schedule')
                         .where('academicYear', '==', activeAcademicYear)
                         .where('day', '==', dayName)
@@ -470,7 +479,7 @@ export default async function handler(req, res) {
                             }
                         }));
                     }
-                    await db.collection('sent_notifications').doc(summarySentId).set({ sentAt: new Date(), type: 'morning_summary' });
+                    await getDb().collection('sent_notifications').doc(summarySentId).set({ sentAt: new Date(), type: 'morning_summary' });
                 } catch (summaryErr) {
                     console.error("Morning Summary Error:", summaryErr);
                 }
@@ -565,7 +574,7 @@ export default async function handler(req, res) {
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
                         await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled !== false).map(u => sendWhatsApp(u.mobile, waMsg)));
-                        await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning' });
+                        await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning' });
                         sentCount++;
                     }
                 }
@@ -581,7 +590,7 @@ export default async function handler(req, res) {
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
                         await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled !== false).map(u => sendWhatsApp(u.mobile, waMsg)));
-                        await db.collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning' });
+                        await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning' });
                         sentCount++;
                     }
                 }

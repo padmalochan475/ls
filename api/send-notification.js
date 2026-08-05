@@ -1,9 +1,10 @@
 /* eslint-env node */
-import admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 
 // Singleton Initialization
-const apps = admin.apps || (typeof admin.getApps === 'function' ? admin.getApps() : []);
-if (!apps.length) {
+if (!getApps().length) {
     try {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
             let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -12,8 +13,8 @@ if (!apps.length) {
             }
             serviceAccountStr = serviceAccountStr.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
             const serviceAccount = JSON.parse(serviceAccountStr);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
+            initializeApp({
+                credential: cert(serviceAccount)
             });
             console.log("Firebase Admin Initialized Successfully from ENV");
         } else {
@@ -24,6 +25,12 @@ if (!apps.length) {
     } catch (error) {
         console.error("Firebase Admin Init Failed:", error);
     }
+}
+
+let dbInstance = null;
+function getDb() {
+    if (!dbInstance) dbInstance = getFirestore();
+    return dbInstance;
 }
 
 export default async function handler(req, res) {
@@ -64,7 +71,7 @@ export default async function handler(req, res) {
         const callerUid = decodedToken.uid;
         
         // Ensure caller is authorized (exists in users collection)
-        const callerDoc = await admin.firestore().collection('users').doc(callerUid).get();
+        const callerDoc = await getDb().collection('users').doc(callerUid).get();
         if (!callerDoc.exists) {
             return res.status(403).json({ error: 'Forbidden' });
         }
@@ -79,7 +86,7 @@ export default async function handler(req, res) {
         // Fetch tokens for the users
         let tokens = [];
         if (targetUids === 'ALL') {
-            const usersSnap = await admin.firestore().collection('users').get();
+            const usersSnap = await getDb().collection('users').get();
             usersSnap.forEach(doc => {
                 const userData = doc.data();
                 if (userData.fcmDeviceTokens) {
@@ -96,10 +103,10 @@ export default async function handler(req, res) {
             const CHUNK_SIZE = 100;
             for (let i = 0; i < targetUids.length; i += CHUNK_SIZE) {
                 const chunkUids = targetUids.slice(i, i + CHUNK_SIZE);
-                const refs = chunkUids.map(uid => admin.firestore().collection('users').doc(uid));
+                const refs = chunkUids.map(uid => getDb().collection('users').doc(uid));
                 
                 try {
-                    const userDocs = await admin.firestore().getAll(...refs);
+                    const userDocs = await getDb().getAll(...refs);
                     userDocs.forEach(userDoc => {
                         if (userDoc.exists) {
                             const userData = userDoc.data();
@@ -187,7 +194,7 @@ export default async function handler(req, res) {
         for (let i = 0; i < tokens.length; i += chunkSize) {
             const chunk = tokens.slice(i, i + chunkSize);
             const chunkMessage = { ...message, tokens: chunk };
-            const response = await admin.messaging().sendEachForMulticast(chunkMessage);
+            const response = await getMessaging().sendEachForMulticast(chunkMessage);
             
             successCount += response.successCount;
             failureCount += response.failureCount;
