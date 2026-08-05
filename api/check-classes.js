@@ -7,7 +7,8 @@ import axios from 'axios';
 export const maxDuration = 60;
 
 // Initialize Firebase Admin (Singleton)
-if (!admin.apps.length) {
+const apps = admin.apps || (typeof admin.getApps === 'function' ? admin.getApps() : []);
+if (!apps.length) {
     try {
         let serviceAccount = null;
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {

@@ -2,7 +2,8 @@
 import admin from 'firebase-admin';
 
 // Singleton Initialization
-if (!admin.apps.length) {
+const apps = admin.apps || (typeof admin.getApps === 'function' ? admin.getApps() : []);
+if (!apps.length) {
     try {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
             let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
