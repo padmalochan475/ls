@@ -174,7 +174,7 @@ async function sendWhatsApp(phoneNumber, message) {
     if (!phoneNumber || !message) return false;
     try {
         await axios.post(WHATSAPP_API_URL, {
-            number: phoneNumber,
+            number: (String(phoneNumber).replace(/[^0-9]/g, '').length === 10 ? '91' + String(phoneNumber).replace(/[^0-9]/g, '') : phoneNumber),
             text: message
         }, {
             headers: {

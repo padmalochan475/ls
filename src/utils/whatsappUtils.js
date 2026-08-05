@@ -20,7 +20,7 @@ export const sendWhatsAppNotification = async (phoneNumber, textMessage) => {
                 'x-api-key': API_KEY
             },
             body: JSON.stringify({
-                number: phoneNumber,
+                number: (String(phoneNumber).replace(/[^0-9]/g, '').length === 10 ? '91' + String(phoneNumber).replace(/[^0-9]/g, '') : phoneNumber),
                 text: textMessage
             }),
         });
