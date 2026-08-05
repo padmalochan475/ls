@@ -258,7 +258,7 @@ export default async function handler(req, res) {
             const h = holidayDoc.data();
             const [hHour, hMin] = holidayTime.split(':').map(Number);
             const holidayAlertTime = new Date(nowIST);
-            holidayAlertTime.setHours(hHour, hMin, 0, 0);
+            holidayAlertTime.setUTCHours(hHour, hMin, 0, 0);
 
             const notifIdHoliday = `holiday_notif_${todayDateStr}`;
             const alreadySentHoliday = await db.collection('sent_notifications').doc(notifIdHoliday).get();
@@ -304,7 +304,7 @@ export default async function handler(req, res) {
 
         // 3. BIRTHDAY & ANNIVERSARY GREETINGS (8:00 AM IST) - Done first so they fire even on holidays
         const greetingAlertTime = new Date(nowIST);
-        greetingAlertTime.setHours(8, 0, 0, 0);
+        greetingAlertTime.setUTCHours(8, 0, 0, 0);
 
         if (nowIST >= greetingAlertTime) {
             const greetingSentId = `greetings_${todayDateStr}`;
@@ -365,7 +365,7 @@ export default async function handler(req, res) {
 
         // 3. WEEKLY PREVIEW (Sunday 7:00 PM Broadcast)
         const weeklyAlertTime = new Date(nowIST);
-        weeklyAlertTime.setHours(19, 0, 0, 0);
+        weeklyAlertTime.setUTCHours(19, 0, 0, 0);
 
         if (dayName === 'Sunday' && nowIST >= weeklyAlertTime) {
             const weeklySentId = `weekly_preview_${todayDateStr}`;
@@ -423,7 +423,7 @@ export default async function handler(req, res) {
 
         // 4. MORNING SCHEDULE SUMMARY (7:30 AM Broadcast)
         const summaryAlertTime = new Date(nowIST);
-        summaryAlertTime.setHours(7, 30, 0, 0);
+        summaryAlertTime.setUTCHours(7, 30, 0, 0);
 
         if (nowIST >= summaryAlertTime) {
             const summarySentId = `morning_summary_${todayDateStr}`;
@@ -645,8 +645,8 @@ export default async function handler(req, res) {
             upcoming: upcomingClasses.length,
             sent: sentCount,
             academicYear: activeAcademicYear,
-            serverTimeIST: nowIST.toString(),
-            debug: debugLogs
+            serverTimeIST: nowIST.toISOString().replace('T', ' ').replace('Z', ' IST'),
+            debug: upcomingClasses.map(c => ({ id: c.id, time: c.startTime, name: c.subject }))
         });
 
     } catch (error) {
@@ -781,6 +781,6 @@ function parseTimeStr(timeStr, referenceDate) {
     if (isPM && hours < 12) hours += 12;
     if (isAM && hours === 12) hours = 0;
     if (!marker && !isPM && !isAM && hours < 7) hours += 12;
-    d.setHours(hours, minutes, 0, 0);
+    d.setUTCHours(hours, minutes, 0, 0);
     return d;
 }
