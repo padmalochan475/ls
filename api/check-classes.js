@@ -419,12 +419,24 @@ export default async function handler(req, res) {
             
             let cofacStr = "";
             if (cls.faculty && cls.faculty2) {
-                const otherFac = (cls.facultyEmpId === target.empId || cls.faculty === target.name) ? cls.faculty2 : cls.faculty;
+                let primaryTarget = target.empId;
+                let primaryTargetName = target.name;
+                
+                // If they are a substitute, figure out who they are replacing
+                // We assume if they are substituting, they usually replace `faculty`.
+                // For a more robust check, we'd need the substitute record, but `isSub` means they replace someone.
+                // Usually substitutions are tracked per `faculty`.
+                if (isSub) {
+                    primaryTarget = cls.facultyEmpId;
+                    primaryTargetName = cls.faculty;
+                }
+
+                const otherFac = (cls.facultyEmpId === primaryTarget || cls.faculty === primaryTargetName) ? cls.faculty2 : cls.faculty;
                 if (otherFac) cofacStr = ` WITH ${otherFac.toUpperCase()}`;
             }
             const roomStr = cls.room ? ` AT ${cls.room.toUpperCase()}` : '';
             const semStr = (cls.semester || cls.sem) ? ` (${cls.semester || cls.sem} SEM)` : '';
-            const subStr = isSub ? ` (SUB FOR ${cls.faculty.toUpperCase()})` : '';
+            const subStr = isSub && cls.faculty ? ` (SUB FOR ${cls.faculty.toUpperCase()})` : '';
 
             const defaultTemplate = "{idx}. {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}";
             
