@@ -25,7 +25,11 @@ const defaultTemplates = {
     sys_sub_rej: "❌ *Substitution Request Status* ❌\n\nHello *{name}*,\nA substitution request for *{subject}* on {date} has been *Rejected* or cancelled.\n\nℹ️ *Info*: Please log in to check the status.",
     sys_sub_acc: "🎉 *Substitution Request Confirmed* 🎉\n\nHello *{name}*,\nYour request for *{subject}* on {date} has been *Accepted* by *{subName}*.\n\n_System Admin_",
     sys_sub_can: "⚠️ *Substitution Cancelled* ⚠️\n\nHello *{name}*,\nA previously requested substitution for *{subject}* on {date} has been *Cancelled*.\n\nℹ️ *Info*: You are expected to take this class.",
-    sys_acc_app: "👋 *Welcome to LAMS, {name}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_"
+    sys_acc_app: "👋 *Welcome to LAMS, {name}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_",
+    obs_sub_app: "🚨 *Admin Alert: Leave Covered* 🚨\n\n*{requesterName}* is on leave on {date}.\n*{subName}* will be taking the {subject} class for ({group}).",
+    obs_sub_can: "⚠️ *Admin Alert: Sub Cancelled* ⚠️\n\nA substitution arrangement for {subject} on {date} was cancelled.",
+    obs_bday: "🎉 *Admin Alert: Birthday Today!* 🎉\n\nToday is *{name}'s* birthday! Be sure to wish them!",
+    obs_anni: "🎊 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating {years} years with us today!"
 };
 
 const TemplateEditor = () => {
@@ -160,7 +164,7 @@ const TemplateEditor = () => {
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', overflowX: 'auto' }}>
-                {['warnings', 'greetings', 'summary', 'holiday', 'system'].map(tab => (
+                {['warnings', 'greetings', 'summary', 'holiday', 'system', 'observers'].map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -272,6 +276,31 @@ const TemplateEditor = () => {
                             <h4 style={{ marginTop: 0, color: '#c084fc' }}>Account Approved</h4>
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}</p>
                             {renderInput('sys_acc_app', 'Message', 'textarea', 5)}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'observers' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+                        <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#f87171' }}>Observer: Sub Approved</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{group}'}</p>
+                            {renderInput('obs_sub_app', 'WhatsApp Broadcast', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#fb923c' }}>Observer: Sub Cancelled</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{date}'}</p>
+                            {renderInput('obs_sub_can', 'WhatsApp Broadcast', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#60a5fa' }}>Observer: Birthday</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}</p>
+                            {renderInput('obs_bday', 'WhatsApp Broadcast', 'textarea', 4)}
+                        </div>
+                        <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#a78bfa' }}>Observer: Anniversary</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{years}'}</p>
+                            {renderInput('obs_anni', 'WhatsApp Broadcast', 'textarea', 4)}
                         </div>
                     </div>
                 )}

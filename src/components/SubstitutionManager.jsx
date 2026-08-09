@@ -13,7 +13,7 @@ import {
 import toast from 'react-hot-toast';
 import { useWritePermission } from '../hooks/useWritePermission'; // Import Hook
 import { normalizeStr, normalizeTime, getDayName, parseTimeSlot } from '../utils/timeUtils';
-import { sendNotification } from '../utils/notificationUtils';
+import { sendNotification, sendToObservers } from '../utils/notificationUtils';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 
 // UI Component Helpers - Moved outside/before main component to avoid hoisting issues
@@ -160,6 +160,12 @@ const SubstitutionManager = () => {
                         }
                     });
                 }
+
+                // NOTIFY OBSERVERS
+                sendToObservers('obs_sub_can', {
+                    subject: adjData.subject || 'Class',
+                    date: adjData.date || ''
+                });
 
                 // 2. Find linked 'approved' request (matches date & scheduleId)
                 const q = query(
@@ -441,7 +447,16 @@ const SubstitutionManager = () => {
                 });
             }
 
-            toast.success("Substitute Assigned");
+            // NOTIFY OBSERVERS
+            sendToObservers('obs_sub_app', {
+                requesterName: selectedAbsentee || 'Unknown',
+                subName: subName || 'Unknown',
+                subject: itemDetails.subject || 'Class',
+                date: selectedDate || '',
+                group: cGroupStr
+            });
+
+            toast.success("Substitution assigned");
         } catch (e) {
             console.error("Assignment Error:", e);
             toast.error(`Failed to assign: ${e.message}`);
@@ -581,6 +596,15 @@ const SubstitutionManager = () => {
                         }
                     });
                 }
+
+                // NOTIFY OBSERVERS
+                sendToObservers('obs_sub_app', {
+                    requesterName: reqData.requesterName || 'Unknown',
+                    subName: reqData.targetFacultyName || 'Unknown',
+                    subject: details.subject || 'Class',
+                    date: reqData.date || '',
+                    group: cGroupStr
+                });
 
                 toast.success("Request Approved");
             } else {

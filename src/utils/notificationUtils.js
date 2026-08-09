@@ -120,6 +120,9 @@ export const sendNotification = async ({
                 case 'alert':
                     return `📢 *Admin Announcement* 📢\n\n*${title}*\n${body}\n\n_System Broadcast_`;
 
+                case 'raw':
+                    return body;
+
                 default:
                     return `🔔 *LAMS Notification* 🔔\n\n*${title}*\n${body}\n\n_Check the portal for details._`;
             }
@@ -202,3 +205,51 @@ export const sendNotification = async ({
         return { success: false, message: error.message };
     }
 };
+
+/**
+ * Helper to fetch Observer Group and send them an automated template message.
+ */
+export const sendToObservers = async (templateKey, templateVars) => {
+    try {
+        // 1. Get Observer Group IDs
+        const notifSnap = await getDoc(doc(db, 'settings', 'notifications'));
+        if (!notifSnap.exists()) return;
+        const observerGroupIds = notifSnap.data().observerGroupIds || [];
+        if (observerGroupIds.length === 0) return;
+
+        // 2. Get Template
+        const templateSnap = await getDoc(doc(db, 'settings', 'templates'));
+        let rawTemplate = '';
+        if (templateSnap.exists() && templateSnap.data()[templateKey]) {
+            rawTemplate = templateSnap.data()[templateKey];
+        } else {
+            // Fallbacks
+            const fallbacks = {
+                obs_sub_app: "🚨 *Admin Alert: Leave Covered* 🚨\n\n*{requesterName}* is on leave on {date}.\n*{subName}* will be taking the {subject} class for ({group}).",
+                obs_sub_can: "⚠️ *Admin Alert: Sub Cancelled* ⚠️\n\nA substitution arrangement for {subject} on {date} was cancelled.",
+                obs_bday: "🎉 *Admin Alert: Birthday Today!* 🎉\n\nToday is *{name}'s* birthday! Be sure to wish them!",
+                obs_anni: "🎊 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating {years} years with us today!"
+            };
+            rawTemplate = fallbacks[templateKey] || "System Alert";
+        }
+
+        // 3. Format Message
+        let finalMessage = rawTemplate;
+        for (const [k, v] of Object.entries(templateVars)) {
+            finalMessage = finalMessage.replace(new RegExp(`{${k}}`, 'g'), v);
+        }
+
+        // 4. Send via raw channel
+        await sendNotification({
+            userIds: observerGroupIds,
+            title: "Admin Alert",
+            body: finalMessage, 
+            type: 'raw',
+            data: { type: 'observer_alert' }
+        });
+
+    } catch (e) {
+        console.error("sendToObservers failed:", e);
+    }
+};
+

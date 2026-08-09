@@ -15,7 +15,8 @@ const NotificationManager = ({ users }) => {
         holidayTime: '09:00',
         autoBirthdays: true,
         autoAnniversaries: true,
-        autoHolidays: true
+        autoHolidays: true,
+        observerGroupIds: []
     });
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState(null);
@@ -39,7 +40,8 @@ const NotificationManager = ({ users }) => {
                     holidayTime: data.holidayTime || '09:00',
                     autoBirthdays: data.autoBirthdays !== false,
                     autoAnniversaries: data.autoAnniversaries !== false,
-                    autoHolidays: data.autoHolidays !== false
+                    autoHolidays: data.autoHolidays !== false,
+                    observerGroupIds: data.observerGroupIds || []
                 });
             }
         };
@@ -56,7 +58,8 @@ const NotificationManager = ({ users }) => {
                 holidayTime: settings.holidayTime,
                 autoBirthdays: settings.autoBirthdays,
                 autoAnniversaries: settings.autoAnniversaries,
-                autoHolidays: settings.autoHolidays
+                autoHolidays: settings.autoHolidays,
+                observerGroupIds: settings.observerGroupIds
             });
             setSaveMessage({ type: 'success', text: 'Settings updated successfully!' });
 
@@ -225,6 +228,59 @@ const NotificationManager = ({ users }) => {
                             />
                             <span className="slider"></span>
                         </label>
+                    </div>
+                </div>
+
+                <div style={{ padding: '1.25rem', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.1)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Megaphone size={16} color="#ef4444" /> Admin Observer Group
+                    </h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0 }}>
+                        Select users who will receive system-wide alerts (Substitution Approvals, Cancellations, Birthdays, Anniversaries).
+                    </p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <select 
+                            className="glass-input" 
+                            style={{ width: '100%', padding: '8px' }}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (val && !settings.observerGroupIds.includes(val)) {
+                                    setSettings({ ...settings, observerGroupIds: [...settings.observerGroupIds, val] });
+                                }
+                                e.target.value = ''; // reset
+                            }}
+                        >
+                            <option value="">+ Add User to Group...</option>
+                            {users.map(u => (
+                                <option key={u.id} value={u.id}>{u.name} ({u.empId})</option>
+                            ))}
+                        </select>
+                        
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            {settings.observerGroupIds.map(id => {
+                                const userObj = users.find(u => u.id === id);
+                                const name = userObj ? userObj.name : id;
+                                return (
+                                    <div key={id} style={{ 
+                                        display: 'flex', alignItems: 'center', gap: '0.35rem', 
+                                        background: 'rgba(255,255,255,0.1)', padding: '4px 10px', 
+                                        borderRadius: '16px', fontSize: '0.8rem', color: '#e2e8f0',
+                                        border: '1px solid rgba(255,255,255,0.1)'
+                                    }}>
+                                        {name}
+                                        <XCircle 
+                                            size={14} 
+                                            style={{ cursor: 'pointer', color: '#f87171' }} 
+                                            onClick={() => setSettings({ ...settings, observerGroupIds: settings.observerGroupIds.filter(i => i !== id) })}
+                                        />
+                                    </div>
+                                );
+                            })}
+                            {(!settings.observerGroupIds || settings.observerGroupIds.length === 0) && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No observers selected</span>
+                            )}
+                        </div>
                     </div>
                 </div>
 

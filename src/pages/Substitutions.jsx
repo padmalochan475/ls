@@ -9,7 +9,7 @@ import { useScheduleContext } from '../contexts/ScheduleContext';
 import { useMasterData } from '../contexts/MasterDataContext';
 import { UserPlus, Calendar, Clock, Check, X, Search, AlertCircle, ArrowRight, Loader, Ghost, ChevronLeft, MapPin, Inbox, Send, ThumbsUp, ThumbsDown, History, Users, CheckCircle, ShieldAlert, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { sendNotification } from '../utils/notificationUtils';
+import { sendNotification, sendToObservers } from '../utils/notificationUtils';
 import { useWritePermission } from '../hooks/useWritePermission';
 import { normalizeStr, normalizeTime, formatDateLocal, getDayName, parseTimeSlot } from '../utils/timeUtils';
 
@@ -335,6 +335,16 @@ const Substitutions = () => {
                 } catch (notifError) {
                     console.error("Notification error (non-critical):", notifError);
                 }
+
+                // NOTIFY OBSERVERS
+                sendToObservers('obs_sub_app', {
+                    requesterName: reqData.requesterName || 'Unknown',
+                    subName: reqData.targetFacultyName || 'Unknown',
+                    subject: reqData.scheduleDetails?.subject || 'Class',
+                    date: reqData.date || '',
+                    group: `${reqData.scheduleDetails?.dept || '?'}-${reqData.scheduleDetails?.grp || '?'}`
+                });
+
                 toast.success("Substitution Confirmed & Scheduled!");
             } else {
                 try {
@@ -413,6 +423,12 @@ const Substitutions = () => {
                     }
                 });
             }
+
+            // NOTIFY OBSERVERS
+            sendToObservers('obs_sub_can', {
+                subject: det.subject || 'Class',
+                date: reqData.date || ''
+            });
 
             toast.success("Request cancelled successfully");
         } catch (error) {
