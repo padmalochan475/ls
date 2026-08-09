@@ -58,10 +58,27 @@ const TemplateEditor = () => {
             await setDoc(doc(db, 'settings', 'templates'), templates);
             toast.success("Templates saved successfully!");
         } catch (err) {
-            console.error(err);
+            console.error("Failed to save templates:", err);
             toast.error("Failed to save templates.");
+        } finally {
+            setIsSaving(false);
         }
-        setIsSaving(false);
+    };
+
+    const handleReset = async () => {
+        if (!window.confirm("Are you sure you want to reset all templates to their default factory settings? This cannot be undone.")) return;
+        
+        setIsSaving(true);
+        try {
+            setTemplates(defaultTemplates);
+            await setDoc(doc(db, 'settings', 'templates'), defaultTemplates);
+            toast.success("Templates reset to defaults!");
+        } catch (err) {
+            console.error("Failed to reset templates:", err);
+            toast.error("Failed to reset templates.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleChange = (key, value) => {
@@ -104,15 +121,25 @@ const TemplateEditor = () => {
                         <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>Customize all automated WhatsApp and Push messages.</div>
                     </div>
                 </div>
-                <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="btn btn-primary"
-                    style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)' }}
-                >
-                    {isSaving ? <Activity className="spin-animation" size={16} /> : <Save size={16} />}
-                    Save Templates
-                </button>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button
+                        onClick={handleReset}
+                        disabled={isSaving}
+                        className="btn btn-outline"
+                        style={{ border: '1px solid rgba(239, 68, 68, 0.5)', color: '#f87171' }}
+                    >
+                        Reset Defaults
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="btn btn-primary"
+                        style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)' }}
+                    >
+                        {isSaving ? <Activity className="spin-animation" size={16} /> : <Save size={16} />}
+                        Save Templates
+                    </button>
+                </div>
             </div>
 
             {/* No-Code User Help Box */}
