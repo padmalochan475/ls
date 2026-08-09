@@ -26,8 +26,8 @@ const defaultTemplates = {
     sys_sub_acc: "🎉 *Substitution Request Confirmed* 🎉\n\nHello *{name}*,\nYour request for *{subject}* on {date} has been *Accepted* by *{subName}*.\n\n_System Admin_",
     sys_sub_can: "⚠️ *Substitution Cancelled* ⚠️\n\nHello *{name}*,\nA previously requested substitution for *{subject}* on {date} has been *Cancelled*.\n\nℹ️ *Info*: You are expected to take this class.",
     sys_acc_app: "👋 *Welcome to LAMS, {name}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_",
-    obs_sub_app: "🚨 *Admin Alert: Leave Covered* 🚨\n\n*{requesterName}* is on leave on {date}.\n*{subName}* will be taking the {subject} class for ({group}).",
-    obs_sub_can: "⚠️ *Admin Alert: Sub Cancelled* ⚠️\n\nA substitution arrangement for {subject} on {date} was cancelled.",
+    obs_sub_app: "🚨 *Admin Alert: Leave Covered* 🚨\n\n*{requesterName}* is on leave on *{day}, {date}*.\n*{subName}* will cover the *{subject}* class for ({group}) at *{time}* in Room *{room}*.",
+    obs_sub_can: "⚠️ *Admin Alert: Sub Cancelled* ⚠️\n\nThe substitution arrangement for *{subject}* on *{day}, {date}* at *{time}* in Room *{room}* has been cancelled.",
     obs_bday: "🎉 *Admin Alert: Birthday Today!* 🎉\n\nToday is *{name}'s* birthday! Be sure to wish them!",
     obs_anni: "🎊 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating {years} years with us today!"
 };
