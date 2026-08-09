@@ -411,6 +411,23 @@ export default async function handler(req, res) {
              return res.status(200).json({ status: "holiday", message: "Classes paused for holiday." });
         }
 
+        // HELPER: Format Class String
+        const formatClassLine = (idx, cls, target, isSub = false) => {
+            const time = cls.time ? cls.time.replace(/\s+/g, '') : "N/A"; // "10:45-01:30PM"
+            const group = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-');
+            const subject = cls.subject ? `[${cls.subject.toUpperCase()}]` : '[CLASS]';
+            let cofacStr = "";
+            if (cls.faculty && cls.faculty2) {
+                const otherFac = (cls.facultyEmpId === target.empId || cls.faculty === target.name) ? cls.faculty2 : cls.faculty;
+                if (otherFac) cofacStr = ` WITH ${otherFac.toUpperCase()}`;
+            }
+            const roomStr = cls.room ? ` AT ${cls.room.toUpperCase()}` : '';
+            const semStr = (cls.semester || cls.sem) ? ` (${cls.semester || cls.sem} SEM)` : '';
+            const subStr = isSub ? ` (SUB FOR ${cls.faculty.toUpperCase()})` : '';
+
+            return `${idx + 1}. ${time} : ${group} ${subject}${cofacStr}${roomStr}${semStr}${subStr}\n`;
+        };
+
         // 3. WEEKLY PREVIEW (Sunday 7:00 PM Broadcast)
         const weeklyAlertTime = new Date(nowIST);
         weeklyAlertTime.setUTCHours(19, 0, 0, 0);
@@ -456,7 +473,16 @@ export default async function handler(req, res) {
                             days.forEach(d => {
                                 const dayClasses = mySchedule.filter(cls => cls.day === d);
                                 if (dayClasses.length > 0) {
-                                    previewMsg += `*${d}*: ${dayClasses.length} class(es)\n`;
+                                    // Sort dayClasses by time
+                                    dayClasses.sort((a,b) => {
+                                        if (!a.time || !b.time) return 0;
+                                        return parseTimeStr(a.time.split(' - ')[0], nowIST) - parseTimeStr(b.time.split(' - ')[0], nowIST);
+                                    });
+                                    
+                                    previewMsg += `\n*${d}* (${dayClasses.length} classes):\n`;
+                                    dayClasses.forEach((cls, idx) => {
+                                        previewMsg += formatClassLine(idx, cls, target, false);
+                                    });
                                 }
                             });
 
@@ -534,20 +560,7 @@ export default async function handler(req, res) {
                                     const sub = subsMap.get(cls.id);
                                     const isSub = sub && (sub.substituteEmpId === target.empId || sub.substituteName === target.name);
                                     
-                                    let typeIcon = cls.subject?.toLowerCase().includes('lab') ? '🧪' : '📖';
-                                    let time = cls.time.split(' - ')[0];
-                                    
-                                    waMsg += `${idx + 1}. *${time}* | ${typeIcon} *${cls.subject}*\n`;
-                                    waMsg += `   📍 Room: ${cls.room} | Group: ${cls.dept}-${cls.section}\n`;
-                                    
-                                    // Co-Faculty Info
-                                    if (cls.faculty && cls.faculty2) {
-                                        const otherFac = (cls.facultyEmpId === target.empId || cls.faculty === target.name) ? cls.faculty2 : cls.faculty;
-                                        waMsg += `   🤝 With: ${otherFac}\n`;
-                                    }
-
-                                    if (isSub) waMsg += `   🔄 _(Substitution for ${cls.faculty})_\n`;
-                                    waMsg += `\n`;
+                                    waMsg += formatClassLine(idx, cls, target, isSub);
                                 });
 
                                 waMsg += formatMsg('morning_footer', `Have a productive day! ✨\n_LAMS Admin_`, { name: target.name });
