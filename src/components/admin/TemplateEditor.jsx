@@ -94,14 +94,14 @@ const TemplateEditor = () => {
                 <input
                     type="text"
                     className="glass-input"
-                    value={templates[key] || defaultTemplates[key] || ''}
+                    value={templates[key] ?? defaultTemplates[key] ?? ''}
                     onChange={(e) => handleChange(key, e.target.value)}
                 />
             ) : (
                 <textarea
                     className="glass-input"
                     rows={rows}
-                    value={templates[key] || defaultTemplates[key] || ''}
+                    value={templates[key] ?? defaultTemplates[key] ?? ''}
                     onChange={(e) => handleChange(key, e.target.value)}
                     style={{ resize: 'vertical' }}
                 />
