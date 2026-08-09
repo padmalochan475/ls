@@ -225,8 +225,8 @@ export const sendToObservers = async (templateKey, templateVars) => {
         } else {
             // Fallbacks
             const fallbacks = {
-                obs_sub_app: "🚨 *Admin Alert: Leave Covered* 🚨\n\n*{requesterName}* is on leave on {date}.\n*{subName}* will be taking the {subject} class for ({group}).",
-                obs_sub_can: "⚠️ *Admin Alert: Sub Cancelled* ⚠️\n\nA substitution arrangement for {subject} on {date} was cancelled.",
+                obs_sub_app: "🚨 *Admin Alert: Leave Covered* 🚨\n\n*{requesterName}* is on leave on {date}.\n*{subName}* will be taking the {subject} class for ({group}) at {time} in Room {room}.",
+                obs_sub_can: "⚠️ *Admin Alert: Sub Cancelled* ⚠️\n\nA substitution arrangement for {subject} on {date} at {time} in Room {room} was cancelled.",
                 obs_bday: "🎉 *Admin Alert: Birthday Today!* 🎉\n\nToday is *{name}'s* birthday! Be sure to wish them!",
                 obs_anni: "🎊 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating {years} years with us today!"
             };

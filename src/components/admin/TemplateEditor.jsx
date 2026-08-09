@@ -77,14 +77,14 @@ const TemplateEditor = () => {
                 <input
                     type="text"
                     className="glass-input"
-                    value={templates[key]}
+                    value={templates[key] || defaultTemplates[key] || ''}
                     onChange={(e) => handleChange(key, e.target.value)}
                 />
             ) : (
                 <textarea
                     className="glass-input"
                     rows={rows}
-                    value={templates[key]}
+                    value={templates[key] || defaultTemplates[key] || ''}
                     onChange={(e) => handleChange(key, e.target.value)}
                     style={{ resize: 'vertical' }}
                 />
@@ -284,12 +284,12 @@ const TemplateEditor = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#f87171' }}>Observer: Sub Approved</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{group}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{group}'}, {'{time}'}, {'{room}'}</p>
                             {renderInput('obs_sub_app', 'WhatsApp Broadcast', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#fb923c' }}>Observer: Sub Cancelled</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{date}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{date}'}, {'{time}'}, {'{room}'}</p>
                             {renderInput('obs_sub_can', 'WhatsApp Broadcast', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>

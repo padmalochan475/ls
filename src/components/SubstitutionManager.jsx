@@ -164,7 +164,9 @@ const SubstitutionManager = () => {
                 // NOTIFY OBSERVERS
                 sendToObservers('obs_sub_can', {
                     subject: adjData.subject || 'Class',
-                    date: adjData.date || ''
+                    date: adjData.date || '',
+                    time: adjData.time || 'N/A',
+                    room: adjData.room || 'N/A'
                 });
 
                 // 2. Find linked 'approved' request (matches date & scheduleId)
@@ -453,7 +455,9 @@ const SubstitutionManager = () => {
                 subName: subName || 'Unknown',
                 subject: itemDetails.subject || 'Class',
                 date: selectedDate || '',
-                group: cGroupStr
+                group: cGroupStr,
+                time: itemDetails.time || 'N/A',
+                room: cRoomStr
             });
 
             toast.success("Substitution assigned");
@@ -603,7 +607,9 @@ const SubstitutionManager = () => {
                     subName: reqData.targetFacultyName || 'Unknown',
                     subject: details.subject || 'Class',
                     date: reqData.date || '',
-                    group: cGroupStr
+                    group: cGroupStr,
+                    time: details.time || 'N/A',
+                    room: cRoomStr
                 });
 
                 toast.success("Request Approved");

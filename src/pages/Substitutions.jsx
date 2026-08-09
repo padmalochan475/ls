@@ -342,7 +342,9 @@ const Substitutions = () => {
                     subName: reqData.targetFacultyName || 'Unknown',
                     subject: reqData.scheduleDetails?.subject || 'Class',
                     date: reqData.date || '',
-                    group: `${reqData.scheduleDetails?.dept || '?'}-${reqData.scheduleDetails?.grp || '?'}`
+                    group: `${reqData.scheduleDetails?.dept || '?'}-${reqData.scheduleDetails?.grp || '?'}`,
+                    time: reqData.scheduleDetails?.time || 'N/A',
+                    room: reqData.scheduleDetails?.room || 'N/A'
                 });
 
                 toast.success("Substitution Confirmed & Scheduled!");
@@ -427,7 +429,9 @@ const Substitutions = () => {
             // NOTIFY OBSERVERS
             sendToObservers('obs_sub_can', {
                 subject: det.subject || 'Class',
-                date: reqData.date || ''
+                date: reqData.date || '',
+                time: det.time || 'N/A',
+                room: det.room || 'N/A'
             });
 
             toast.success("Request cancelled successfully");
