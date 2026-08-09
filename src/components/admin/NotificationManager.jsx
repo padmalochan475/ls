@@ -9,7 +9,14 @@ import TemplateEditor from './TemplateEditor';
 
 const NotificationManager = ({ users }) => {
     const { currentUser } = useAuth();
-    const [settings, setSettings] = useState({ firstWarning: 15, secondWarning: 5, holidayTime: '09:00' });
+    const [settings, setSettings] = useState({ 
+        firstWarning: 15, 
+        secondWarning: 5, 
+        holidayTime: '09:00',
+        autoBirthdays: true,
+        autoAnniversaries: true,
+        autoHolidays: true
+    });
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState(null);
 
@@ -29,7 +36,10 @@ const NotificationManager = ({ users }) => {
                 setSettings({
                     firstWarning: data.firstWarning || 15,
                     secondWarning: data.secondWarning || 5,
-                    holidayTime: data.holidayTime || '09:00'
+                    holidayTime: data.holidayTime || '09:00',
+                    autoBirthdays: data.autoBirthdays !== false,
+                    autoAnniversaries: data.autoAnniversaries !== false,
+                    autoHolidays: data.autoHolidays !== false
                 });
             }
         };
@@ -43,7 +53,10 @@ const NotificationManager = ({ users }) => {
             await setDoc(doc(db, 'settings', 'notifications'), {
                 firstWarning: parseInt(settings.firstWarning),
                 secondWarning: parseInt(settings.secondWarning),
-                holidayTime: settings.holidayTime
+                holidayTime: settings.holidayTime,
+                autoBirthdays: settings.autoBirthdays,
+                autoAnniversaries: settings.autoAnniversaries,
+                autoHolidays: settings.autoHolidays
             });
             setSaveMessage({ type: 'success', text: 'Settings updated successfully!' });
 
@@ -151,7 +164,7 @@ const NotificationManager = ({ users }) => {
                     {/* Holiday Alert */}
                     <div>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                            <Calendar size={14} /> Holiday Alert
+                            <Calendar size={14} /> Holiday Alert Time
                         </label>
                         <input
                             type="time"
@@ -161,6 +174,57 @@ const NotificationManager = ({ users }) => {
                             style={{ colorScheme: 'dark' }}
                         />
                         <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Send msg at this time</p>
+                    </div>
+                </div>
+
+                <div style={{ padding: '1.25rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Activity size={16} color="#fbbf24" /> Automated Features
+                    </h4>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                            <div style={{ fontSize: '0.9rem', color: '#f8fafc' }}>Holiday Automation</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Auto-cancel classes and notify users on holidays.</div>
+                        </div>
+                        <label className="switch">
+                            <input 
+                                type="checkbox" 
+                                checked={settings.autoHolidays} 
+                                onChange={e => setSettings({ ...settings, autoHolidays: e.target.checked })} 
+                            />
+                            <span className="slider"></span>
+                        </label>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                            <div style={{ fontSize: '0.9rem', color: '#f8fafc' }}>Birthday Greetings</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Send automated birthday wishes at 8:00 AM.</div>
+                        </div>
+                        <label className="switch">
+                            <input 
+                                type="checkbox" 
+                                checked={settings.autoBirthdays} 
+                                onChange={e => setSettings({ ...settings, autoBirthdays: e.target.checked })} 
+                            />
+                            <span className="slider"></span>
+                        </label>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                            <div style={{ fontSize: '0.9rem', color: '#f8fafc' }}>Work Anniversaries</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Send automated work anniversary wishes at 8:00 AM.</div>
+                        </div>
+                        <label className="switch">
+                            <input 
+                                type="checkbox" 
+                                checked={settings.autoAnniversaries} 
+                                onChange={e => setSettings({ ...settings, autoAnniversaries: e.target.checked })} 
+                            />
+                            <span className="slider"></span>
+                        </label>
                     </div>
                 </div>
 

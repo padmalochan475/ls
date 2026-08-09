@@ -1292,7 +1292,7 @@ const AdminPanel = () => {
                                                         <Trash2 size={16} />
                                                     </button>
                                                     <button
-                                                        onClick={() => setEditingUser(user)}
+                                                        onClick={() => openEditModal(user)}
                                                         className="action-btn"
                                                         style={{ background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24' }}
                                                         title="Edit User"

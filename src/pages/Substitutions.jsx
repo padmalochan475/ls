@@ -296,10 +296,10 @@ const Substitutions = () => {
                 }
             });
 
-            if (responseType === 'accepted') {
-                const reqSnap = await getDoc(doc(db, 'substitution_requests', requestId));
-                const reqData = reqSnap.data();
+            const reqSnap = await getDoc(doc(db, 'substitution_requests', requestId));
+            const reqData = reqSnap.data();
 
+            if (responseType === 'accepted') {
                 // Cancel Siblings
                 const siblingsQ = query(
                     collection(db, 'substitution_requests'),
@@ -332,6 +332,16 @@ const Substitutions = () => {
                 }
                 toast.success("Substitution Confirmed & Scheduled!");
             } else {
+                try {
+                    await sendNotification({
+                        empIds: [reqData.requesterId],
+                        title: 'Request Declined',
+                        body: `${reqData.targetFacultyName} declined your substitution request for ${reqData.date}.`,
+                        type: 'substitution_rejected'
+                    });
+                } catch (notifError) {
+                    console.error("Notification error (non-critical):", notifError);
+                }
                 toast.success("Request Declined");
             }
         } catch (e) {
@@ -635,7 +645,7 @@ const Substitutions = () => {
             try {
                 const cGroupStr = `${originalClass.dept || '?'}-${originalClass.grp || originalClass.section || '?'}${originalClass.group && originalClass.group !== 'All' ? `-${originalClass.group}` : ''}`;
                 await sendNotification({
-                    empIds: [targetFacultyId],
+                    empIds: [targetFac.empId],
                     title: "New Substitution Request",
                     body: `${userProfile.name} requested you to cover ${originalClass.subject || 'class'} on ${selectedDate} at ${originalClass.time || 'N/A'} for (${cGroupStr}).`,
                     type: 'substitution_request',

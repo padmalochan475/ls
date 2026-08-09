@@ -133,6 +133,26 @@ const SubstitutionManager = () => {
             if (adjSnap.exists()) {
                 const adjData = adjSnap.data();
 
+                // NOTIFICATIONS FOR DELETION
+                if (adjData.substituteEmpId) {
+                    sendNotification({
+                        empIds: [adjData.substituteEmpId],
+                        title: "Substitution Cancelled",
+                        body: `Your assigned substitution for ${adjData.subject} on ${adjData.date} has been CANCELLED by the administration.`,
+                        type: 'substitution_cancelled',
+                        data: { type: 'substitution_cancelled', date: adjData.date }
+                    });
+                }
+                if (adjData.originalFacultyEmpId) {
+                    sendNotification({
+                        empIds: [adjData.originalFacultyEmpId],
+                        title: "Substitution Cancelled",
+                        body: `The substitution arrangement for your ${adjData.subject} class on ${adjData.date} has been CANCELLED. You are now expected to take the class.`,
+                        type: 'substitution_cancelled',
+                        data: { type: 'substitution_cancelled', date: adjData.date }
+                    });
+                }
+
                 // 2. Find linked 'approved' request (matches date & scheduleId)
                 const q = query(
                     collection(db, 'substitution_requests'),
@@ -374,12 +394,27 @@ const SubstitutionManager = () => {
             const subEmpId = substituteUser?.empId;
             const subPhone = substituteUser?.phone; // Pulling phone from user collection
 
+            const cGroupStr = `${itemDetails.dept || '?'}-${itemDetails.section || itemDetails.grp || '?'}${itemDetails.group && itemDetails.group !== 'All' ? `-${itemDetails.group}` : ''}`;
+            const cRoomStr = itemDetails.room || 'N/A';
+
             if (subEmpId) {
                 sendNotification({
                     empIds: [subEmpId],
                     title: "New Substitution Assigned",
-                    body: `You have been assigned to cover ${itemDetails.subject} for ${selectedAbsentee} on ${selectedDate} at ${itemDetails.time}.`,
+                    body: `You have been assigned to cover ${itemDetails.subject} for ${selectedAbsentee} on ${selectedDate} at ${itemDetails.time} for (${cGroupStr}) in Room ${cRoomStr}.`,
                     type: 'substitution_request',
+                    data: { type: 'substitution', date: selectedDate }
+                });
+            }
+
+            // NOTIFY ORIGINAL FACULTY (ABSENTEE)
+            const absenteeEmpId = faculty.find(f => f.name === selectedAbsentee)?.empId;
+            if (absenteeEmpId) {
+                sendNotification({
+                    empIds: [absenteeEmpId],
+                    title: "Class Covered",
+                    body: `Your ${itemDetails.subject} class on ${selectedDate} at ${itemDetails.time} for (${cGroupStr}) in Room ${cRoomStr} will be covered by ${subName}.`,
+                    type: 'substitution_accepted',
                     data: { type: 'substitution', date: selectedDate }
                 });
             }
@@ -407,6 +442,26 @@ const SubstitutionManager = () => {
                 return;
             }
             const adjData = adjSnap.data();
+
+            // NOTIFICATIONS FOR REMOVAL
+            if (adjData.substituteEmpId) {
+                sendNotification({
+                    empIds: [adjData.substituteEmpId],
+                    title: "Substitution Cancelled",
+                    body: `Your assigned substitution for ${adjData.subject} on ${adjData.date} has been CANCELLED by the administration.`,
+                    type: 'substitution_cancelled',
+                    data: { type: 'substitution_cancelled', date: adjData.date }
+                });
+            }
+            if (adjData.originalFacultyEmpId) {
+                sendNotification({
+                    empIds: [adjData.originalFacultyEmpId],
+                    title: "Substitution Cancelled",
+                    body: `The substitution arrangement for your ${adjData.subject} class on ${adjData.date} has been CANCELLED. You are now expected to take the class.`,
+                    type: 'substitution_cancelled',
+                    data: { type: 'substitution_cancelled', date: adjData.date }
+                });
+            }
 
             // 2. Delete Adjustment
             await deleteDoc(adjRef);
@@ -471,11 +526,14 @@ const SubstitutionManager = () => {
                 await updateDoc(doc(db, 'substitution_requests', reqId), { status: 'approved' });
 
                 // NOTIFY REQUESTER
+                const cGroupStr = `${details.dept || '?'}-${details.grp || '?'}${details.subgrp && details.subgrp !== 'All' ? `-${details.subgrp}` : ''}`;
+                const cRoomStr = details.room || 'N/A';
+
                 if (reqData.requesterId) {
                     sendNotification({
                         empIds: [reqData.requesterId],
                         title: "Substitution Approved",
-                        body: `Your request for ${reqData.targetFacultyName} to cover your class on ${reqData.date} has been APPROVED.`,
+                        body: `Your request for ${reqData.targetFacultyName} to cover your class on ${reqData.date} for (${cGroupStr}) in Room ${cRoomStr} has been APPROVED.`,
                         data: { type: 'request_update', status: 'approved' }
                     });
                 }
@@ -484,7 +542,7 @@ const SubstitutionManager = () => {
                     sendNotification({
                         empIds: [reqData.targetFacultyId],
                         title: "Substitution Confirmed",
-                        body: `You are confirmed to cover ${reqData.requesterName}'s class on ${reqData.date} at ${details.time}.`,
+                        body: `You are confirmed to cover ${reqData.requesterName}'s class on ${reqData.date} at ${details.time} for (${cGroupStr}) in Room ${cRoomStr}.`,
                         type: 'substitution_approved',
                         data: { type: 'substitution', date: reqData.date }
                     });

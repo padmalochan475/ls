@@ -105,6 +105,49 @@ const TemplateEditor = () => {
                 </button>
             </div>
 
+            {/* No-Code User Help Box */}
+            <div style={{ 
+                background: 'rgba(59, 130, 246, 0.1)', 
+                border: '1px solid rgba(59, 130, 246, 0.3)', 
+                borderRadius: '8px', 
+                padding: '1.25rem', 
+                display: 'flex', 
+                gap: '1rem',
+                alignItems: 'flex-start'
+            }}>
+                <div style={{ padding: '0.5rem', background: 'rgba(59, 130, 246, 0.2)', borderRadius: '50%', color: '#60a5fa' }}>
+                    <MessageSquare size={20} />
+                </div>
+                <div style={{ width: '100%' }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#60a5fa', fontSize: '1.05rem' }}>How to edit these messages? (For No-Code Admins)</h4>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.5' }}>
+                        Simply type your message in the boxes below! The words wrapped in curly braces like <strong style={{ color: '#fbbf24' }}>{'{room}'}</strong> are magic placeholders. When the system sends the message, it automatically replaces them with the real data (e.g., L10).
+                    </p>
+                    
+                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <h5 style={{ margin: '0 0 0.75rem 0', color: '#94a3b8', fontSize: '0.85rem', textTransform: 'uppercase' }}>Available Placeholders by Category:</h5>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
+                            <div>
+                                <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>⚠️ Class Warnings:</strong>
+                                <span style={{ color: '#fbbf24' }}>{'{subject}'}, {'{room}'}, {'{group}'}, {'{mins}'}</span>
+                            </div>
+                            <div>
+                                <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>🎉 Greetings:</strong>
+                                <span style={{ color: '#fbbf24' }}>{'{name}'}, {'{years}'}</span> <span style={{color: '#64748b'}}>(for anniversary)</span>
+                            </div>
+                            <div>
+                                <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>📊 Summaries:</strong>
+                                <span style={{ color: '#fbbf24' }}>{'{day}'}, {'{total_classes}'}, {'{total_sessions}'}</span>
+                            </div>
+                            <div>
+                                <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>🏖️ Holidays:</strong>
+                                <span style={{ color: '#fbbf24' }}>{'{holiday_name}'}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', overflowX: 'auto' }}>
                 {['warnings', 'greetings', 'summary', 'holiday'].map(tab => (

@@ -167,23 +167,47 @@ async function sendFCM(target, title, body, data, targetType = 'external_id', op
     }
 }
 
-const WHATSAPP_API_URL = 'https://lams-whatsapp-bot.onrender.com/api/sendText';
-const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || process.env.VITE_WHATSAPP_API_KEY;
+const WHATSAPP_API_BASE = 'http://129.225.114.212:2785';
+const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || process.env.VITE_WHATSAPP_API_KEY || 'owa_k1_8a50b3ca467309faccd977e2b1abc741ab3de161d9f8ccb0c100afe81e2b46f1';
+
+let cachedSessionId = null;
 
 async function sendWhatsApp(phoneNumber, message) {
     if (!phoneNumber || !message) return false;
     try {
-        await axios.post(WHATSAPP_API_URL, {
-            number: (String(phoneNumber).replace(/[^0-9]/g, '').length === 10 ? '91' + String(phoneNumber).replace(/[^0-9]/g, '') : phoneNumber),
+        let formattedNumber = String(phoneNumber).replace(/[^0-9]/g, '');
+        if (formattedNumber.length === 10) formattedNumber = '91' + formattedNumber;
+        else if (formattedNumber.length < 10) return false;
+        
+        const chatId = formattedNumber + '@c.us';
+
+        if (!cachedSessionId) {
+            const sessionsRes = await axios.get(`${WHATSAPP_API_BASE}/api/sessions`, {
+                headers: { 'x-api-key': WHATSAPP_API_KEY }
+            });
+            if (sessionsRes.data && sessionsRes.data.length > 0) {
+                cachedSessionId = sessionsRes.data[0].id;
+            } else {
+                console.error("No active WhatsApp sessions found.");
+                return false;
+            }
+        }
+
+        await axios.post(`${WHATSAPP_API_BASE}/api/sessions/${cachedSessionId}/messages/send-text`, {
+            chatId: chatId,
             text: message
         }, {
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${WHATSAPP_API_KEY}`,
                 'x-api-key': WHATSAPP_API_KEY
             }
         });
         return true;
     } catch (e) {
+        if (e.response && (e.response.status === 401 || e.response.status === 404)) {
+            cachedSessionId = null;
+        }
         console.error("WhatsApp Error:", e.response?.data || e.message);
         return false;
     }
@@ -204,10 +228,6 @@ export default async function handler(req, res) {
         const todayDateStr = nowUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         console.log(`Starting check-classes (${todayDateStr} ${nowIST.toLocaleTimeString()})...`);
-
-        // 🛡️ AUTO-WAKE: Every time LAMS runs, it "pokes" the WhatsApp bot to keep it awake.
-        // No more opening the browser manually!
-        axios.get('https://lams-whatsapp-bot.onrender.com/').catch(() => {});
 
         // 2. Parallel Fetch of settings and today's holiday status (with 10-min Cache)
         const currentTimeMs = Date.now();
@@ -241,6 +261,9 @@ export default async function handler(req, res) {
         const warn1Min = parseInt(notifSettings.firstWarning) || 15;
         const warn2Min = parseInt(notifSettings.secondWarning) || 5;
         const holidayTime = notifSettings.holidayTime || '09:00';
+        const autoBirthdays = notifSettings.autoBirthdays !== false;
+        const autoAnniversaries = notifSettings.autoAnniversaries !== false;
+        const autoHolidays = notifSettings.autoHolidays !== false;
 
         // 2.5 Template Engine
         const formatMsg = (key, defaultText, vars) => {
@@ -254,8 +277,8 @@ export default async function handler(req, res) {
         // 3. CHECK HOLIDAYS
         const holidayDoc = holidayDocs.find(d => d.type === 'holiday');
 
-        if (holidayDoc) {
-            const h = holidayDoc.data();
+        if (holidayDoc && autoHolidays) {
+            const h = holidayDoc;
             const [hHour, hMin] = holidayTime.split(':').map(Number);
             const holidayAlertTime = new Date(nowIST);
             holidayAlertTime.setUTCHours(hHour, hMin, 0, 0);
@@ -326,7 +349,7 @@ export default async function handler(req, res) {
                         const [todayMonth, todayDay] = todayDateStr.split('-').slice(1).map(Number); // [MM, DD]
 
                         // BIRTHDAY CHECK
-                        if (fac.dob) {
+                        if (autoBirthdays && fac.dob) {
                             const [bYear, bMonth, bDay] = fac.dob.split('-').map(Number);
                             if (bMonth === todayMonth && bDay === todayDay) {
                                 let bdayMsg = formatMsg('birthday_wa', `🎂 *Happy Birthday, {name}!* 🎂\n\nOn behalf of the entire college, we wish you a fantastic day filled with joy and a year ahead full of success and happiness. Keep inspiring! ✨\n\n_Best Wishes,_\n*LAMS Administration*`, { name: fac.name });
@@ -336,7 +359,7 @@ export default async function handler(req, res) {
                         }
 
                         // ANNIVERSARY CHECK
-                        if (fac.joiningDate) {
+                        if (autoAnniversaries && fac.joiningDate) {
                             const [jYear, jMonth, jDay] = fac.joiningDate.split('-').map(Number);
                             if (jMonth === todayMonth && jDay === todayDay) {
                                 const yearsCompleted = nowIST.getFullYear() - jYear;
@@ -359,7 +382,7 @@ export default async function handler(req, res) {
             }
         }
 
-        if (holidayDoc) {
+        if (holidayDoc && autoHolidays) {
              return res.status(200).json({ status: "holiday", message: "Classes paused for holiday." });
         }
 
