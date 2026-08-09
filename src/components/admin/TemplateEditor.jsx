@@ -17,8 +17,10 @@ const defaultTemplates = {
     warn2_push_body: "🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!",
     warn2_wa: "🚀 *Now* 🚀\n\n🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!",
     weekly_header: "🗓️ *Weekly Preview for {name}* 🗓️\n\nPrep for the upcoming week! You have *{total_sessions} sessions* scheduled.\n\n",
+    weekly_class_line: "{idx}. {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}",
     weekly_footer: "\n🌐 _Check the portal for full timetable._\nGood luck for the week! 💪",
     morning_header: "📅 *Today's Briefing: {name}* 📅\nDay: *{day}* | Classes: *{total_classes}*\n\n",
+    morning_class_line: "{idx}. {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}",
     morning_footer: "Have a productive day! ✨\n_LAMS Admin_",
     sys_sub_req: "🔄 *Substitution Request* 🔄\n\nHello *{name}*,\nYou have received a new substitution request from *{requesterName}*.\n\n📝 *Details*:\nClass: {subject} ({group})\nRoom: {room}\nWhen: *{day}*, {date} at {time}\n\n👉 _Log in to the portal to Accept or Reject._",
     sys_sub_app: "✅ *Substitution Approved* ✅\n\nGood news *{name}*,\nYour substitution for *{subject}* on *{day}*, {date} has been *Approved*.\n\n📅 *Covered By*: {subName}\n\n_System Admin_",
@@ -249,12 +251,16 @@ const TemplateEditor = () => {
                             <h4 style={{ marginTop: 0, color: '#8b5cf6' }}>Morning Summary (WhatsApp)</h4>
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Header Vars: {'{name}'}, {'{day}'}, {'{total_classes}'}</p>
                             {renderInput('morning_header', 'Header Text', 'textarea', 3)}
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '1rem', marginBottom: '1rem' }}>Class List Vars: {'{idx}'}, {'{time}'}, {'{group}'}, {'{subject}'}, {'{cofacStr}'}, {'{roomStr}'}, {'{semStr}'}, {'{subStr}'}</p>
+                            {renderInput('morning_class_line', 'Class Item Format', 'textarea', 2)}
                             {renderInput('morning_footer', 'Footer Text', 'textarea', 2)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#6366f1' }}>Weekly Preview (Sun 7 PM)</h4>
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Header Vars: {'{name}'}, {'{total_sessions}'}</p>
                             {renderInput('weekly_header', 'Header Text', 'textarea', 3)}
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '1rem', marginBottom: '1rem' }}>Class List Vars: {'{idx}'}, {'{time}'}, {'{group}'}, {'{subject}'}, {'{cofacStr}'}, {'{roomStr}'}, {'{semStr}'}</p>
+                            {renderInput('weekly_class_line', 'Class Item Format', 'textarea', 2)}
                             {renderInput('weekly_footer', 'Footer Text', 'textarea', 2)}
                         </div>
                     </div>

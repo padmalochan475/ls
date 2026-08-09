@@ -412,10 +412,11 @@ export default async function handler(req, res) {
         }
 
         // HELPER: Format Class String
-        const formatClassLine = (idx, cls, target, isSub = false) => {
-            const time = cls.time ? cls.time.replace(/\s+/g, '') : "N/A"; // "10:45-01:30PM"
+        const formatClassLine = (templateKey, idx, cls, target, isSub = false) => {
+            const time = cls.time ? cls.time.replace(/\s+/g, '') : "N/A";
             const group = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-');
-            const subject = cls.subject ? `[${cls.subject.toUpperCase()}]` : '[CLASS]';
+            const subject = cls.subject ? `${cls.subject.toUpperCase()}` : 'CLASS';
+            
             let cofacStr = "";
             if (cls.faculty && cls.faculty2) {
                 const otherFac = (cls.facultyEmpId === target.empId || cls.faculty === target.name) ? cls.faculty2 : cls.faculty;
@@ -425,7 +426,20 @@ export default async function handler(req, res) {
             const semStr = (cls.semester || cls.sem) ? ` (${cls.semester || cls.sem} SEM)` : '';
             const subStr = isSub ? ` (SUB FOR ${cls.faculty.toUpperCase()})` : '';
 
-            return `${idx + 1}. ${time} : ${group} ${subject}${cofacStr}${roomStr}${semStr}${subStr}\n`;
+            const defaultTemplate = "{idx}. {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}";
+            
+            const vars = {
+                idx: String(idx + 1),
+                time,
+                group,
+                subject,
+                cofacStr,
+                roomStr,
+                semStr,
+                subStr
+            };
+            
+            return formatMsg(templateKey, defaultTemplate, vars) + "\n";
         };
 
         // 3. WEEKLY PREVIEW (Sunday 7:00 PM Broadcast)
@@ -481,7 +495,7 @@ export default async function handler(req, res) {
                                     
                                     previewMsg += `\n*${d}* (${dayClasses.length} classes):\n`;
                                     dayClasses.forEach((cls, idx) => {
-                                        previewMsg += formatClassLine(idx, cls, target, false);
+                                        previewMsg += formatClassLine('weekly_class_line', idx, cls, target, false);
                                     });
                                 }
                             });
@@ -560,7 +574,7 @@ export default async function handler(req, res) {
                                     const sub = subsMap.get(cls.id);
                                     const isSub = sub && (sub.substituteEmpId === target.empId || sub.substituteName === target.name);
                                     
-                                    waMsg += formatClassLine(idx, cls, target, isSub);
+                                    waMsg += formatClassLine('morning_class_line', idx, cls, target, isSub);
                                 });
 
                                 waMsg += formatMsg('morning_footer', `Have a productive day! ✨\n_LAMS Admin_`, { name: target.name });
