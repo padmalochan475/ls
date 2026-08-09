@@ -19,6 +19,7 @@ import AdminOtpModal from '../components/admin/AdminOtpModal';
 import SystemSettings from '../components/admin/SystemSettings';
 import SyllabusManager from '../components/admin/SyllabusManager';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
+import { sendNotification } from '../utils/notificationUtils';
 import { useDynamicListener } from '../hooks/useDynamicListener';
 // eslint-disable-next-line sonarjs/cognitive-complexity
 const AdminPanel = () => {
@@ -252,17 +253,16 @@ const AdminPanel = () => {
             // Send WhatsApp Notification if approved
             if (newStatus === 'approved') {
                 const targetUser = users.find(u => u.id === userId);
-                if (targetUser && targetUser.mobile && targetUser.whatsappEnabled !== false) {
-                    const approveMsg = `✅ *Account Approved* ✅\n\nHi ${targetUser.name},\nYour LAMS account has been verified and approved by the Administrator.\n\nYou can now log in and access the portal.`;
-                    const waSuccess = await sendWhatsAppNotification(targetUser.mobile, approveMsg);
-                    if (!waSuccess) {
-                        toast.error(`Account approved, but WhatsApp notification to ${targetUser.mobile} failed.`);
-                    } else {
-                        toast.success(`Account approved and WhatsApp notification sent!`);
-                    }
-                } else {
-                    toast.success("Account approved.");
+                if (targetUser) {
+                    await sendNotification({
+                        userIds: [userId],
+                        title: 'Account Approved',
+                        body: `Your LAMS account has been verified and approved by the Administrator.`,
+                        type: 'account_approved',
+                        data: { name: targetUser.name }
+                    });
                 }
+                toast.success("Account approved.");
             } else {
                 toast.success(`Account status updated to ${newStatus}.`);
             }

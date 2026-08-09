@@ -140,7 +140,11 @@ const SubstitutionManager = () => {
                         title: "Substitution Cancelled",
                         body: `Your assigned substitution for ${adjData.subject} on ${adjData.date} has been CANCELLED by the administration.`,
                         type: 'substitution_cancelled',
-                        data: { type: 'substitution_cancelled', date: adjData.date }
+                        data: { 
+                            type: 'substitution_cancelled', 
+                            date: adjData.date,
+                            subject: adjData.subject
+                        }
                     });
                 }
                 if (adjData.originalFacultyEmpId) {
@@ -149,7 +153,11 @@ const SubstitutionManager = () => {
                         title: "Substitution Cancelled",
                         body: `The substitution arrangement for your ${adjData.subject} class on ${adjData.date} has been CANCELLED. You are now expected to take the class.`,
                         type: 'substitution_cancelled',
-                        data: { type: 'substitution_cancelled', date: adjData.date }
+                        data: { 
+                            type: 'substitution_cancelled', 
+                            date: adjData.date,
+                            subject: adjData.subject 
+                        }
                     });
                 }
 
@@ -403,7 +411,15 @@ const SubstitutionManager = () => {
                     title: "New Substitution Assigned",
                     body: `You have been assigned to cover ${itemDetails.subject} for ${selectedAbsentee} on ${selectedDate} at ${itemDetails.time} for (${cGroupStr}) in Room ${cRoomStr}.`,
                     type: 'substitution_request',
-                    data: { type: 'substitution', date: selectedDate }
+                    data: { 
+                        type: 'substitution', 
+                        date: selectedDate,
+                        subject: itemDetails.subject || 'Class',
+                        time: itemDetails.time || 'N/A',
+                        group: cGroupStr,
+                        room: cRoomStr,
+                        requesterName: 'Admin'
+                    }
                 });
             }
 
@@ -415,7 +431,13 @@ const SubstitutionManager = () => {
                     title: "Class Covered",
                     body: `Your ${itemDetails.subject} class on ${selectedDate} at ${itemDetails.time} for (${cGroupStr}) in Room ${cRoomStr} will be covered by ${subName}.`,
                     type: 'substitution_accepted',
-                    data: { type: 'substitution', date: selectedDate }
+                    data: { 
+                        type: 'substitution', 
+                        date: selectedDate,
+                        subject: itemDetails.subject || 'Class',
+                        time: itemDetails.time || 'N/A',
+                        subName: subName 
+                    }
                 });
             }
 
@@ -534,7 +556,14 @@ const SubstitutionManager = () => {
                         empIds: [reqData.requesterId],
                         title: "Substitution Approved",
                         body: `Your request for ${reqData.targetFacultyName} to cover your class on ${reqData.date} for (${cGroupStr}) in Room ${cRoomStr} has been APPROVED.`,
-                        data: { type: 'request_update', status: 'approved' }
+                        type: 'substitution_approved',
+                        data: { 
+                            type: 'request_update', 
+                            status: 'approved',
+                            subject: details.subject || 'Class',
+                            date: reqData.date,
+                            subName: reqData.targetFacultyName 
+                        }
                     });
                 }
                 // NOTIFY SUBSTITUTE
@@ -544,7 +573,12 @@ const SubstitutionManager = () => {
                         title: "Substitution Confirmed",
                         body: `You are confirmed to cover ${reqData.requesterName}'s class on ${reqData.date} at ${details.time} for (${cGroupStr}) in Room ${cRoomStr}.`,
                         type: 'substitution_approved',
-                        data: { type: 'substitution', date: reqData.date }
+                        data: { 
+                            type: 'substitution', 
+                            date: reqData.date,
+                            subject: details.subject || 'Class',
+                            subName: reqData.targetFacultyName
+                        }
                     });
                 }
 
@@ -559,7 +593,12 @@ const SubstitutionManager = () => {
                         title: "Substitution Rejected",
                         body: `Your request for ${reqData.targetFacultyName} to cover your class on ${reqData.date} was REJECTED by Admin.`,
                         type: 'substitution_rejected',
-                        data: { type: 'request_update', status: 'rejected' }
+                        data: { 
+                            type: 'request_update', 
+                            status: 'rejected',
+                            subject: details.subject || 'Class',
+                            date: reqData.date
+                        }
                     });
                 }
 

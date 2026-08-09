@@ -325,7 +325,12 @@ const Substitutions = () => {
                         empIds: [reqData.requesterId],
                         title: 'Request Accepted',
                         body: `${reqData.targetFacultyName} confirmed your request.`,
-                        type: 'substitution_accepted'
+                        type: 'substitution_accepted',
+                        data: {
+                            subName: reqData.targetFacultyName,
+                            subject: reqData.scheduleDetails?.subject || 'Class',
+                            date: reqData.date
+                        }
                     });
                 } catch (notifError) {
                     console.error("Notification error (non-critical):", notifError);
@@ -337,7 +342,11 @@ const Substitutions = () => {
                         empIds: [reqData.requesterId],
                         title: 'Request Declined',
                         body: `${reqData.targetFacultyName} declined your substitution request for ${reqData.date}.`,
-                        type: 'substitution_rejected'
+                        type: 'substitution_rejected',
+                        data: {
+                            subject: reqData.scheduleDetails?.subject || 'Class',
+                            date: reqData.date
+                        }
                     });
                 } catch (notifError) {
                     console.error("Notification error (non-critical):", notifError);
@@ -398,7 +407,9 @@ const Substitutions = () => {
                     type: 'substitution_cancelled',
                     data: {
                         type: 'substitution_cancelled',
-                        requestId: requestId
+                        requestId: requestId,
+                        subject: det.subject || 'Class',
+                        date: reqData.date
                     }
                 });
             }
@@ -652,7 +663,11 @@ const Substitutions = () => {
                     data: {
                         type: 'substitution_request',
                         date: selectedDate,
-                        subject: originalClass.subject
+                        subject: originalClass.subject || 'Class',
+                        time: originalClass.time || 'N/A',
+                        group: cGroupStr,
+                        room: originalClass.room || 'N/A',
+                        requesterName: userProfile.name
                     }
                 });
             } catch (notifErr) {

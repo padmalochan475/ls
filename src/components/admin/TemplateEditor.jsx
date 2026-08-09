@@ -19,7 +19,13 @@ const defaultTemplates = {
     weekly_header: "🗓️ *Weekly Preview for {name}* 🗓️\n\nPrep for the upcoming week! You have *{total_sessions} sessions* scheduled.\n\n",
     weekly_footer: "\n🌐 _Check the portal for full timetable._\nGood luck for the week! 💪",
     morning_header: "📅 *Today's Briefing: {name}* 📅\nDay: *{day}* | Classes: *{total_classes}*\n\n",
-    morning_footer: "Have a productive day! ✨\n_LAMS Admin_"
+    morning_footer: "Have a productive day! ✨\n_LAMS Admin_",
+    sys_sub_req: "🔄 *Substitution Request* 🔄\n\nHello *{name}*,\nYou have received a new substitution request from *{requesterName}*.\n\n📝 *Details*:\nClass: {subject} ({group})\nRoom: {room}\nWhen: {date} at {time}\n\n👉 _Log in to the portal to Accept or Reject._",
+    sys_sub_app: "✅ *Substitution Approved* ✅\n\nGood news *{name}*,\nYour substitution for *{subject}* on {date} has been *Approved*.\n\n📅 *Covered By*: {subName}\n\n_System Admin_",
+    sys_sub_rej: "❌ *Substitution Request Status* ❌\n\nHello *{name}*,\nA substitution request for *{subject}* on {date} has been *Rejected* or cancelled.\n\nℹ️ *Info*: Please log in to check the status.",
+    sys_sub_acc: "🎉 *Substitution Request Confirmed* 🎉\n\nHello *{name}*,\nYour request for *{subject}* on {date} has been *Accepted* by *{subName}*.\n\n_System Admin_",
+    sys_sub_can: "⚠️ *Substitution Cancelled* ⚠️\n\nHello *{name}*,\nA previously requested substitution for *{subject}* on {date} has been *Cancelled*.\n\nℹ️ *Info*: You are expected to take this class.",
+    sys_acc_app: "👋 *Welcome to LAMS, {name}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_"
 };
 
 const TemplateEditor = () => {
@@ -143,6 +149,10 @@ const TemplateEditor = () => {
                                 <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>🏖️ Holidays:</strong>
                                 <span style={{ color: '#fbbf24' }}>{'{holiday_name}'}</span>
                             </div>
+                            <div>
+                                <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>⚙️ System & Subs:</strong>
+                                <span style={{ color: '#fbbf24' }}>{'{name}'}, {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{time}'}, {'{group}'}, {'{room}'}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -150,7 +160,7 @@ const TemplateEditor = () => {
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', overflowX: 'auto' }}>
-                {['warnings', 'greetings', 'summary', 'holiday'].map(tab => (
+                {['warnings', 'greetings', 'summary', 'holiday', 'system'].map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -161,7 +171,7 @@ const TemplateEditor = () => {
                             fontWeight: activeTab === tab ? 600 : 400, textTransform: 'capitalize', whiteSpace: 'nowrap'
                         }}
                     >
-                        {tab}
+                        {tab === 'system' ? 'System & Subs' : tab}
                     </button>
                 ))}
             </div>
@@ -227,6 +237,41 @@ const TemplateEditor = () => {
                             {renderInput('holiday_push_title', 'Push Title', 'text')}
                             {renderInput('holiday_push_body', 'Push Body', 'textarea', 2)}
                             {renderInput('holiday_wa', 'WhatsApp Message', 'textarea', 4)}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'system' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#fcd34d' }}>Substitution Request</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{requesterName}'}, {'{subject}'}, {'{date}'}, {'{time}'}, {'{room}'}, {'{group}'}</p>
+                            {renderInput('sys_sub_req', 'Message', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#34d399' }}>Substitution Approved</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}</p>
+                            {renderInput('sys_sub_app', 'Message', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#f87171' }}>Substitution Rejected</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}</p>
+                            {renderInput('sys_sub_rej', 'Message', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#60a5fa' }}>Substitution Accepted</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}</p>
+                            {renderInput('sys_sub_acc', 'Message', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#fb923c' }}>Substitution Cancelled</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}</p>
+                            {renderInput('sys_sub_can', 'Message', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#c084fc' }}>Account Approved</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}</p>
+                            {renderInput('sys_acc_app', 'Message', 'textarea', 5)}
                         </div>
                     </div>
                 )}

@@ -74,27 +74,46 @@ export const sendNotification = async ({
         await Promise.all(batchArray);
 
         // 3. WHATSAPP INTEGRATION (Dynamic Template Engine)
+        let customTemplates = {};
+        try {
+            const tplSnap = await getDoc(doc(db, 'settings', 'templates'));
+            if (tplSnap.exists()) {
+                customTemplates = tplSnap.data();
+            }
+        } catch (err) {
+            console.error("Failed to load templates for notification", err);
+        }
+
         const getWhatsAppTemplate = (profile) => {
             const userName = profile.name || 'Faculty';
+            const vars = { name: userName, title: title || '', body: body || '', ...data };
+            
+            const formatMsg = (key, defaultText) => {
+                let str = customTemplates[key] || defaultText;
+                for (const [vKey, vVal] of Object.entries(vars)) {
+                    str = str.replace(new RegExp(`{${vKey}}`, 'g'), vVal);
+                }
+                return str;
+            };
             
             switch (type) {
                 case 'substitution_request':
-                    return `🔄 *Substitution Request* 🔄\n\nHello *${userName}*,\nYou have received a new substitution request.\n\n📝 *Details*:\n${body}\n\n👉 _Log in to the portal to Accept or Reject._`;
+                    return formatMsg('sys_sub_req', `🔄 *Substitution Request* 🔄\n\nHello *${userName}*,\nYou have received a new substitution request.\n\n📝 *Details*:\n${body}\n\n👉 _Log in to the portal to Accept or Reject._`);
                 
                 case 'substitution_approved':
-                    return `✅ *Substitution Approved* ✅\n\nGood news *${userName}*,\nYour substitution has been *Approved*.\n\n📅 *Updated Schedule*:\n${body}\n\n_System Admin_`;
+                    return formatMsg('sys_sub_app', `✅ *Substitution Approved* ✅\n\nGood news *${userName}*,\nYour substitution has been *Approved*.\n\n📅 *Updated Schedule*:\n${body}\n\n_System Admin_`);
 
                 case 'substitution_rejected':
-                    return `❌ *Substitution Request Status* ❌\n\nHello *${userName}*,\nA substitution request has been *Rejected* or cancelled.\n\nℹ️ *Info*:\n${body}`;
+                    return formatMsg('sys_sub_rej', `❌ *Substitution Request Status* ❌\n\nHello *${userName}*,\nA substitution request has been *Rejected* or cancelled.\n\nℹ️ *Info*:\n${body}`);
 
                 case 'account_approved':
-                    return `👋 *Welcome to LAMS, ${userName}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_`;
+                    return formatMsg('sys_acc_app', `👋 *Welcome to LAMS, ${userName}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_`);
 
                 case 'substitution_accepted':
-                    return `🎉 *Substitution Request Confirmed* 🎉\n\nHello *${userName}*,\nYour request has been *Accepted* by the target faculty member.\n\n📅 *Schedule Updated*:\n${body}\n\n_System Admin_`;
+                    return formatMsg('sys_sub_acc', `🎉 *Substitution Request Confirmed* 🎉\n\nHello *${userName}*,\nYour request has been *Accepted* by the target faculty member.\n\n📅 *Schedule Updated*:\n${body}\n\n_System Admin_`);
 
                 case 'substitution_cancelled':
-                    return `⚠️ *Substitution Cancelled* ⚠️\n\nHello *${userName}*,\nA previously requested substitution has been *Cancelled*.\n\nℹ️ *Info*:\n${body}`;
+                    return formatMsg('sys_sub_can', `⚠️ *Substitution Cancelled* ⚠️\n\nHello *${userName}*,\nA previously requested substitution has been *Cancelled*.\n\nℹ️ *Info*:\n${body}`);
 
                 case 'manual':
                 case 'manual_alert':
