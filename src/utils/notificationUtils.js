@@ -1,6 +1,7 @@
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { sendWhatsAppNotification } from './whatsappUtils';
+import { getDayName } from './timeUtils';
 
 /**
  * Sends notifications (In-App + Push + WhatsApp) to users.
@@ -87,6 +88,10 @@ export const sendNotification = async ({
         const getWhatsAppTemplate = (profile) => {
             const userName = profile.name || 'Faculty';
             const vars = { name: userName, title: title || '', body: body || '', ...data };
+            
+            if (vars.date && !vars.day) {
+                vars.day = getDayName(vars.date);
+            }
             
             const formatMsg = (key, defaultText) => {
                 let str = customTemplates[key] || defaultText;
@@ -235,6 +240,12 @@ export const sendToObservers = async (templateKey, templateVars) => {
 
         // 3. Format Message
         let finalMessage = rawTemplate;
+        
+        // Auto-inject day if date exists
+        if (templateVars.date && !templateVars.day) {
+            templateVars.day = getDayName(templateVars.date);
+        }
+
         for (const [k, v] of Object.entries(templateVars)) {
             finalMessage = finalMessage.replace(new RegExp(`{${k}}`, 'g'), v);
         }

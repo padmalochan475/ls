@@ -155,7 +155,7 @@ const TemplateEditor = () => {
                             </div>
                             <div>
                                 <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>⚙️ System & Subs:</strong>
-                                <span style={{ color: '#fbbf24' }}>{'{name}'}, {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{time}'}, {'{group}'}, {'{room}'}</span>
+                                <span style={{ color: '#fbbf24' }}>{'{name}'}, {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{group}'}, {'{room}'}</span>
                             </div>
                         </div>
                     </div>
@@ -284,12 +284,12 @@ const TemplateEditor = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#f87171' }}>Observer: Sub Approved</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{group}'}, {'{time}'}, {'{room}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{group}'}, {'{time}'}, {'{room}'}</p>
                             {renderInput('obs_sub_app', 'WhatsApp Broadcast', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#fb923c' }}>Observer: Sub Cancelled</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{date}'}, {'{time}'}, {'{room}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{room}'}</p>
                             {renderInput('obs_sub_can', 'WhatsApp Broadcast', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
