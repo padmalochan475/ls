@@ -254,12 +254,21 @@ const AdminPanel = () => {
                 const targetUser = users.find(u => u.id === userId);
                 if (targetUser && targetUser.mobile && targetUser.whatsappEnabled !== false) {
                     const approveMsg = `✅ *Account Approved* ✅\n\nHi ${targetUser.name},\nYour LAMS account has been verified and approved by the Administrator.\n\nYou can now log in and access the portal.`;
-                    sendWhatsAppNotification(targetUser.mobile, approveMsg);
+                    const waSuccess = await sendWhatsAppNotification(targetUser.mobile, approveMsg);
+                    if (!waSuccess) {
+                        toast.error(`Account approved, but WhatsApp notification to ${targetUser.mobile} failed.`);
+                    } else {
+                        toast.success(`Account approved and WhatsApp notification sent!`);
+                    }
+                } else {
+                    toast.success("Account approved.");
                 }
+            } else {
+                toast.success(`Account status updated to ${newStatus}.`);
             }
         } catch (error) {
             console.error("Error updating status: ", error);
-            alert("Failed to update status.");
+            toast.error("Failed to update status.");
         }
     };
 

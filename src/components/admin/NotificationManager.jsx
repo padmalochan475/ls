@@ -83,7 +83,8 @@ const NotificationManager = ({ users }) => {
             });
 
             if (result.success) {
-                toast.success(`Delivered to ${result.count} users successfully.`);
+                const waText = result.waSuccessCount > 0 ? ` (and ${result.waSuccessCount} WhatsApp msgs)` : '';
+                toast.success(`Delivered to ${result.count} users successfully${waText}.`);
             } else {
                 toast.error("Failed: " + result.message);
             }

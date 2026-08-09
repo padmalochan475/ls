@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  openwa:
+    image: rmyndharis/openwa:latest
+    container_name: lams-openwa
+    restart: unless-stopped
+    ports:
+      - "2785:2785"
+    environment:
+      - NODE_ENV=production
+      - API_KEY=lams_secure_api_key_2026
+      - ENGINE_TYPE=baileys  # Crucial for low-RAM free tiers
+      - PORT=2785
+      - CSP_UPGRADE_INSECURE_REQUESTS=false
+    volumes:
+      - ./data:/app/data

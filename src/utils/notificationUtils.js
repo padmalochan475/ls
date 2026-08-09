@@ -107,23 +107,26 @@ export const sendNotification = async ({
         };
 
         // SAFETY LOCK: Prevent browser freeze and WhatsApp Bot DDOS on massive broadcasts
+        let waSuccessCount = 0;
         if (targetUids.length <= 25) {
-            const whatsappPromises = targetUids.map(async (uid) => {
+            for (const uid of targetUids) {
                 try {
                     const userSnap = await getDoc(doc(db, 'users', uid));
                     if (userSnap.exists()) {
                         const profile = userSnap.data();
                         if (profile.mobile && profile.whatsappEnabled !== false) {
                             const waMessage = getWhatsAppTemplate(profile);
-                            return sendWhatsAppNotification(profile.mobile, waMessage);
+                            const success = await sendWhatsAppNotification(profile.mobile, waMessage);
+                            if (success) waSuccessCount++;
+                            
+                            // Sleep 200ms to simulate human-like typing and prevent gateway rate-limits
+                            await new Promise(r => setTimeout(r, 200));
                         }
                     }
                 } catch (err) {
                     console.warn(`WhatsApp skip for ${uid}:`, err.message);
                 }
-                return null;
-            });
-            Promise.all(whatsappPromises).catch(err => console.error("WhatsApp Bulk Error:", err));
+            }
         } else {
             console.log(`Skipping WhatsApp to protect bot from rate limits. Target size: ${targetUids.length}`);
         }
@@ -166,14 +169,14 @@ export const sendNotification = async ({
         }
 
         // We use pushStatus to determine the overall success logic for the toast UI
-        if (pushStatus === "no_devices") {
-            return { success: false, count: 0, pushStatus, message: "Target users have no push devices registered." };
+        if (pushStatus === "no_devices" && waSuccessCount === 0) {
+            return { success: false, count: 0, pushStatus, waSuccessCount, message: "Target users have no push devices registered, and WhatsApp delivery failed or was skipped." };
         }
-        if (pushStatus === "failed") {
-            return { success: false, count: 0, pushStatus, message: "Server error while sending push." };
+        if (pushStatus === "failed" && waSuccessCount === 0) {
+            return { success: false, count: 0, pushStatus, waSuccessCount, message: "Server error while sending push, and WhatsApp delivery failed." };
         }
 
-        return { success: true, count: targetUids.length, pushStatus };
+        return { success: true, count: targetUids.length, pushStatus, waSuccessCount };
 
     } catch (error) {
         console.error("sendNotification Utility Error:", error);

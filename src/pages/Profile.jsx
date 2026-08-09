@@ -10,6 +10,7 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '../utils/cropImage';
 import { useScheduleData } from '../hooks/useScheduleData';
 import { sendNotification } from '../utils/notificationUtils';
+import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import toast from 'react-hot-toast';
 import '../styles/design-system.css';
@@ -51,6 +52,7 @@ const Profile = () => {
 
     const [waVerifyCode, setWaVerifyCode] = useState(null);
     const [generatingCode, setGeneratingCode] = useState(false);
+    const [otpInput, setOtpInput] = useState('');
     const [botNumber, setBotNumber] = useState('919668593551'); // Fallback to current
 
     const [showPassword, setShowPassword] = useState({
@@ -130,10 +132,24 @@ const Profile = () => {
     }, []);
 
     const handleGeneratewaVerifyCode = async () => {
+        if (!userProfile?.mobile) {
+            toast.error("Please add and save a mobile number to your profile first.");
+            return;
+        }
+
         try {
             setGeneratingCode(true);
             const code = Math.floor(100000 + Math.random() * 900000).toString();
             
+            const message = `🔐 *LAMS Verification* 🔐\n\nYour WhatsApp linking code is:\n*${code}*\n\nPlease enter this code in the app to connect your account.`;
+            
+            const success = await sendWhatsAppNotification(userProfile.mobile, message);
+            
+            if (!success) {
+                toast.error("Failed to send OTP to your WhatsApp. Check number.");
+                return;
+            }
+
             // Save code to user document
             const userRef = doc(db, 'users', currentUser.uid);
             await updateDoc(userRef, {
@@ -142,7 +158,7 @@ const Profile = () => {
             });
             
             setWaVerifyCode(code);
-            toast.success("Verification Code Generated!");
+            toast.success("Verification Code Sent to WhatsApp!");
         } catch (error) {
             console.error("Error generating code:", error);
             toast.error("Failed to generate code.");
@@ -151,21 +167,39 @@ const Profile = () => {
         }
     };
 
-    // --- PERSISTENT REAL-TIME SUCCESS LISTENER ---
-    useDynamicListener((isActiveRef) => {
-        if (!currentUser || !waVerifyCode) return;
-        
-        const userRef = doc(db, 'users', currentUser.uid);
-        return onSnapshot(userRef, (doc) => {
-            if (!isActiveRef.current) return;
-            const data = doc.data();
-            // If ID is linked and code is cleared (means bot successfully verified)
-            if (data && data.lid && data.waVerifyCode === null) {
-                toast.success("WhatsApp Linked Successfully! 🎉");
-                setWaVerifyCode(null);
-            }
-        });
-    }, [waVerifyCode, currentUser]);
+    const handleVerifyOtp = async () => {
+        if (!otpInput) {
+            toast.error("Please enter the code.");
+            return;
+        }
+        if (otpInput !== waVerifyCode) {
+            toast.error("Incorrect code. Please try again.");
+            return;
+        }
+
+        try {
+            setGeneratingCode(true);
+            const formattedNumber = String(userProfile.mobile).replace(/[^0-9]/g, '');
+            const finalNumber = formattedNumber.length === 10 ? '91' + formattedNumber : formattedNumber;
+            const lid = finalNumber + '@c.us';
+
+            const userRef = doc(db, 'users', currentUser.uid);
+            await updateDoc(userRef, {
+                waVerifyCode: null,
+                lid: lid,
+                whatsappEnabled: true
+            });
+            
+            toast.success("WhatsApp Linked Successfully! 🎉");
+            setWaVerifyCode(null);
+            setOtpInput('');
+        } catch (err) {
+            console.error("Error linking:", err);
+            toast.error("Failed to link account.");
+        } finally {
+            setGeneratingCode(false);
+        }
+    };
 
     const onCropComplete = (croppedArea, croppedAreaPixels) => {
         setCroppedAreaPixels(croppedAreaPixels);
@@ -743,57 +777,60 @@ const Profile = () => {
                                         border: '1px dashed rgba(255,255,255,0.12)',
                                         animation: 'fadeIn 0.5s ease'
                                     }}>
-                                        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem', textAlign: 'center' }}>
-                                            Step 2: Send this secure code to the bot
-                                        </div>
-                                        <div style={{ 
-                                            fontSize: '2.2rem', 
-                                            fontWeight: 800, 
-                                            letterSpacing: '8px', 
-                                            textAlign: 'center', 
-                                            color: '#25D366',
-                                            fontFamily: 'monospace',
-                                            margin: '0.75rem 0',
-                                            textShadow: '0 0 20px rgba(37, 211, 102, 0.2)'
-                                        }}>
-                                            {waVerifyCode}
+                                        <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', marginBottom: '1rem', textAlign: 'center' }}>
+                                            We've sent a 6-digit code to <b>{userProfile.mobile}</b> via WhatsApp.
                                         </div>
                                         
-                                        <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
-                                            <a 
-                                                href={`https://wa.me/${botNumber}?text=VERIFY%20${waVerifyCode}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
+                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                            <input
+                                                type="text"
+                                                className="glass-input"
                                                 style={{ 
-                                                    display: 'inline-flex', 
-                                                    alignItems: 'center', 
-                                                    gap: '10px', 
-                                                    background: '#25D366', 
+                                                    width: '150px', 
+                                                    textAlign: 'center', 
+                                                    fontSize: '1.2rem', 
+                                                    letterSpacing: '4px',
+                                                    fontWeight: 'bold'
+                                                }}
+                                                maxLength="6"
+                                                placeholder="000000"
+                                                value={otpInput}
+                                                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleVerifyOtp}
+                                                disabled={generatingCode || otpInput.length < 6}
+                                                className="btn btn-primary"
+                                                style={{
+                                                    background: '#25D366',
                                                     color: 'white',
-                                                    padding: '0.75rem 1.5rem',
-                                                    fontSize: '0.9rem',
-                                                    textDecoration: 'none',
-                                                    borderRadius: '12px',
-                                                    fontWeight: 700,
-                                                    boxShadow: '0 4px 15px rgba(37, 211, 102, 0.3)',
-                                                    transition: 'all 0.2s ease'
-                                                }}
-                                                onMouseOver={e => {
-                                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 211, 102, 0.4)';
-                                                }}
-                                                onMouseOut={e => {
-                                                    e.currentTarget.style.transform = 'translateY(0)';
-                                                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(37, 211, 102, 0.3)';
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    fontWeight: 600,
+                                                    padding: '0 1.25rem',
+                                                    cursor: 'pointer'
                                                 }}
                                             >
-                                                <Phone size={18} fill="white" />
-                                                Open WhatsApp
-                                            </a>
+                                                {generatingCode ? '...' : 'Verify'}
+                                            </button>
                                         </div>
-
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '1rem', opacity: 0.7 }}>
-                                            Code valid for 30 minutes. Refresh to regenerate.
+                                        
+                                        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setWaVerifyCode(null)}
+                                                style={{ 
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    color: 'var(--color-text-muted)',
+                                                    fontSize: '0.8rem',
+                                                    cursor: 'pointer',
+                                                    textDecoration: 'underline'
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
                                         </div>
                                     </div>
                                 )}

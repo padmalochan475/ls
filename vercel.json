@@ -45,6 +45,10 @@
             "destination": "/manifest.json"
         },
         {
+            "source": "/api/whatsapp/:path*",
+            "destination": "http://129.225.114.212:2785/:path*"
+        },
+        {
             "source": "/api/:path*",
             "destination": "/api/:path*"
         },
