@@ -610,7 +610,7 @@ export default async function handler(req, res) {
                                 
                                 targetClasses.forEach((cls, idx) => {
                                     const sub = subsMap.get(cls.id);
-                                    const isSub = sub && (sub.substituteEmpId === target.empId || sub.substituteName === target.name);
+                                    const isSub = sub && target.empId && (sub.substituteEmpId === target.empId);
                                     
                                     waMsg += formatClassLine('morning_class_line', idx, cls, target, isSub);
                                 });
