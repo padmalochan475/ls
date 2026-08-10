@@ -571,6 +571,8 @@ export default async function handler(req, res) {
                             };
                         }).filter(t => t.mobile && t.whatsappEnabled);
                         
+                        debugLogs.push(`Total waTargets: ${waTargets.length}. Valid: ${waTargets.map(t => t.name).join(', ')}`);
+
                         await Promise.all(waTargets.map(async (target) => {
                             // Find classes where they are the primary, co-faculty, or substitute
                             const targetClasses = allTodaysClasses.filter(cls => {
@@ -595,6 +597,7 @@ export default async function handler(req, res) {
                             });
 
                             if (targetClasses.length > 0) {
+                                debugLogs.push(`Sending morning briefing for ${target.name}, found ${targetClasses.length} classes`);
                                 // Sort by time
                                 targetClasses.sort((a,b) => {
                                     if (!a.time || !b.time) return 0;
