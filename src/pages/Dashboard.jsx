@@ -38,13 +38,28 @@ const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
     if (isPersonalView && userProfile?.empId) {
         if (item.facultyEmpId === userProfile.empId) return true;
         if (item.faculty2EmpId === userProfile.empId) return true;
-        return false; // Strict empId matching if it's personal view
+        
+        // If the item HAS an empId assigned to BOTH slots, and neither matched, it's definitely NOT theirs
+        if (item.facultyEmpId && (!item.faculty2 || item.faculty2EmpId)) {
+            return false;
+        }
     }
 
-    // 2. Fallback check for Admin View (Name Matching)
+    // 2. Fallback check for Admin View (or Legacy Data missing EmpIDs)
     if (!targetName) return false;
     const targetNorm = normalizeStr(targetName);
-    return normalizeStr(item.faculty) === targetNorm || normalizeStr(item.faculty2) === targetNorm;
+    
+    if (normalizeStr(item.faculty) === targetNorm) {
+        if (isPersonalView && item.facultyEmpId && item.facultyEmpId !== userProfile?.empId) return false;
+        return true;
+    }
+    
+    if (normalizeStr(item.faculty2) === targetNorm) {
+        if (isPersonalView && item.faculty2EmpId && item.faculty2EmpId !== userProfile?.empId) return false;
+        return true;
+    }
+    
+    return false;
 };
 
 const calculateTodaySchedule = (selectedFaculty, allData = [], currentDayName, adjustments = [], currentDate, isPersonalView, userProfile, myAbsences = [], activeSubstitutions = []) => {
