@@ -139,11 +139,12 @@ const SubstitutionManager = () => {
                         empIds: [adjData.substituteEmpId],
                         title: "Substitution Cancelled",
                         body: `Your assigned substitution for ${adjData.subject} on ${adjData.date} has been CANCELLED by the administration.`,
-                        type: 'substitution_cancelled',
+                        type: 'substitution_cancelled_sub',
                         data: { 
-                            type: 'substitution_cancelled', 
+                            type: 'substitution_cancelled_sub', 
                             date: adjData.date,
-                            subject: adjData.subject
+                            subject: adjData.subject,
+                            faculty2: adjData.faculty2 || null
                         }
                     });
                 }
@@ -633,6 +634,23 @@ const SubstitutionManager = () => {
                         empIds: [reqData.requesterId],
                         title: "Substitution Rejected",
                         body: `Your request for ${reqData.targetFacultyName} to cover your class on ${reqData.date} was REJECTED by Admin.`,
+                        type: 'substitution_rejected',
+                        data: { 
+                            type: 'request_update', 
+                            status: 'rejected',
+                            subject: details.subject || 'Class',
+                            date: reqData.date,
+                            faculty2: details.faculty2 || null
+                        }
+                    });
+                }
+                
+                // NOTIFY SUBSTITUTE (Who already accepted it, but now Admin rejected it)
+                if (reqData.targetFacultyId) {
+                    sendNotification({
+                        empIds: [reqData.targetFacultyId],
+                        title: "Substitution Rejected",
+                        body: `The request for you to cover ${reqData.requesterName}'s class on ${reqData.date} was REJECTED by Admin.`,
                         type: 'substitution_rejected',
                         data: { 
                             type: 'request_update', 

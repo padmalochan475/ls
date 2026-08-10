@@ -127,6 +127,9 @@ export const sendNotification = async ({
                 case 'substitution_cancelled':
                     return formatMsg('sys_sub_can', defaultTemplates['sys_sub_can']);
 
+                case 'substitution_cancelled_sub':
+                    return formatMsg('sys_sub_can_sub', defaultTemplates['sys_sub_can_sub']);
+
                 case 'substitution_request_cancelled':
                     return formatMsg('sys_req_can', defaultTemplates['sys_req_can']);
 
