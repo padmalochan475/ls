@@ -255,38 +255,11 @@ const Substitutions = () => {
                         throw "Class is already covered by someone else.";
                     }
 
-                    const originalItem = fullSchedule.find(i => i.id === reqData.originalScheduleId) || {};
-                    const subject = originalItem.subject || reqData.scheduleDetails?.subject || "N/A";
-                    const time = originalItem.time || reqData.scheduleDetails?.time || "N/A";
-
-                    const adjustmentData = {
-                        academicYear: reqData.academicYear,
-                        date: reqData.date,
-                        originalFaculty: reqData.requesterName || "Unknown",
-                        substituteName: reqData.targetFacultyName || userProfile.name || "Unknown",
-                        originalScheduleId: reqData.originalScheduleId,
-                        originalFacultyEmpId: reqData.requesterId || "",
-                        substituteEmpId: userProfile.empId,
-                        subject,
-                        time,
-                        room: originalItem.room || reqData.scheduleDetails?.room || "N/A",
-                        dept: originalItem.dept || reqData.scheduleDetails?.dept || "N/A",
-                        section: originalItem.section || originalItem.grp || reqData.scheduleDetails?.grp || "N/A",
-                        group: originalItem.group || originalItem.subGroup || reqData.scheduleDetails?.subgrp || "All",
-                        sem: originalItem.sem || "N/A",
-                        createdAt: serverTimestamp(),
-                        createdBy: currentUser.uid,
-                        status: 'active'
-                    };
-
-                    console.log("Creating adjustment:", adjustmentData);
-                    transaction.set(adjRef, adjustmentData);
-
                     transaction.update(reqRef, {
                         targetResponse: 'accepted',
-                        targetResponseAt: serverTimestamp(),
-                        status: 'approved',
-                        adminComment: 'Auto-approved via Peer Acceptance'
+                        targetResponseAt: serverTimestamp()
+                        // DO NOT set status: 'approved' or create adjustment here.
+                        // Admin will do this via SubstitutionManager.jsx
                     });
                 } else {
                     transaction.update(reqRef, {
@@ -340,18 +313,10 @@ const Substitutions = () => {
                 }
 
                 // NOTIFY OBSERVERS
-                sendToObservers('obs_sub_app', {
-                    requesterName: reqData.requesterName || 'Unknown',
-                    subName: reqData.targetFacultyName || 'Unknown',
-                    subject: reqData.scheduleDetails?.subject || 'Class',
-                    date: reqData.date || '',
-                    group: `${reqData.scheduleDetails?.dept || '?'}-${reqData.scheduleDetails?.grp || '?'}`,
-                    time: reqData.scheduleDetails?.time || 'N/A',
-                    room: reqData.scheduleDetails?.room || 'N/A',
-                    faculty2: reqData.scheduleDetails?.faculty2 || null
-                });
+                // We DO NOT send 'obs_sub_app' here because it's only pending admin approval.
+                // The Admin will trigger 'obs_sub_app' when they officially approve it.
 
-                toast.success("Substitution Confirmed & Scheduled!");
+                toast.success("Substitution Accepted! Pending Admin Approval.");
             } else {
                 try {
                     await sendNotification({
