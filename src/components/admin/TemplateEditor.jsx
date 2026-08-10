@@ -27,6 +27,7 @@ const defaultTemplates = {
     sys_sub_rej: "❌ *Substitution Request Status* ❌\n\nHello *{name}*,\nA substitution request for *{subject}* on *{day}*, {date} has been *Rejected* or cancelled.\n\nℹ️ *Info*: Please log in to check the status.",
     sys_sub_acc: "🎉 *Substitution Request Confirmed* 🎉\n\nHello *{name}*,\nYour request for *{subject}* on *{day}*, {date} has been *Accepted* by *{subName}*.\n\n_System Admin_",
     sys_sub_can: "⚠️ *Substitution Cancelled* ⚠️\n\nHello *{name}*,\nA previously requested substitution for *{subject}* on *{day}*, {date} has been *Cancelled*.\n\nℹ️ *Info*: You are expected to take this class.",
+    sys_new_assign: "📚 *New Assignment* 📚\n\nHello *{name}*,\n{body}\n\n_System Admin_",
     sys_acc_app: "👋 *Welcome to LAMS, {name}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_",
     obs_sub_app: "🚨 *Admin Alert: Leave Covered* 🚨\n\n*{requesterName}* is on leave on *{day}, {date}*.\n*{subName}* will cover the *{subject}* class for ({group}) at *{time}* in Room *{room}*.",
     obs_sub_can: "⚠️ *Admin Alert: Sub Cancelled* ⚠️\n\nThe substitution arrangement for *{subject}* on *{day}, {date}* at *{time}* in Room *{room}* has been cancelled.",
@@ -184,7 +185,7 @@ const TemplateEditor = () => {
                             </div>
                             <div>
                                 <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>⚙️ System & Subs:</strong>
-                                <span style={{ color: '#fbbf24' }}>{'{name}'}, {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{group}'}, {'{room}'}</span>
+                                <span style={{ color: '#fbbf24' }}>{'{name}'}, {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{group}'}, {'{room}'}, {'{body}'}</span>
                             </div>
                         </div>
                     </div>
@@ -309,6 +310,11 @@ const TemplateEditor = () => {
                             <h4 style={{ marginTop: 0, color: '#c084fc' }}>Account Approved</h4>
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}</p>
                             {renderInput('sys_acc_app', 'Message', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#f472b6' }}>New Assignment</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{body}'}</p>
+                            {renderInput('sys_new_assign', 'Message', 'textarea', 5)}
                         </div>
                     </div>
                 )}

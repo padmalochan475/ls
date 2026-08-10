@@ -596,7 +596,10 @@ export default async function handler(req, res) {
 
                             if (targetClasses.length > 0) {
                                 // Sort by time
-                                targetClasses.sort((a,b) => parseTimeStr(a.time.split(' - ')[0], nowIST) - parseTimeStr(b.time.split(' - ')[0], nowIST));
+                                targetClasses.sort((a,b) => {
+                                    if (!a.time || !b.time) return 0;
+                                    return parseTimeStr(a.time.split(' - ')[0], nowIST) - parseTimeStr(b.time.split(' - ')[0], nowIST);
+                                });
 
                                 let waMsg = formatMsg('morning_header', `📅 *Today's Briefing: {name}* 📅\nDay: *{day}* | Classes: *{total_classes}*\n\n`, { name: target.name, day: dayName, total_classes: targetClasses.length });
                                 

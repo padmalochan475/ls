@@ -114,6 +114,9 @@ export const sendNotification = async ({
                 case 'account_approved':
                     return formatMsg('sys_acc_app', `👋 *Welcome to LAMS, ${userName}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_`);
 
+                case 'assignment':
+                    return formatMsg('sys_new_assign', `📚 *New Assignment* 📚\n\nHello *${userName}*,\n${body}\n\n_System Admin_`);
+
                 case 'substitution_accepted':
                     return formatMsg('sys_sub_acc', `🎉 *Substitution Request Confirmed* 🎉\n\nHello *${userName}*,\nYour request has been *Accepted* by the target faculty member.\n\n📅 *Schedule Updated*:\n${body}\n\n_System Admin_`);
 
