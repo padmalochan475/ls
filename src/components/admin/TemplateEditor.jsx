@@ -185,14 +185,14 @@ import { defaultTemplates } from '../../utils/defaultTemplates';const TemplateEd
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#f59e0b' }}>First Warning (e.g., 15 Mins)</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{group}'}, {'{room}'}, {'{mins}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{group}'}, {'{room}'}, {'{mins}'}, {'{cofacStr}'}, {'{cofacInline}'}</p>
                             {renderInput('warn1_push_title', 'Push Title', 'text')}
                             {renderInput('warn1_push_body', 'Push Body', 'textarea', 2)}
                             {renderInput('warn1_wa', 'WhatsApp Message', 'textarea', 4)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#ef4444' }}>Second Warning (e.g., 5 Mins)</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{group}'}, {'{room}'}, {'{mins}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{group}'}, {'{room}'}, {'{mins}'}, {'{cofacStr}'}, {'{cofacInline}'}</p>
                             {renderInput('warn2_push_title', 'Push Title', 'text')}
                             {renderInput('warn2_push_body', 'Push Body', 'textarea', 2)}
                             {renderInput('warn2_wa', 'WhatsApp Message', 'textarea', 4)}
@@ -252,27 +252,27 @@ import { defaultTemplates } from '../../utils/defaultTemplates';const TemplateEd
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#fcd34d' }}>Substitution Request</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{requesterName}'}, {'{subject}'}, {'{date}'}, {'{time}'}, {'{room}'}, {'{group}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{requesterName}'}, {'{subject}'}, {'{date}'}, {'{time}'}, {'{room}'}, {'{group}'}, {'{cofacStr}'}</p>
                             {renderInput('sys_sub_req', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#34d399' }}>Substitution Approved</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_app', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#f87171' }}>Substitution Rejected</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_rej', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#60a5fa' }}>Substitution Accepted</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_acc', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#fb923c' }}>Substitution Cancelled</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_can', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
