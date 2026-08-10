@@ -444,7 +444,7 @@ export default async function handler(req, res) {
             const semStr = (cls.semester || cls.sem) ? `\n 🎓 *Sem:* ${cls.semester || cls.sem}` : '';
             const subStr = isSub && cls.faculty ? `\n ⚠️ *SUB FOR:* ${cls.faculty.toUpperCase()}` : '';
 
-            const defaultTemplate = "🔹 *[{idx}]* ⏰ _{time}_\n 📌 *{subject}* ({group}){roomStr}{semStr}{cofacStr}{subStr}\n";
+            const defaultTemplate = defaultTemplates[templateKey] || "🔹 *[{idx}]* ⏰ _{time}_\n 📌 *{subject}* ({group}){roomStr}{semStr}{cofacStr}{subStr}\n";
             
             const vars = {
                 idx: String(idx + 1),
