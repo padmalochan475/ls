@@ -712,8 +712,12 @@ export default async function handler(req, res) {
                     const subData = subSnap.docs[0].data();
                     const subs = await getFacultyData([{ id: subData.substituteEmpId, name: subData.substituteName }], cachedUsers, cachedFaculty);
                     
-                    // Remove original faculty from recipients, keep the other faculty, and add the substitute
-                    finalUsers = finalUsers.filter(u => u.empId !== subData.originalFacultyEmpId && u.name !== subData.originalFaculty);
+                    // Remove ONLY the original faculty from recipients, keep the other faculty, and add the substitute
+                    finalUsers = finalUsers.filter(u => {
+                        const isEmpIdMatch = u.empId && subData.originalFacultyEmpId && String(u.empId) === String(subData.originalFacultyEmpId);
+                        const isNameMatch = u.name && subData.originalFaculty && String(u.name).toLowerCase() === String(subData.originalFaculty).toLowerCase();
+                        return !(isEmpIdMatch || isNameMatch);
+                    });
                     if (subs.length > 0) finalUsers.push(subs[0]);
                 }
 
