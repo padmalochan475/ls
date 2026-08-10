@@ -205,6 +205,8 @@ async function sendWhatsApp(phoneNumber, message) {
         });
         return true;
     } catch (error) {
+        // Invalidate cached session on failure so it fetches a fresh one next time
+        cachedSessionId = null;
         console.error(`WhatsApp Send Error to ${phoneNumber}:`, error.message);
         return error.message;
     }
@@ -227,7 +229,8 @@ export default async function handler(req, res) {
         let debugLogs = [];
         debugLogs.push(`force_morning received: ${req.query?.force_morning}`);
 
-        console.log(`Starting check-classes (${todayDateStr} ${nowIST.toLocaleTimeString()})...`);
+        const currentISTTimeStr = nowUTC.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' });
+        console.log(`Starting check-classes (${todayDateStr} ${currentISTTimeStr})...`);
 
         // 2. Parallel Fetch of settings and today's holiday status (with 10-min Cache)
         const currentTimeMs = Date.now();
@@ -765,7 +768,7 @@ export default async function handler(req, res) {
             upcoming: upcomingClasses.length,
             sent: sentCount,
             academicYear: activeAcademicYear,
-            serverTimeIST: `${todayDateStr} ${nowIST.toLocaleTimeString()} IST`,
+            serverTimeIST: `${todayDateStr} ${nowUTC.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' })} IST`,
             debug: debugLogs.concat(upcomingClasses.map(c => ({ id: c.id, time: c.startTime, name: c.subject })))
         });
     } catch (error) {
