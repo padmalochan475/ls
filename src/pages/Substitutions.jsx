@@ -460,13 +460,7 @@ const Substitutions = () => {
                 if (s.facultyEmpId === userProfile.empId || s.faculty2EmpId === userProfile.empId) return true;
             }
 
-            // 2. Match by Name (Robust Fallback)
-            if (!userProfile?.name) return false;
-            const search = normalizeStr(userProfile.name);
-            const f1 = normalizeStr(s.faculty);
-            const f2 = normalizeStr(s.faculty2);
-
-            return f1.includes(search) || f2.includes(search);
+            return false; // Name matching is disabled to prevent duplicate name collisions
         });
 
         // Check for existing requests/adjustments to prevent duplicates

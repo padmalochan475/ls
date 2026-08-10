@@ -40,13 +40,7 @@ const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
         if (item.faculty2EmpId === userProfile.empId) return true;
     }
 
-    // 2. Fallback Check: Match by Name (Robust)
-    if (!targetName) return false;
-    const search = normalizeStr(targetName);
-    const f1 = normalizeStr(item.faculty);
-    const f2 = normalizeStr(item.faculty2);
-
-    return f1.includes(search) || f2.includes(search);
+    return false; // Name matching is disabled to prevent duplicate name collisions
 };
 
 const calculateTodaySchedule = (selectedFaculty, allData = [], currentDayName, adjustments = [], currentDate, isPersonalView, userProfile, myAbsences = [], activeSubstitutions = []) => {

@@ -494,8 +494,8 @@ export default async function handler(req, res) {
 
                     for (const target of waTargets) {
                         const mySchedule = allSchedule.filter(cls => 
-                            cls.facultyEmpId === target.empId || cls.faculty === target.name || 
-                            cls.faculty2EmpId === target.empId || cls.faculty2 === target.name
+                            (target.empId && cls.facultyEmpId === target.empId) || 
+                            (target.empId && cls.faculty2EmpId === target.empId)
                         );
 
                         if (mySchedule.length > 0) {
@@ -583,21 +583,19 @@ export default async function handler(req, res) {
                                 const sub = subsMap.get(cls.id);
                                 if (sub) {
                                     // The substitute gets the class
-                                    if (sub.substituteEmpId === target.empId || sub.substituteName === target.name) return true;
+                                    if (target.empId && sub.substituteEmpId === target.empId) return true;
                                     
                                     // The primary faculty (who is substituted) does not get the class
-                                    if (sub.originalFacultyEmpId === target.empId || sub.originalFaculty === target.name) return false;
+                                    if (target.empId && sub.originalFacultyEmpId === target.empId) return false;
                                     
                                     // But the co-faculty (faculty2) should still get it if they match.
-                                    if (cls.facultyEmpId === target.empId || cls.faculty === target.name || 
-                                        cls.faculty2EmpId === target.empId || cls.faculty2 === target.name) {
+                                    if (target.empId && (cls.facultyEmpId === target.empId || cls.faculty2EmpId === target.empId)) {
                                         return true;
                                     }
                                     
                                     return false;
                                 }
-                                return cls.facultyEmpId === target.empId || cls.faculty === target.name || 
-                                       cls.faculty2EmpId === target.empId || cls.faculty2 === target.name;
+                                return target.empId && (cls.facultyEmpId === target.empId || cls.faculty2EmpId === target.empId);
                             });
 
                             if (targetClasses.length > 0) {
@@ -718,8 +716,7 @@ export default async function handler(req, res) {
                     // Remove ONLY the original faculty from recipients, keep the other faculty, and add the substitute
                     finalUsers = finalUsers.filter(u => {
                         const isEmpIdMatch = u.empId && subData.originalFacultyEmpId && String(u.empId) === String(subData.originalFacultyEmpId);
-                        const isNameMatch = u.name && subData.originalFaculty && String(u.name).toLowerCase() === String(subData.originalFaculty).toLowerCase();
-                        return !(isEmpIdMatch || isNameMatch);
+                        return !isEmpIdMatch;
                     });
                     if (subs.length > 0) finalUsers.push(subs[0]);
                 }
@@ -851,47 +848,6 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                         whatsappEnabled: (userMatch?.whatsappEnabled !== false) && (facMatch?.whatsappEnabled !== false),
                         isExactMatch: true
                     });
-                    foundById = true;
-                }
-            }
-
-            // 2. SEARCH BY NAME (LEGACY FALLBACK) - Only if ID search came up empty.
-            if (!foundById && targetName) {
-                let nameMatch = allUsers.find(u => {
-                    const uName = u.name ? u.name.toString().trim().toLowerCase() : null;
-                    return uName && (uName === targetName || uName.includes(targetName) || targetName.includes(uName));
-                });
-
-                let final_name_match = null;
-
-                if (!nameMatch) {
-                    const facMatch = allFaculty.find(f => {
-                        const fName = f.name ? f.name.toString().trim().toLowerCase() : null;
-                        return fName && (fName === targetName || fName.includes(targetName) || targetName.includes(fName));
-                    });
-                    if (facMatch) {
-                        final_name_match = {
-                            uid: facMatch.uid || facMatch.id,
-                            fcmTokens: null,
-                            name: facMatch.name,
-                            empId: facMatch.empId,
-                            mobile: facMatch.mobile || facMatch.phone || null,
-                            whatsappEnabled: facMatch.whatsappEnabled !== false
-                        };
-                    }
-                } else {
-                    final_name_match = {
-                        uid: nameMatch.uid,
-                        fcmTokens: nameMatch.fcmTokens || null,
-                        name: nameMatch.name,
-                        empId: nameMatch.empId,
-                        mobile: nameMatch.mobile || nameMatch.phone || null,
-                        whatsappEnabled: nameMatch.whatsappEnabled !== false
-                    };
-                }
-
-                if (final_name_match) {
-                    discoveredUsers.push({ ...final_name_match, isExactMatch: false });
                 }
             }
         });
