@@ -293,8 +293,8 @@ export default async function handler(req, res) {
             const alreadySentHoliday = await db.collection('sent_notifications').doc(notifIdHoliday).get();
 
             if (!alreadySentHoliday.exists && nowIST >= holidayAlertTime) {
-                    const title = formatMsg('holiday_push_title', '🎉 Holiday Alert', { holiday_name: h.name });
-                    const body = formatMsg('holiday_push_body', 'Today is {holiday_name}. No classes today. Enjoy!', { holiday_name: h.name });
+                    const title = formatMsg('holiday_push_title', defaultTemplates.holiday_push_title, { holiday_name: h.name });
+                    const body = formatMsg('holiday_push_body', defaultTemplates.holiday_push_body, { holiday_name: h.name });
                     
                     const success = await sendFCM('ALL', title, body, { type: 'holiday', date: todayDateStr });
 
@@ -314,7 +314,7 @@ export default async function handler(req, res) {
                             };
                         }).filter(u => u.mobile && u.whatsappEnabled);
                         
-                        const waMsg = formatMsg('holiday_wa', '🏝️ *HAPPY HOLIDAY!* 🏝️\n\nWishing everyone a wonderful *{holiday_name}*! 🎉\nHave a great time!\n\n~ *LAMS Admin*', { holiday_name: h.name });
+                        const waMsg = formatMsg('holiday_wa', defaultTemplates.holiday_wa, { holiday_name: h.name });
                         
                         await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
                     } catch (waErr) {
@@ -371,13 +371,13 @@ export default async function handler(req, res) {
                         if (autoBirthdays && fac.dob) {
                             const [bYear, bMonth, bDay] = fac.dob.split('-').map(Number);
                             if (bMonth === todayMonth && bDay === todayDay) {
-                                let bdayMsg = formatMsg('birthday_wa', `🎂 *HAPPY BIRTHDAY, {name}!* 🎂\n\nWishing you a fantastic day filled with joy, and a year ahead full of success and happiness! Keep inspiring! ✨🥂\n\n~ *LAMS Admin*`, { name: fac.name });
+                                let bdayMsg = formatMsg('birthday_wa', defaultTemplates.birthday_wa, { name: fac.name });
                                 greetingTasks.push(sendWhatsApp(targetNumber, bdayMsg));
                                 console.log(`Birthday greeting triggered for ${fac.name}`);
 
                                 // OBSERVER NOTIFICATION
                                 if (observerNumbers.length > 0) {
-                                    let obsBday = formatMsg('obs_bday', `📢 *Admin Alert: Birthday Today!* 🎈\n\nToday is *{name}'s* birthday! Be sure to wish them! 🎂`, { name: fac.name });
+                                    let obsBday = formatMsg('obs_bday', defaultTemplates.obs_bday, { name: fac.name });
                                     observerNumbers.forEach(num => greetingTasks.push(sendWhatsApp(num, obsBday)));
                                 }
                             }
@@ -389,13 +389,13 @@ export default async function handler(req, res) {
                             if (jMonth === todayMonth && jDay === todayDay) {
                                 const yearsCompleted = nowIST.getFullYear() - jYear;
                                 if (yearsCompleted > 0) {
-                                    let annMsg = formatMsg('anniversary_wa', `🎊 *HAPPY WORK ANNIVERSARY!* 🎊\n\nCongratulations, *{name}*, on completing *{years}* with our institution! 🏫\n\nThank you for your incredible dedication and hard work. We are so proud to have you on our team! 🌟\n\n~ *College Management*`, { name: fac.name, years: `${yearsCompleted} ${yearsCompleted === 1 ? 'year' : 'years'}` });
+                                    let annMsg = formatMsg('anniversary_wa', defaultTemplates.anniversary_wa, { name: fac.name, years: `${yearsCompleted} ${yearsCompleted === 1 ? 'year' : 'years'}` });
                                     greetingTasks.push(sendWhatsApp(targetNumber, annMsg));
                                     console.log(`Anniversary greeting triggered for ${fac.name} (${yearsCompleted} years)`);
 
                                     // OBSERVER NOTIFICATION
                                     if (observerNumbers.length > 0) {
-                                        let obsAnn = formatMsg('obs_anni', `📢 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating *{years} years* with us today! 🏫`, { name: fac.name, years: yearsCompleted });
+                                        let obsAnn = formatMsg('obs_anni', defaultTemplates.obs_anni, { name: fac.name, years: yearsCompleted });
                                         observerNumbers.forEach(num => greetingTasks.push(sendWhatsApp(num, obsAnn)));
                                     }
                                 }
@@ -500,7 +500,7 @@ export default async function handler(req, res) {
                         );
 
                         if (mySchedule.length > 0) {
-                            let previewMsg = formatMsg('weekly_header', `🗓️ *WEEKLY PREVIEW: {name}* 🗓️\n\n🎯 _Prep for the upcoming week!_\nYou have *{total_sessions} sessions* scheduled.\n\n`, { name: target.name, total_sessions: mySchedule.length });
+                            let previewMsg = formatMsg('weekly_header', defaultTemplates.weekly_header, { name: target.name, total_sessions: mySchedule.length });
                             
                             // Group by day
                             const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -520,7 +520,7 @@ export default async function handler(req, res) {
                                 }
                             });
 
-                            previewMsg += formatMsg('weekly_footer', `\n🌐 _Check the portal for full timetable._\nGood luck for the week! 💪`, {});
+                            previewMsg += formatMsg('weekly_footer', defaultTemplates.weekly_footer, {});
                             await sendWhatsApp(target.mobile, previewMsg);
                             await new Promise(r => setTimeout(r, 300));
                         }
@@ -607,7 +607,7 @@ export default async function handler(req, res) {
                                     return parseTimeStr(a.time.split(' - ')[0], nowIST) - parseTimeStr(b.time.split(' - ')[0], nowIST);
                                 });
 
-                                let waMsg = formatMsg('morning_header', `✨ *GOOD MORNING, {name}!* ✨\n🗓️ _{day}_ | 📚 *{total_classes} Classes Today*\n\n`, { name: target.name, day: dayName, total_classes: targetClasses.length });
+                                let waMsg = formatMsg('morning_header', defaultTemplates.morning_header, { name: target.name, day: dayName, total_classes: targetClasses.length });
                                 
                                 targetClasses.forEach((cls, idx) => {
                                     const sub = subsMap.get(cls.id);
@@ -616,7 +616,7 @@ export default async function handler(req, res) {
                                     waMsg += formatClassLine('morning_class_line', idx, cls, target, isSub);
                                 });
 
-                                waMsg += formatMsg('morning_footer', `\n💡 _Have a highly productive day!_\n~ *LAMS Admin*`, { name: target.name });
+                                waMsg += formatMsg('morning_footer', defaultTemplates.morning_footer, { name: target.name });
                                 const ok = await sendWhatsApp(target.mobile, waMsg);
                                 if (ok !== true) debugLogs.push(`WA FAILED for ${target.name} (${target.mobile}): ${ok}`);
                                 else debugLogs.push(`WA SUCCESS for ${target.name} (${target.mobile})`);
@@ -741,8 +741,8 @@ export default async function handler(req, res) {
                         const cofacInline = cls.faculty2 ? ` (w/ ${cls.faculty2})` : '';
                         const cofacStr = cls.faculty2 ? `\n🔹 *Cofaculty:* ${cls.faculty2}` : '';
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft, cofacInline, cofacStr };
-                        const pushTitle = formatMsg('warn1_push_title', 'Upcoming Class', vars);
-                        const pushBody = formatMsg('warn1_push_body', '🔔 Heads Up: {subject} ({group}){cofacInline} starts in {mins} mins at Room {room}.', vars);
+                        const pushTitle = formatMsg('warn1_push_title', defaultTemplates.warn1_push_title, vars);
+                        const pushBody = formatMsg('warn1_push_body', defaultTemplates.warn1_push_body, vars);
                         const waMsg = formatMsg('warn1_wa', defaultTemplates.warn1_wa, vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
@@ -767,8 +767,8 @@ export default async function handler(req, res) {
                         const cofacInline = cls.faculty2 ? ` (w/ ${cls.faculty2})` : '';
                         const cofacStr = cls.faculty2 ? `\n🔹 *Cofaculty:* ${cls.faculty2}` : '';
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft, cofacInline, cofacStr };
-                        const pushTitle = formatMsg('warn2_push_title', 'Class Starting!', vars);
-                        const pushBody = formatMsg('warn2_push_body', '🚀 ACTION: Run to Room {room}! {subject} ({group}){cofacInline} is starting NOW!', vars);
+                        const pushTitle = formatMsg('warn2_push_title', defaultTemplates.warn2_push_title, vars);
+                        const pushBody = formatMsg('warn2_push_body', defaultTemplates.warn2_push_body, vars);
                         const waMsg = formatMsg('warn2_wa', defaultTemplates.warn2_wa, vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
