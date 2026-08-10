@@ -739,7 +739,7 @@ export default async function handler(req, res) {
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
                         const cofacInline = cls.faculty2 ? ` (w/ ${cls.faculty2})` : '';
-                        const cofacStr = cls.faculty2 ? `\n 👥 _Cofaculty:_ ${cls.faculty2}` : '';
+                        const cofacStr = cls.faculty2 ? `\n🔹 *Cofaculty:* ${cls.faculty2}` : '';
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft, cofacInline, cofacStr };
                         const pushTitle = formatMsg('warn1_push_title', 'Upcoming Class', vars);
                         const pushBody = formatMsg('warn1_push_body', '🔔 Heads Up: {subject} ({group}){cofacInline} starts in {mins} mins at Room {room}.', vars);
@@ -765,7 +765,7 @@ export default async function handler(req, res) {
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
                         const cofacInline = cls.faculty2 ? ` (w/ ${cls.faculty2})` : '';
-                        const cofacStr = cls.faculty2 ? `\n 👥 _Cofaculty:_ ${cls.faculty2}` : '';
+                        const cofacStr = cls.faculty2 ? `\n🔹 *Cofaculty:* ${cls.faculty2}` : '';
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft, cofacInline, cofacStr };
                         const pushTitle = formatMsg('warn2_push_title', 'Class Starting!', vars);
                         const pushBody = formatMsg('warn2_push_body', '🚀 ACTION: Run to Room {room}! {subject} ({group}){cofacInline} is starting NOW!', vars);
