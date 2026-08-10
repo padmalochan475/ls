@@ -619,9 +619,9 @@ const Substitutions = () => {
             await addDoc(collection(db, 'substitution_requests'), {
                 academicYear: activeAcademicYear,
                 requesterUid: currentUser?.uid || "system", // For permission checks
-                requesterId: userProfile.empId,
+                requesterId: userProfile.empId || userProfile.name || "Unknown",
                 requesterName: userProfile.name || "Unknown",
-                targetFacultyId: targetFac.empId || "Unknown",
+                targetFacultyId: targetFac.empId || targetFac.name || "Unknown",
                 targetFacultyName: targetFac.name || "Unknown",
                 originalScheduleId: selectedClassId || "",
                 scheduleDetails: {
