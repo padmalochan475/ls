@@ -206,7 +206,7 @@ const Dashboard = () => {
 
         if (newMode === 'personal') {
             setSelectedFaculty(userProfile.name);
-            setSelectedFacultyId(userProfile.empId);
+            setSelectedFacultyId(userProfile.empId || userProfile.name);
         } else {
             setSelectedFaculty('All Assignments');
             setSelectedFacultyId('All Assignments');
@@ -227,7 +227,7 @@ const Dashboard = () => {
                 // Force non-admins or personal view to see only their own schedule
                 setTimeout(() => {
                     setSelectedFaculty(userProfile.name);
-                    setSelectedFacultyId(userProfile.empId);
+                    setSelectedFacultyId(userProfile.empId || userProfile.name);
                 }, 0);
             }
         }
@@ -341,7 +341,8 @@ const Dashboard = () => {
     // Fetch Adjustments (Surgical Real-Time Sync)
     const [adjustments, setAdjustments] = useState([]);    // Real-time listener for today's adjustments
     useDynamicListener((isActiveRef) => {
-        if (activeAcademicYear && userProfile?.empId) {
+        const myId = userProfile?.empId || userProfile?.name;
+        if (activeAcademicYear && myId) {
             const targetDateStr = formatDateLocal(currentDate);
             const adjustmentsRef = collection(db, 'adjustments');
             
@@ -349,21 +350,14 @@ const Dashboard = () => {
             // Mode A: Faculty/Personal - Listen to THEIR OWN adjustments for the year (Small/Fast)
             // Mode B: Admin/All - Listen to ONLY TODAY'S adjustments (Small/Fast)
             let q;
-            
-            let targetEmpId = null;
-            if (dashboardView === 'personal' && userProfile?.empId) {
-                targetEmpId = userProfile.empId;
-            } else if (dashboardView === 'admin' && selectedFacultyId && selectedFacultyId !== 'All Assignments') {
-                targetEmpId = selectedFacultyId;
-            }
 
             if (dashboardView === 'personal' && selectedFaculty !== 'All Assignments') {
                 q = query(adjustmentsRef, 
                     and(
                         where('academicYear', '==', activeAcademicYear),
                         or(
-                            where('originalFacultyEmpId', '==', userProfile.empId),
-                            where('substituteEmpId', '==', userProfile.empId)
+                            where('originalFacultyEmpId', '==', myId),
+                            where('substituteEmpId', '==', myId)
                         )
                     )
                 );
