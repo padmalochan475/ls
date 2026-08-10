@@ -38,9 +38,13 @@ const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
     if (isPersonalView && userProfile?.empId) {
         if (item.facultyEmpId === userProfile.empId) return true;
         if (item.faculty2EmpId === userProfile.empId) return true;
+        return false; // Strict empId matching if it's personal view
     }
 
-    return false; // Name matching is disabled to prevent duplicate name collisions
+    // 2. Fallback check for Admin View (Name Matching)
+    if (!targetName) return false;
+    const targetNorm = normalizeStr(targetName);
+    return normalizeStr(item.faculty) === targetNorm || normalizeStr(item.faculty2) === targetNorm;
 };
 
 const calculateTodaySchedule = (selectedFaculty, allData = [], currentDayName, adjustments = [], currentDate, isPersonalView, userProfile, myAbsences = [], activeSubstitutions = []) => {
@@ -137,13 +141,16 @@ const calculateDerivedSchedules = ({
     const isPersonalView = dashboardView === 'personal';
 
     // Robust Matching for Absences/Substitutions
-    const matchesTarget = (val) => {
-        if (!val || !selectedFaculty) return false;
-        return normalizeStr(val) === normalizeStr(selectedFaculty);
+    const matchesTarget = (nameVal, empIdVal) => {
+        if (isPersonalView && userProfile?.empId && empIdVal) {
+            return empIdVal === userProfile.empId;
+        }
+        if (!nameVal || !selectedFaculty) return false;
+        return normalizeStr(nameVal) === normalizeStr(selectedFaculty);
     };
 
-    const myAbsences = (adjustments || []).filter(a => matchesTarget(a.originalFaculty));
-    const mySubstitutions = (adjustments || []).filter(a => matchesTarget(a.substituteName));
+    const myAbsences = (adjustments || []).filter(a => matchesTarget(a.originalFaculty, a.originalFacultyEmpId));
+    const mySubstitutions = (adjustments || []).filter(a => matchesTarget(a.substituteName, a.substituteEmpId));
 
     const activeSubstitutions = (mySubstitutions || []).map(adj => ({
         id: `adj_${adj.id}`,
