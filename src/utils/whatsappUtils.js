@@ -15,77 +15,87 @@ let cachedSessionId = null;
  * @returns {Promise<boolean>} - Success status
  */
 export const sendWhatsAppNotification = async (phoneNumber, textMessage) => {
-    try {
-        if (!phoneNumber) return false;
-        
-        // Strip everything except numbers
-        let formattedNumber = String(phoneNumber).replace(/[^0-9]/g, '');
-        
-        // Basic validation: Indian numbers are 10 digits. If it's already 12 digits starting with 91, it's fine.
-        if (formattedNumber.length === 10) {
-            formattedNumber = '91' + formattedNumber;
-        } else if (formattedNumber.length < 10) {
-            console.warn(`WhatsApp skip: Number too short (${formattedNumber})`);
-            return false;
-        }
+    let attempt = 0;
+    const maxRetries = 3;
 
-        // WAHA / OpenWA requires the destination to end with @c.us for regular chats
-        const chatId = formattedNumber + '@c.us';
-
-        // Use relative URL to leverage Vite proxy and bypass browser CORS policies
-        const baseUrl = '/api/whatsapp';
-        let sessionId = cachedSessionId;
-
-        // 1. Fetch active sessions to dynamically get the correct session UUID if not cached
-        if (!sessionId) {
-            const sessionsRes = await fetch(`${baseUrl}/api/sessions`, {
-                headers: { 'x-api-key': API_KEY }
-            });
-            const sessions = await sessionsRes.json();
+    while (attempt < maxRetries) {
+        try {
+            if (!phoneNumber) return false;
             
-            if (!Array.isArray(sessions) || sessions.length === 0) {
-                console.error("No active WhatsApp sessions found on the gateway or unauthorized.", sessions);
-                toast.error(sessions?.message ? `API Auth Error: ${sessions.message}` : "No active WhatsApp sessions available.");
+            // Strip everything except numbers
+            let formattedNumber = String(phoneNumber).replace(/[^0-9]/g, '');
+            
+            // Basic validation: Indian numbers are 10 digits. If it's already 12 digits starting with 91, it's fine.
+            if (formattedNumber.length === 10) {
+                formattedNumber = '91' + formattedNumber;
+            } else if (formattedNumber.length < 10) {
+                console.warn(`WhatsApp skip: Number too short (${formattedNumber})`);
                 return false;
             }
-            
-            // Use the first active session's UUID and cache it
-            sessionId = sessions[0].id;
-            cachedSessionId = sessionId;
-        }
-        
-        const endpoint = `${baseUrl}/api/sessions/${sessionId}/messages/send-text`;
 
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_KEY}`,
-                'x-api-key': API_KEY 
-            },
-            body: JSON.stringify({
-                chatId: chatId,
-                text: textMessage
-            }),
-        });
-        
-        if(response.ok) {
-            console.log("WhatsApp message successfully dispatched!");
-            return true;
-        } else {
-            if (response.status === 400 || response.status === 404 || response.status === 401) {
-                // The session might have expired or gateway restarted, clear cache so we fetch new session next time
-                cachedSessionId = null;
+            // WAHA / OpenWA requires the destination to end with @c.us for regular chats
+            const chatId = formattedNumber + '@c.us';
+
+            // Use relative URL to leverage Vite proxy and bypass browser CORS policies
+            const baseUrl = '/api/whatsapp';
+            let sessionId = cachedSessionId;
+
+            // 1. Fetch active sessions to dynamically get the correct session UUID if not cached
+            if (!sessionId) {
+                const sessionsRes = await fetch(`${baseUrl}/api/sessions`, {
+                    headers: { 'x-api-key': API_KEY }
+                });
+                const sessions = await sessionsRes.json();
+                
+                if (!Array.isArray(sessions) || sessions.length === 0) {
+                    console.error("No active WhatsApp sessions found on the gateway or unauthorized.", sessions);
+                    if (attempt === maxRetries - 1) toast.error(sessions?.message ? `API Auth Error: ${sessions.message}` : "No active WhatsApp sessions available.");
+                    return false;
+                }
+                
+                // Use the first active session's UUID and cache it
+                sessionId = sessions[0].id;
+                cachedSessionId = sessionId;
             }
-            const data = await response.json().catch(() => ({}));
-            const errMsg = data.message || response.statusText || 'Unknown API Error';
-            console.warn("WhatsApp API returned false status:", errMsg);
-            toast.error(`WA API Error: ${response.status} ${errMsg}`);
-            return false;
+            
+            const endpoint = `${baseUrl}/api/sessions/${sessionId}/messages/send-text`;
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'x-api-key': API_KEY 
+                },
+                body: JSON.stringify({
+                    chatId: chatId,
+                    text: textMessage
+                }),
+            });
+            
+            if(response.ok) {
+                console.log("WhatsApp message successfully dispatched!");
+                return true;
+            } else {
+                if (response.status === 400 || response.status === 404 || response.status === 401) {
+                    // The session might have expired or gateway restarted, clear cache so we fetch new session next time
+                    cachedSessionId = null;
+                }
+                const data = await response.json().catch(() => ({}));
+                const errMsg = data.message || response.statusText || 'Unknown API Error';
+                console.warn(`WhatsApp API returned false status (attempt ${attempt + 1}):`, errMsg);
+                
+                if (attempt === maxRetries - 1) toast.error(`WA API Error: ${response.status} ${errMsg}`);
+            }
+        } catch (error) {
+            console.error(`Failed to ping WhatsApp API server (attempt ${attempt + 1}):`, error);
+            if (attempt === maxRetries - 1) toast.error(`Network Error: ${error.message}`);
         }
-    } catch (error) {
-        console.error("Failed to ping WhatsApp API server:", error);
-        toast.error(`Network Error: ${error.message}`);
-        return false;
+
+        attempt++;
+        if (attempt < maxRetries) {
+            await new Promise(res => setTimeout(res, 1000 * Math.pow(2, attempt)));
+        }
     }
+    return false;
 };

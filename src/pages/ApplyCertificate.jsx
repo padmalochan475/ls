@@ -4,8 +4,10 @@ import { GraduationCap, Send, ShieldCheck, Info, FileText, CheckCircle2 } from '
 import QuantumLoader from '../components/QuantumLoader';
 import toast from 'react-hot-toast';
 import { certApi } from '../utils/certificateApi';
+import { useAuth } from '../contexts/AuthContext';
 
 const ApplyCertificate = () => {
+    const { activeAcademicYear } = useAuth();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -17,7 +19,7 @@ const ApplyCertificate = () => {
         regNo: '',
         branch: '',
         year: '4th Year',
-        session: '2025-26',
+        session: activeAcademicYear || '2025-2026 (EVEN)',
         type: 'Internship',
         company: '',
         duration: '',
