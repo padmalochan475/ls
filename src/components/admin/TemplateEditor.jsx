@@ -4,7 +4,9 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { Save, Activity, LayoutTemplate, MessageSquare, Bell } from 'lucide-react';
 
-import { defaultTemplates } from '../../utils/defaultTemplates';const TemplateEditor = () => {
+import { defaultTemplates } from '../../utils/defaultTemplates';
+
+const TemplateEditor = () => {
     const [templates, setTemplates] = useState(defaultTemplates);
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('warnings'); // warnings, greetings, summary, holiday
