@@ -743,7 +743,7 @@ export default async function handler(req, res) {
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft, cofacInline, cofacStr };
                         const pushTitle = formatMsg('warn1_push_title', 'Upcoming Class', vars);
                         const pushBody = formatMsg('warn1_push_body', '🔔 Heads Up: {subject} ({group}){cofacInline} starts in {mins} mins at Room {room}.', vars);
-                        const waMsg = formatMsg('warn1_wa', '🔔 *UPCOMING CLASS* 🔔\n\n📌 *{subject}* ({group}){cofacStr}\n⏰ _Starts in:_ *{mins} mins*\n🏫 _Room:_ *{room}*', vars);
+                        const waMsg = formatMsg('warn1_wa', defaultTemplates.warn1_wa, vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
                         
@@ -769,7 +769,7 @@ export default async function handler(req, res) {
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft, cofacInline, cofacStr };
                         const pushTitle = formatMsg('warn2_push_title', 'Class Starting!', vars);
                         const pushBody = formatMsg('warn2_push_body', '🚀 ACTION: Run to Room {room}! {subject} ({group}){cofacInline} is starting NOW!', vars);
-                        const waMsg = formatMsg('warn2_wa', '🚀 *CLASS STARTING NOW!* 🚀\n\n🚨 _ACTION REQUIRED:_ Run to *Room {room}!*\n\n📌 *{subject}* ({group}){cofacStr} is starting *NOW!*', vars);
+                        const waMsg = formatMsg('warn2_wa', defaultTemplates.warn2_wa, vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
                         
