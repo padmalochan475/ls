@@ -156,7 +156,8 @@ const SubstitutionManager = () => {
                         data: { 
                             type: 'substitution_cancelled', 
                             date: adjData.date,
-                            subject: adjData.subject 
+                            subject: adjData.subject,
+                            faculty2: adjData.faculty2 || null
                         }
                     });
                 }
@@ -168,7 +169,8 @@ const SubstitutionManager = () => {
                     date: adjData.date || '',
                     time: adjData.time || 'N/A',
                     room: adjData.room || 'N/A',
-                    group: cGroupStr
+                    group: cGroupStr,
+                    faculty2: adjData.faculty2 || null
                 });
 
                 // 2. Find linked 'approved' request (matches date & scheduleId)
@@ -428,7 +430,8 @@ const SubstitutionManager = () => {
                         time: itemDetails.time || 'N/A',
                         group: cGroupStr,
                         room: cRoomStr,
-                        requesterName: 'Admin'
+                        requesterName: 'Admin',
+                        faculty2: itemDetails.faculty2 || null
                     }
                 });
             }
@@ -446,7 +449,8 @@ const SubstitutionManager = () => {
                         date: selectedDate,
                         subject: itemDetails.subject || 'Class',
                         time: itemDetails.time || 'N/A',
-                        subName: subName 
+                        subName: subName,
+                        faculty2: itemDetails.faculty2 || null
                     }
                 });
             }
@@ -459,7 +463,8 @@ const SubstitutionManager = () => {
                 date: selectedDate || '',
                 group: cGroupStr,
                 time: itemDetails.time || 'N/A',
-                room: cRoomStr
+                room: cRoomStr,
+                faculty2: itemDetails.faculty2 || null
             });
 
             toast.success("Substitution assigned");
@@ -584,7 +589,8 @@ const SubstitutionManager = () => {
                             status: 'approved',
                             subject: details.subject || 'Class',
                             date: reqData.date,
-                            subName: reqData.targetFacultyName 
+                            subName: reqData.targetFacultyName,
+                            faculty2: details.faculty2 || null
                         }
                     });
                 }
@@ -599,7 +605,8 @@ const SubstitutionManager = () => {
                             type: 'substitution', 
                             date: reqData.date,
                             subject: details.subject || 'Class',
-                            subName: reqData.targetFacultyName
+                            subName: reqData.targetFacultyName,
+                            faculty2: details.faculty2 || null
                         }
                     });
                 }
@@ -612,7 +619,8 @@ const SubstitutionManager = () => {
                     date: reqData.date || '',
                     group: cGroupStr,
                     time: details.time || 'N/A',
-                    room: cRoomStr
+                    room: cRoomStr,
+                    faculty2: details.faculty2 || null
                 });
 
                 toast.success("Request Approved");
@@ -630,7 +638,8 @@ const SubstitutionManager = () => {
                             type: 'request_update', 
                             status: 'rejected',
                             subject: details.subject || 'Class',
-                            date: reqData.date
+                            date: reqData.date,
+                            faculty2: details.faculty2 || null
                         }
                     });
                 }

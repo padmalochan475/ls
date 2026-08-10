@@ -254,27 +254,27 @@ const TemplateEditor = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#fcd34d' }}>Substitution Request</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{requesterName}'}, {'{subject}'}, {'{date}'}, {'{time}'}, {'{room}'}, {'{group}'}, {'{cofacStr}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{requesterName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{room}'}, {'{group}'}, {'{cofacStr}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_req', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#34d399' }}>Substitution Approved</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{cofacInline}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_app', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#f87171' }}>Substitution Rejected</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}, {'{cofacInline}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_rej', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#60a5fa' }}>Substitution Accepted</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{cofacInline}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_acc', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#fb923c' }}>Substitution Cancelled</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}, {'{cofacInline}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{cofacInline}'}</p>
                             {renderInput('sys_sub_can', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
@@ -299,12 +299,12 @@ const TemplateEditor = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#f87171' }}>Observer: Sub Approved</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{group}'}, {'{time}'}, {'{room}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{group}'}, {'{time}'}, {'{room}'}, {'{cofacInline}'}</p>
                             {renderInput('obs_sub_app', 'WhatsApp Broadcast', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#fb923c' }}>Observer: Sub Cancelled</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{room}'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{room}'}, {'{group}'}, {'{cofacInline}'}</p>
                             {renderInput('obs_sub_can', 'WhatsApp Broadcast', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '12px' }}>
