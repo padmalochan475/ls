@@ -40,15 +40,35 @@ class ErrorBoundary extends React.Component {
                                      message.includes('Importing a module script failed') ||
                                      message.includes('Unable to preload CSS');
         if (isDynamicImportError) {
-            const hasReloaded = sessionStorage.getItem('vite_hmr_reloaded');
-            if (!hasReloaded) {
-                sessionStorage.setItem('vite_hmr_reloaded', 'true');
-                console.warn('[ErrorBoundary] Dynamic import error detected. Auto-reloading immediately...');
-                window.location.reload();
-            } else {
-                sessionStorage.removeItem('vite_hmr_reloaded');
-                console.error('[ErrorBoundary] Infinite reload detected! Stopping auto-reload.');
+            console.warn('[ErrorBoundary] Dynamic import error detected. Forcing hard reload...');
+            
+            // 1. Unregister all Service Workers immediately
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                        registration.unregister();
+                    }
+                });
             }
+
+            // 2. Clear all Caches
+            if ('caches' in window) {
+                caches.keys().then((names) => {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                });
+            }
+
+            // 3. Clear Session Storage loop preventer just in case it's stuck
+            sessionStorage.removeItem('vite_hmr_reloaded');
+
+            // 4. Force a hard reload with a cache-busting query parameter
+            setTimeout(() => {
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.set('v', Date.now().toString());
+                window.location.href = currentUrl.toString();
+            }, 500);
         }
     }
 
