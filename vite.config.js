@@ -63,7 +63,12 @@ export default defineConfig(({ mode }) => {
     base: '/',
     server: {
       proxy: {
-
+        '/api/whatsapp': {
+          target: env.VITE_WHATSAPP_API_URL ? env.VITE_WHATSAPP_API_URL.replace(/\/api\/sendText$/, '') : 'http://129.225.114.212:2785',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/api\/whatsapp/, '')
+        },
         '/api': {
           target: 'https://lams.vercel.app',
           changeOrigin: true,

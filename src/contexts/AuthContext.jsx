@@ -129,6 +129,17 @@ export const AuthProvider = ({ children }) => {
     };
 
     const signup = async (empId, password, name, recoveryEmail, mobileNumber) => {
+        // Pre-flight check: ensure EmpID is not already taken
+        try {
+            const lookupDoc = await getDoc(doc(db, 'emp_lookups', empId));
+            if (lookupDoc.exists()) {
+                throw new Error("This Employee ID is already registered. Please login or contact Admin.");
+            }
+        } catch (err) {
+            if (err.message.includes("registered")) throw err;
+            // Ignore permission/network errors here, let the actual signup fail if necessary
+        }
+
         const { user } = await createUserWithEmailAndPassword(auth, recoveryEmail, password);
 
         let isFirstUser = false;

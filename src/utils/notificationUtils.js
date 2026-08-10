@@ -88,13 +88,7 @@ export const sendNotification = async ({
 
         const getWhatsAppTemplate = (profile) => {
             const userName = profile.name || 'Faculty';
-            const vars = { 
-                name: userName, 
-                title: title || '', 
-                body: body || '', 
-                appUrl: typeof window !== 'undefined' ? window.location.origin : 'https://lams.vercel.app',
-                ...data 
-            };
+            const vars = { name: userName, title: title || '', body: body || '', ...data };
             
             if (vars.date && !vars.day) {
                 vars.day = getDayName(vars.date);

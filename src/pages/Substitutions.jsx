@@ -48,13 +48,12 @@ const Substitutions = () => {
 
     // 1. Fetch Outgoing Requests (I asked someone)
     useDynamicListener((isActiveRef) => {
-        const myId = userProfile?.empId || userProfile?.name;
-        if (!myId || !currentUser) return;
+        if (!userProfile?.empId || !currentUser) return;
         const q = query(
             collection(db, 'substitution_requests'),
             and(
                 where('academicYear', '==', activeAcademicYear),
-                where('requesterId', '==', myId)
+                where('requesterId', '==', userProfile.empId)
             )
         );
         return onSnapshot(q,
@@ -73,14 +72,13 @@ const Substitutions = () => {
 
     // 2. Fetch Incoming Requests (Someone asked me)
     useDynamicListener((isActiveRef) => {
-        const myId = userProfile?.empId || userProfile?.name;
-        if (!myId || !currentUser) return;
+        if (!userProfile?.empId || !currentUser) return;
         // Note: Using EmpID match. Ensure targetFacultyId is stored as EmpID.
         const q = query(
             collection(db, 'substitution_requests'),
             and(
                 where('academicYear', '==', activeAcademicYear),
-                where('targetFacultyId', '==', myId)
+                where('targetFacultyId', '==', userProfile.empId)
             )
         );
         return onSnapshot(q,
@@ -99,13 +97,12 @@ const Substitutions = () => {
 
     // 3. Fetch Outgoing Adjustments (I am absent, assigned by Admin or Request)
     useDynamicListener((isActiveRef) => {
-        const myId = userProfile?.empId || userProfile?.name;
-        if (!myId || !currentUser) return;
+        if (!userProfile?.empId || !currentUser) return;
         const q = query(
             collection(db, 'adjustments'),
             and(
                 where('academicYear', '==', activeAcademicYear),
-                where('originalFacultyEmpId', '==', myId)
+                where('originalFacultyEmpId', '==', userProfile.empId)
             )
         );
         return onSnapshot(q, (snap) => {
@@ -118,13 +115,12 @@ const Substitutions = () => {
 
     // 4. Fetch Incoming Adjustments (I am covering, assigned by Admin or Request)
     useDynamicListener((isActiveRef) => {
-        const myId = userProfile?.empId || userProfile?.name;
-        if (!myId || !currentUser) return;
+        if (!userProfile?.empId || !currentUser) return;
         const q = query(
             collection(db, 'adjustments'),
             and(
                 where('academicYear', '==', activeAcademicYear),
-                where('substituteEmpId', '==', myId)
+                where('substituteEmpId', '==', userProfile.empId)
             )
         );
         return onSnapshot(q, (snap) => {
@@ -623,9 +619,9 @@ const Substitutions = () => {
             await addDoc(collection(db, 'substitution_requests'), {
                 academicYear: activeAcademicYear,
                 requesterUid: currentUser?.uid || "system", // For permission checks
-                requesterId: userProfile.empId || userProfile.name || "Unknown",
+                requesterId: userProfile.empId,
                 requesterName: userProfile.name || "Unknown",
-                targetFacultyId: targetFac.empId || targetFac.name || "Unknown",
+                targetFacultyId: targetFac.empId || "Unknown",
                 targetFacultyName: targetFac.name || "Unknown",
                 originalScheduleId: selectedClassId || "",
                 scheduleDetails: {

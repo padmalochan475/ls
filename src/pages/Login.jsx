@@ -38,15 +38,8 @@ const Login = () => {
     if (currentUser && userProfile) {
       navigate('/');
     } else if (currentUser && profileMissing) {
-      // Auto-heal: If Firestore profile was deleted (e.g. by a cleanup script) but Auth remains,
-      // delete the Auth user so they can sign up again cleanly without "Email already in use" errors.
-      currentUser.delete().then(() => {
-          setError("Your old profile data was cleared during a system cleanup. Please click 'Sign Up' below to create a fresh profile.");
-      }).catch((err) => {
-          console.error("Failed to auto-delete orphaned auth:", err);
-          setError("Your profile is missing. Please contact Admin.");
-          logout().catch(console.error);
-      });
+      setError("Your profile is incomplete or missing. Please register again or contact Admin.");
+      logout().catch(console.error);
     }
   }, [currentUser, userProfile, profileMissing, loading, navigate, logout]);
 
@@ -74,7 +67,7 @@ const Login = () => {
   const handleLoginSubmit = async () => {
     setIsLoading(true);
     try {
-      await login(formData.empId, formData.password);
+      await login(formData.empId.trim(), formData.password);
     } catch (err) {
       console.error(err);
       handleAuthError(err);
@@ -84,8 +77,9 @@ const Login = () => {
   };
 
   const handleSignupStep1 = async () => {
+    const cleanEmpId = formData.empId.trim();
     const empIdRegex = /^[a-zA-Z0-9]+$/;
-    if (!empIdRegex.test(formData.empId)) {
+    if (!empIdRegex.test(cleanEmpId)) {
       setError('Employee ID must contain only letters and numbers (no special characters).');
       return;
     }
@@ -96,6 +90,18 @@ const Login = () => {
     }
 
     setIsLoading(true);
+
+    try {
+      // Pre-check: Ensure EmpID isn't already taken before sending OTP
+      const lookupDoc = await getDoc(doc(db, 'emp_lookups', cleanEmpId));
+      if (lookupDoc.exists()) {
+        setError('This Employee ID is already registered. Please sign in or contact Admin.');
+        setIsLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("Pre-check failed, continuing...", err);
+    }
     const newOtp = Math.floor(100000 + Math.random() * 900000).toString(); // eslint-disable-line sonarjs/pseudo-random
     setGeneratedSignupOtp(newOtp);
 
@@ -119,7 +125,7 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      await signup(formData.empId, formData.password, formData.name, formData.recoveryEmail, formData.mobileNumber);
+      await signup(formData.empId.trim(), formData.password, formData.name.trim(), formData.recoveryEmail.trim(), formData.mobileNumber.trim());
     } catch (err) {
       console.error(err);
       handleAuthError(err);
@@ -162,7 +168,7 @@ const Login = () => {
     try {
       // Step 1: Verify Emp ID and get Email (SECURE LOOKUP)
       // Use emp_lookups because unauthenticated users cannot query the full 'users' collection.
-      const lookupDoc = await getDoc(doc(db, 'emp_lookups', resetEmpId));
+      const lookupDoc = await getDoc(doc(db, 'emp_lookups', resetEmpId.trim()));
 
       if (!lookupDoc.exists()) {
         setError('Employee ID not found. Please contact Admin.');

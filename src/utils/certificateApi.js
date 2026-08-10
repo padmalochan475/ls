@@ -1,26 +1,9 @@
 import toast from 'react-hot-toast';
-import { db } from '../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
 
-let cachedApiUrl = null;
-
-const getApiUrl = async () => {
-    if (cachedApiUrl) return cachedApiUrl;
-    try {
-        const snap = await getDoc(doc(db, 'settings', 'config'));
-        if (snap.exists() && snap.data().certApiUrl) {
-            cachedApiUrl = snap.data().certApiUrl;
-            return cachedApiUrl;
-        }
-    } catch (e) {
-        console.warn("Could not fetch dynamic certApiUrl.", e);
-    }
-    return null;
-};
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxafCLI6Y6if5d7XMxQfBj4OyKROVsP404AwpUucUDfb4TL3aufbHLjOllCFVAvTXteAA/exec"; // SET YOUR DEPLOYED URL HERE
 
 export const certApi = {
     async call(action, data = {}) {
-        const APPS_SCRIPT_URL = await getApiUrl();
         if (!APPS_SCRIPT_URL) return { success: false, error: "API_NOT_CONFIGURED" };
         try {
             const response = await fetch(APPS_SCRIPT_URL, {

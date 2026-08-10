@@ -168,83 +168,49 @@ async function sendFCM(target, title, body, data, targetType = 'external_id', op
     }
 }
 
-let cachedSessionId = null;
-let cachedWhatsappApiUrl = null;
+const WHATSAPP_API_BASE = 'http://129.225.114.212:2785';
+const WHATSAPP_API_KEY = process.env.VITE_WHATSAPP_API_KEY || 'owa_k1_8a50b3ca467309faccd977e2b1abc741ab3de161d9f8ccb0c100afe81e2b46f1';
 
-async function getWhatsappApiBase() {
-    if (cachedWhatsappApiUrl) return cachedWhatsappApiUrl;
-    try {
-        const configSnap = await admin.firestore().collection('settings').doc('config').get();
-        if (configSnap.exists) {
-            const data = configSnap.data();
-            if (data.whatsappApiUrl) {
-                cachedWhatsappApiUrl = data.whatsappApiUrl.replace(/\/api\/sendText$/, '');
-                return cachedWhatsappApiUrl;
-            }
-        }
-    } catch (e) {
-        console.error("Failed to fetch WhatsApp API config:", e);
-    }
-    // If no config found, throw an error to prevent hardcoded behavior
-    throw new Error("WhatsApp API URL not configured in Master Data Settings.");
-}
+let cachedSessionId = null;
 
 async function sendWhatsApp(phoneNumber, message) {
     if (!phoneNumber || !message) return false;
-    let attempt = 0;
-    const maxRetries = 3;
+    try {
+        let formattedNumber = String(phoneNumber).replace(/[^0-9]/g, '');
+        if (formattedNumber.length === 10) formattedNumber = '91' + formattedNumber;
+        else if (formattedNumber.length < 10) return false;
+        
+        const chatId = formattedNumber + '@c.us';
 
-    while (attempt < maxRetries) {
-        try {
-            const WHATSAPP_API_BASE = await getWhatsappApiBase();
-            const WHATSAPP_API_KEY = process.env.VITE_WHATSAPP_API_KEY || 'owa_k1_8a50b3ca467309faccd977e2b1abc741ab3de161d9f8ccb0c100afe81e2b46f1';
-            let formattedNumber = String(phoneNumber).replace(/[^0-9]/g, '');
-            if (formattedNumber.length === 10) formattedNumber = '91' + formattedNumber;
-            else if (formattedNumber.length < 10) return false;
-            
-            const chatId = formattedNumber + '@c.us';
-
-            if (!cachedSessionId) {
-                const sessionsRes = await axios.get(`${WHATSAPP_API_BASE}/api/sessions`, {
-                    headers: { 'x-api-key': WHATSAPP_API_KEY }
-                });
-                if (sessionsRes.data && sessionsRes.data.length > 0) {
-                    cachedSessionId = sessionsRes.data[0].id;
-                } else {
-                    console.error("No active WhatsApp sessions found.");
-                    return false;
-                }
-            }
-
-            const sendRes = await axios.post(`${WHATSAPP_API_BASE}/api/sessions/${cachedSessionId}/messages/send-text`, {
-                chatId: chatId,
-                text: message
-            }, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${WHATSAPP_API_KEY}`,
-                    'x-api-key': WHATSAPP_API_KEY
-                }
+        if (!cachedSessionId) {
+            const sessionsRes = await axios.get(`${WHATSAPP_API_BASE}/api/sessions`, {
+                headers: { 'x-api-key': WHATSAPP_API_KEY }
             });
-
-            if (sendRes.status === 200 || sendRes.status === 201) {
-                return true;
-            }
-        } catch (error) {
-            console.error(`WhatsApp push error (attempt ${attempt + 1}):`, error.message);
-            if (error.response && (error.response.status === 400 || error.response.status === 401 || error.response.status === 404)) {
-                cachedSessionId = null; // Invalidate session and try again
-            }
-            
-            attempt++;
-            if (attempt >= maxRetries) {
+            if (sessionsRes.data && sessionsRes.data.length > 0) {
+                cachedSessionId = sessionsRes.data[0].id;
+            } else {
+                console.error("No active WhatsApp sessions found.");
                 return false;
             }
-            // Exponential backoff
-            await new Promise(res => setTimeout(res, 1000 * Math.pow(2, attempt)));
         }
+
+        await axios.post(`${WHATSAPP_API_BASE}/api/sessions/${cachedSessionId}/messages/send-text`, {
+            chatId: chatId,
+            text: message
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${WHATSAPP_API_KEY}`,
+                'x-api-key': WHATSAPP_API_KEY
+            }
+        });
+        return true;
+    } catch (error) {
+        // Invalidate cached session on failure so it fetches a fresh one next time
+        cachedSessionId = null;
+        console.error(`WhatsApp Send Error to ${phoneNumber}:`, error.message);
+        return error.message;
     }
-    return false;
 }
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
