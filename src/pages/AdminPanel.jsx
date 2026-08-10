@@ -16,7 +16,7 @@ import NotificationManager from '../components/admin/NotificationManager';
 import CelebrationManager from '../components/admin/CelebrationManager';
 import SubstitutionManager from '../components/SubstitutionManager';
 import AdminOtpModal from '../components/admin/AdminOtpModal';
-import SystemSettings from '../components/admin/SystemSettings';
+
 import SyllabusManager from '../components/admin/SyllabusManager';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 import { sendNotification } from '../utils/notificationUtils';
@@ -818,13 +818,7 @@ const AdminPanel = () => {
                     >
                         <MessageSquare size={18} /> Suggestions
                     </button>
-                    <button
-                        onClick={() => setActiveTab('settings')}
-                        className={activeTab === 'settings' ? 'active' : ''}
-                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-                    >
-                        <Settings size={18} /> Settings
-                    </button>
+
                 </div>
             </div>
 
@@ -847,22 +841,7 @@ const AdminPanel = () => {
                     </div>
                 )}
                 
-                {activeTab === 'settings' && (
-                    <div className="admin-section-divider">
-                        <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1.25rem', background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%)', padding: '1.5rem 2rem', borderRadius: '16px', borderLeft: '4px solid #3b82f6' }}>
-                            <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.2)', color: '#93c5fd', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
-                                <Settings size={32} />
-                            </div>
-                            <div>
-                                <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}>Global Settings</h2>
-                                <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '0.95rem' }}>Configure academic years, OTP security, and other global platform preferences.</p>
-                            </div>
-                        </div>
-                        <div className="glass-panel" style={{ padding: '2rem' }}>
-                            <SystemSettings />
-                        </div>
-                    </div>
-                )}
+
                 
                 {activeTab === 'syllabus' && (
                     <div className="admin-section-divider">

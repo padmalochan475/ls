@@ -7,7 +7,7 @@ import { useMasterData } from '../contexts/MasterDataContext';
 import ConfirmModal from '../components/ConfirmModal';
 import YearTransitionModal from '../components/YearTransitionModal';
 import '../styles/design-system.css';
-import { Settings, Plus, Search, Edit2, Trash2, Check, ChevronDown, RefreshCw, ShieldAlert, Users, Layers, BookOpen, MapPin, Box, Calendar, Clock, Hash, CalendarOff, Eye } from 'lucide-react';
+import { Settings, Plus, Search, Edit2, Trash2, Check, ChevronDown, RefreshCw, ShieldAlert, Users, Layers, BookOpen, MapPin, Box, Calendar, Clock, Hash, CalendarOff, Eye, Key } from 'lucide-react';
 import QuantumLoader from '../components/QuantumLoader';
 import toast from 'react-hot-toast';
 import { useWritePermission } from '../hooks/useWritePermission';
@@ -198,6 +198,21 @@ const MasterData = ({ initialTab }) => {
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [transitionModal, setTransitionModal] = useState({ isOpen: false, fromYear: null, toYear: null });
+    const [groqApiKey, setGroqApiKey] = useState('');
+
+    useEffect(() => {
+        const fetchGlobalSettings = async () => {
+            try {
+                const snap = await getDoc(doc(db, 'settings', 'global'));
+                if (snap.exists()) {
+                    setGroqApiKey(snap.data().groqApiKey || '');
+                }
+            } catch (err) {
+                console.warn("Could not fetch global settings", err);
+            }
+        };
+        fetchGlobalSettings();
+    }, []);
 
     const handleAddYear = async (combinedYear) => {
         // STRICT PERMISSION CHECK
@@ -369,9 +384,29 @@ const MasterData = ({ initialTab }) => {
     };
 
 
+    const handleUpdateGeneralConfig = async (key, value) => {
+        if (!checkWritePermission()) return;
+        try {
+            const configRef = doc(db, 'settings', 'config');
+            await updateDoc(configRef, { [key]: value });
+            toast.success("Settings updated successfully!");
+        } catch (e) {
+            console.error("Error updating config:", e);
+            toast.error(`Failed to update: ${e.message}`);
+        }
+    const handleUpdateGroqKey = async () => {
+        if (!checkWritePermission()) return;
+        try {
+            await setDoc(doc(db, 'settings', 'global'), { groqApiKey }, { merge: true });
+            toast.success("AI Assistant Key saved successfully!");
+        } catch (error) {
+            console.error("Failed to save Groq Key:", error);
+            toast.error("Failed to save AI key");
+        }
+    };
 
 
-    // Delete Confirmation State
+
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, type: 'item' });
 
     const confirmDelete = (id, e) => {
@@ -1702,7 +1737,101 @@ const MasterData = ({ initialTab }) => {
                                 </div>
                             </div>
 
+                            {/* Panel: Global API Configuration */}
+                            <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'fit-content' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                                    <div style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                                        <Settings size={20} color="#fff" />
+                                    </div>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Global API Configuration</h3>
+                                </div>
+                                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                                    Manage external service URLs. Leave blank to use system defaults.
+                                </p>
 
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem', display: 'block' }}>WhatsApp Gateway IP / URL</label>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <input 
+                                                type="text" 
+                                                id="input-whatsappApiUrl"
+                                                defaultValue={data[0]?.whatsappApiUrl || ''} 
+                                                placeholder="e.g. http://129.225.114.212:2785"
+                                                className="glass-input" 
+                                                style={{ width: '100%', padding: '0.75rem' }} 
+                                            />
+                                            <button 
+                                                className="btn" 
+                                                style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.1)' }} 
+                                                onClick={() => handleUpdateGeneralConfig('whatsappApiUrl', document.getElementById('input-whatsappApiUrl').value)}
+                                                title="Save WhatsApp URL"
+                                            >
+                                                <Check size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem', display: 'block' }}>Google Apps Script URL (Certificates)</label>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <input 
+                                                type="text" 
+                                                id="input-certApiUrl"
+                                                defaultValue={data[0]?.certApiUrl || ''} 
+                                                placeholder="https://script.google.com/macros/s/.../exec"
+                                                className="glass-input" 
+                                                style={{ width: '100%', padding: '0.75rem' }} 
+                                            />
+                                            <button 
+                                                className="btn" 
+                                                style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.1)' }} 
+                                                onClick={() => handleUpdateGeneralConfig('certApiUrl', document.getElementById('input-certApiUrl').value)}
+                                                title="Save Certificate API URL"
+                                            >
+                                                <Check size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Panel: AI Assistant Configuration */}
+                            <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'fit-content' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                                    <div style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                                        <Key size={20} color="#fbbf24" />
+                                    </div>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>AI Assistant Settings</h3>
+                                </div>
+                                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                                    Configure the global Groq API Key. This allows all users to access the AI assistant without needing their own keys.
+                                </p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem', display: 'block' }}>Global Groq API Key</label>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <input 
+                                                type="password" 
+                                                id="input-groqApiKey"
+                                                defaultValue={groqApiKey || ''} 
+                                                onChange={(e) => setGroqApiKey(e.target.value)}
+                                                placeholder="gsk_..."
+                                                className="glass-input" 
+                                                style={{ width: '100%', padding: '0.75rem' }} 
+                                            />
+                                            <button 
+                                                className="btn" 
+                                                style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.1)' }} 
+                                                onClick={handleUpdateGroqKey}
+                                                title="Save Groq API Key"
+                                            >
+                                                <Check size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
                         </div>
 
