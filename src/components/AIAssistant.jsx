@@ -55,8 +55,19 @@ const AIAssistant = ({ isOpen, onClose, contextData }) => {
         
         setIsSaving(true);
         try {
+            const resolveEmpId = (nameStr) => {
+                if (!nameStr) return null;
+                const fac = contextData?.faculty?.find(f => {
+                    const fName = typeof f === 'object' ? f.name : f;
+                    return fName?.toLowerCase() === nameStr.toLowerCase();
+                });
+                return fac ? (fac.empId || null) : null;
+            };
+
             const payload = {
                 ...args,
+                facultyEmpId: resolveEmpId(args.faculty),
+                faculty2EmpId: resolveEmpId(args.faculty2),
                 academicYear: contextData.activeAcademicYear,
                 createdAt: new Date().toISOString(),
                 createdBy: contextData?.userProfile?.uid || 'system_ai',
