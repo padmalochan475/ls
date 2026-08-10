@@ -934,9 +934,9 @@ const Dashboard = () => {
                                         setSelectedFacultyId('All Assignments');
                                         setSelectedFaculty('All Assignments');
                                     } else {
-                                        const fac = facultyList.find(f => f.empId === val);
+                                        const fac = facultyList.find(f => (f.empId || f.name) === val);
                                         if (fac) {
-                                            setSelectedFacultyId(fac.empId);
+                                            setSelectedFacultyId(fac.empId || fac.name);
                                             setSelectedFaculty(fac.name);
                                         }
                                     }
@@ -953,11 +953,14 @@ const Dashboard = () => {
                                 }}
                             >
                                 <option value="All Assignments" style={{ background: '#1e293b', color: 'white' }}>All Assignments</option>
-                                {facultyList.map(f => (
-                                    <option key={f.empId} value={f.empId} style={{ background: '#1e293b', color: 'white' }}>
-                                        {f.name}
-                                    </option>
-                                ))}
+                                {facultyList.map((f, index) => {
+                                    const idVal = f.empId || f.name || `unknown-${index}`;
+                                    return (
+                                        <option key={idVal} value={idVal} style={{ background: '#1e293b', color: 'white' }}>
+                                            {f.name}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                     ) : (
