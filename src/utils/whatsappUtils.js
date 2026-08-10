@@ -2,7 +2,6 @@
 
 import toast from 'react-hot-toast';
 
-const WHATSAPP_API_URL = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:2785/api/sendText';
 const API_KEY = import.meta.env.VITE_WHATSAPP_API_KEY || 'lams_secure_api_key_2026';
 
 let cachedSessionId = null;
@@ -36,13 +35,13 @@ export const sendWhatsAppNotification = async (phoneNumber, textMessage) => {
             // WAHA / OpenWA requires the destination to end with @c.us for regular chats
             const chatId = formattedNumber + '@c.us';
 
-            // Use relative URL to leverage Vite proxy and bypass browser CORS policies
-            const baseUrl = '/api/whatsapp';
+            // Point to our dynamic Vercel Serverless Function proxy instead of static Vite/Vercel rewrite
+            const proxyUrl = '/api/whatsapp-proxy';
             let sessionId = cachedSessionId;
 
             // 1. Fetch active sessions to dynamically get the correct session UUID if not cached
             if (!sessionId) {
-                const sessionsRes = await fetch(`${baseUrl}/api/sessions`, {
+                const sessionsRes = await fetch(`${proxyUrl}?path=/api/sessions`, {
                     headers: { 'x-api-key': API_KEY }
                 });
                 const sessions = await sessionsRes.json();
@@ -58,7 +57,7 @@ export const sendWhatsAppNotification = async (phoneNumber, textMessage) => {
                 cachedSessionId = sessionId;
             }
             
-            const endpoint = `${baseUrl}/api/sessions/${sessionId}/messages/send-text`;
+            const endpoint = `${proxyUrl}?path=/api/sessions/${sessionId}/messages/send-text`;
 
             const response = await fetch(endpoint, {
                 method: 'POST',
