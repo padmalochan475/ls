@@ -731,8 +731,8 @@ export default async function handler(req, res) {
                 const targetPayload = finalUsers.map(u => u.uid).filter(Boolean);
                 if (targetPayload.length === 0) return;
 
-                // Triggers
-                if (minutesLeft > warn2Min && minutesLeft <= (warn1Min + 5)) {
+                // 1st Warning Window: 6 mins left to 25 mins left (Very wide window to guarantee it fires)
+                if (minutesLeft > warn2Min && minutesLeft <= (warn1Min + 10)) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_first`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
@@ -748,11 +748,12 @@ export default async function handler(req, res) {
                     }
                 }
 
-                if (minutesLeft > 0 && minutesLeft <= warn2Min) {
+                // 2nd Warning Window: -5 mins left (already started) to 5 mins left
+                if (minutesLeft >= -5 && minutesLeft <= warn2Min) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_second`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
-                        const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft };
+                        const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft };
                         const pushTitle = formatMsg('warn2_push_title', 'Class Starting!', vars);
                         const pushBody = formatMsg('warn2_push_body', '🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!', vars);
                         const waMsg = formatMsg('warn2_wa', '🚀 *Now* 🚀\n\n🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!', vars);
