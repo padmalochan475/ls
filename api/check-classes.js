@@ -320,12 +320,12 @@ export default async function handler(req, res) {
                         console.error("Holiday WhatsApp Error:", waErr);
                     }
 
-                    if (success) {
-                        await db.collection('sent_notifications').doc(notifIdHoliday).set({
-                            sentAt: new Date(), type: 'holiday_alert', holidayName: h.name
-                        });
-                        return res.status(200).json({ message: `Holiday Broadcast Sent: ${h.name}`, count: 1 });
-                    }
+                    // Always save the receipt to prevent catastrophic WhatsApp spam loops, 
+                    // even if FCM fails (e.g. no tokens found).
+                    await db.collection('sent_notifications').doc(notifIdHoliday).set({
+                        sentAt: new Date(), type: 'holiday_alert', holidayName: h.name
+                    });
+                    return res.status(200).json({ message: `Holiday Broadcast Sent: ${h.name}`, count: 1 });
                 }
             return res.status(200).json({ message: `Holiday: ${h.name}. Automation Active.`, count: 0 });
         }
