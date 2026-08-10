@@ -418,7 +418,7 @@ const SubstitutionManager = () => {
                     empIds: [subEmpId],
                     title: "New Substitution Assigned",
                     body: `You have been assigned to cover ${itemDetails.subject} for ${selectedAbsentee} on ${selectedDate} at ${itemDetails.time} for (${cGroupStr}) in Room ${cRoomStr}.`,
-                    type: 'substitution_request',
+                    type: 'assignment',
                     data: { 
                         type: 'substitution', 
                         date: selectedDate,
@@ -438,7 +438,7 @@ const SubstitutionManager = () => {
                     empIds: [absenteeEmpId],
                     title: "Class Covered",
                     body: `Your ${itemDetails.subject} class on ${selectedDate} at ${itemDetails.time} for (${cGroupStr}) in Room ${cRoomStr} will be covered by ${subName}.`,
-                    type: 'substitution_accepted',
+                    type: 'alert',
                     data: { 
                         type: 'substitution', 
                         date: selectedDate,
@@ -547,7 +547,8 @@ const SubstitutionManager = () => {
             if (action === 'approve') {
                 // Safely extract details with fallbacks
                 const details = reqData.scheduleDetails || {};
-                await addDoc(collection(db, 'adjustments'), {
+                const adjustmentId = `${reqData.date}_${reqData.originalScheduleId}`;
+                await setDoc(doc(db, 'adjustments', adjustmentId), {
                     academicYear: reqData.academicYear || activeAcademicYear,
                     originalScheduleId: reqData.originalScheduleId || "",
                     date: reqData.date || "",
