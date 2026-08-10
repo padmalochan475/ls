@@ -1,0 +1,14 @@
+name: LAMS Cron Job
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+jobs:
+  ping-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Check Classes API
+        run: |
+          curl -sS --fail -m 30 "https://lams.vercel.app/api/check-classes" || echo "Failed to ping"

@@ -168,7 +168,7 @@ async function sendFCM(target, title, body, data, targetType = 'external_id', op
 }
 
 const WHATSAPP_API_BASE = 'http://129.225.114.212:2785';
-const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || process.env.VITE_WHATSAPP_API_KEY || 'owa_k1_8a50b3ca467309faccd977e2b1abc741ab3de161d9f8ccb0c100afe81e2b46f1';
+const WHATSAPP_API_KEY = process.env.VITE_WHATSAPP_API_KEY || 'owa_k1_8a50b3ca467309faccd977e2b1abc741ab3de161d9f8ccb0c100afe81e2b46f1';
 
 let cachedSessionId = null;
 
