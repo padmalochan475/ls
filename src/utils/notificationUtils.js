@@ -94,6 +94,9 @@ export const sendNotification = async ({
                 vars.day = getDayName(vars.date);
             }
             
+            vars.cofacInline = vars.faculty2 ? ` (w/ ${vars.faculty2})` : '';
+            vars.cofacStr = vars.faculty2 ? `\n👥 _Cofaculty:_ ${vars.faculty2}` : '';
+            
             const formatMsg = (key, defaultText) => {
                 let str = customTemplates[key] || defaultText;
                 for (const [vKey, vVal] of Object.entries(vars)) {
@@ -243,6 +246,9 @@ export const sendToObservers = async (templateKey, templateVars) => {
         if (templateVars.date && !templateVars.day) {
             templateVars.day = getDayName(templateVars.date);
         }
+        
+        templateVars.cofacInline = templateVars.faculty2 ? ` (w/ ${templateVars.faculty2})` : '';
+        templateVars.cofacStr = templateVars.faculty2 ? `\n👥 _Cofaculty:_ ${templateVars.faculty2}` : '';
 
         for (const [k, v] of Object.entries(templateVars)) {
             finalMessage = finalMessage.replace(new RegExp(`\\{${k}\\}`, 'g'), v);

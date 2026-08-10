@@ -156,7 +156,8 @@ const Substitutions = () => {
                         room: adj.room,
                         dept: adj.dept,
                         grp: adj.group || "N/A",
-                        subgrp: adj.subGroup || "All"
+                        subgrp: adj.subGroup || "All",
+                        faculty2: adj.faculty2 || null
                     },
                     createdAt: adj.createdAt
                 });
@@ -187,7 +188,8 @@ const Substitutions = () => {
                         room: adj.room,
                         dept: adj.dept,
                         grp: adj.group || "N/A",
-                        subgrp: adj.subGroup || "All"
+                        subgrp: adj.subGroup || "All",
+                        faculty2: adj.faculty2 || null
                     },
                     createdAt: adj.createdAt
                 });
@@ -329,7 +331,8 @@ const Substitutions = () => {
                         data: {
                             subName: reqData.targetFacultyName,
                             subject: reqData.scheduleDetails?.subject || 'Class',
-                            date: reqData.date
+                            date: reqData.date,
+                            faculty2: reqData.scheduleDetails?.faculty2 || null
                         }
                     });
                 } catch (notifError) {
@@ -344,7 +347,8 @@ const Substitutions = () => {
                     date: reqData.date || '',
                     group: `${reqData.scheduleDetails?.dept || '?'}-${reqData.scheduleDetails?.grp || '?'}`,
                     time: reqData.scheduleDetails?.time || 'N/A',
-                    room: reqData.scheduleDetails?.room || 'N/A'
+                    room: reqData.scheduleDetails?.room || 'N/A',
+                    faculty2: reqData.scheduleDetails?.faculty2 || null
                 });
 
                 toast.success("Substitution Confirmed & Scheduled!");
@@ -357,7 +361,8 @@ const Substitutions = () => {
                         type: 'substitution_rejected',
                         data: {
                             subject: reqData.scheduleDetails?.subject || 'Class',
-                            date: reqData.date
+                            date: reqData.date,
+                            faculty2: reqData.scheduleDetails?.faculty2 || null
                         }
                     });
                 } catch (notifError) {
@@ -421,7 +426,8 @@ const Substitutions = () => {
                         type: 'substitution_cancelled',
                         requestId: requestId,
                         subject: det.subject || 'Class',
-                        date: reqData.date
+                        date: reqData.date,
+                        faculty2: det.faculty2 || null
                     }
                 });
             }
@@ -431,7 +437,8 @@ const Substitutions = () => {
                 subject: det.subject || 'Class',
                 date: reqData.date || '',
                 time: det.time || 'N/A',
-                room: det.room || 'N/A'
+                room: det.room || 'N/A',
+                faculty2: det.faculty2 || null
             });
 
             toast.success("Request cancelled successfully");
@@ -657,7 +664,8 @@ const Substitutions = () => {
                     time: originalClass.time || "N/A",
                     dept: originalClass.dept || "N/A",
                     grp: originalClass.section || originalClass.grp || "N/A",
-                    subgrp: originalClass.group || originalClass.subgrp || "All"
+                    subgrp: originalClass.group || originalClass.subgrp || "All",
+                    faculty2: originalClass.faculty2 || null
                 },
                 date: selectedDate || "",
                 reason: reason || "No reason provided",
@@ -681,7 +689,8 @@ const Substitutions = () => {
                         time: originalClass.time || 'N/A',
                         group: cGroupStr,
                         room: originalClass.room || 'N/A',
-                        requesterName: userProfile.name
+                        requesterName: userProfile.name,
+                        faculty2: originalClass.faculty2 || null
                     }
                 });
             } catch (notifErr) {
