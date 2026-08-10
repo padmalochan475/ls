@@ -166,21 +166,25 @@ const Login = () => {
     setIsLoading(true);
 
     try {
+      let email = resetEmpId.trim();
+
       // Step 1: Verify Emp ID and get Email (SECURE LOOKUP)
-      // Use emp_lookups because unauthenticated users cannot query the full 'users' collection.
-      const lookupDoc = await getDoc(doc(db, 'emp_lookups', resetEmpId.trim()));
+      // If the input doesn't look like an email, assume it's an Employee ID
+      if (!email.includes('@')) {
+          const lookupDoc = await getDoc(doc(db, 'emp_lookups', email));
 
-      if (!lookupDoc.exists()) {
-        setError('Employee ID not found. Please contact Admin.');
-        setIsLoading(false);
-        return;
-      }
+          if (!lookupDoc.exists()) {
+            setError('Employee ID not found. Please try entering your registered Email Address.');
+            setIsLoading(false);
+            return;
+          }
 
-      const email = lookupDoc.data().email;
-      if (!email) {
-        setError('No recovery email linked. Contact Admin.');
-        setIsLoading(false);
-        return;
+          email = lookupDoc.data().email;
+          if (!email) {
+            setError('No recovery email linked to this Employee ID. Contact Admin.');
+            setIsLoading(false);
+            return;
+          }
       }
 
       // Step 2: Send Firebase Password Reset Email
@@ -212,7 +216,7 @@ const Login = () => {
 
           <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <input
-              type="text" placeholder="Enter Employee ID" className="glass-input" aria-label="Employee ID for Reset"
+              type="text" placeholder="Enter Employee ID or Email" className="glass-input" aria-label="Employee ID or Email for Reset"
               value={resetEmpId} onChange={(e) => setResetEmpId(e.target.value)} required
             />
 
