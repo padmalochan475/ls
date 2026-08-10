@@ -3,6 +3,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import axios from 'axios';
+import { defaultTemplates } from '../src/utils/defaultTemplates.js';
 
 // Increase Vercel function timeout to 60 seconds (maximum for Hobby tier)
 // This gives the Render WhatsApp bot time to wake up from cold starts.
@@ -272,9 +273,9 @@ export default async function handler(req, res) {
 
         // 2.5 Template Engine
         const formatMsg = (key, defaultText, vars) => {
-            let str = tplData[key] || defaultText;
+            let str = tplData[key] || defaultTemplates[key] || defaultText;
             for (const [vKey, vVal] of Object.entries(vars)) {
-                str = str.replace(new RegExp(`{${vKey}}`, 'g'), vVal);
+                str = str.replace(new RegExp(`\\{${vKey}\\}`, 'g'), vVal);
             }
             return str;
         };
@@ -625,6 +626,7 @@ export default async function handler(req, res) {
                         }
                         
                         await getDb().collection('sent_notifications').doc(summarySentId).set({ sentAt: new Date(), type: 'morning_summary' });
+                    }
                 } catch (summaryErr) {
                     console.error("Morning Summary Error:", summaryErr);
                 }
@@ -755,8 +757,8 @@ export default async function handler(req, res) {
                     }
                 }
 
-                // 2nd Warning Window: -5 mins left (already started) to 5 mins left
-                if (minutesLeft >= -5 && minutesLeft <= warn2Min) {
+                // 2nd Warning Window: -10 mins left (already started) to warn2Min + 2 mins left (Widened for Vercel Cron Jitter)
+                if (minutesLeft >= -10 && minutesLeft <= (warn2Min + 2)) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_second`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {

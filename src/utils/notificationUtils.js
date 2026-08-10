@@ -2,6 +2,7 @@ import { db, auth } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { sendWhatsAppNotification } from './whatsappUtils';
 import { getDayName } from './timeUtils';
+import { defaultTemplates } from './defaultTemplates';
 
 /**
  * Sends notifications (In-App + Push + WhatsApp) to users.
@@ -96,32 +97,32 @@ export const sendNotification = async ({
             const formatMsg = (key, defaultText) => {
                 let str = customTemplates[key] || defaultText;
                 for (const [vKey, vVal] of Object.entries(vars)) {
-                    str = str.replace(new RegExp(`{${vKey}}`, 'g'), vVal);
+                    str = str.replace(new RegExp(`\\{${vKey}\\}`, 'g'), vVal);
                 }
                 return str;
             };
             
             switch (type) {
                 case 'substitution_request':
-                    return formatMsg('sys_sub_req', `🔄 *NEW SUBSTITUTION REQUEST* 🔄\n\nHello *${userName}*,\nYou have received a new substitution request!\n\n📝 *Details*:\n${body}\n\n👉 _Please log in to the portal to Accept or Reject._`);
+                    return formatMsg('sys_sub_req', defaultTemplates['sys_sub_req']);
                 
                 case 'substitution_approved':
-                    return formatMsg('sys_sub_app', `✅ *SUBSTITUTION APPROVED!* ✅\n\nGreat news, *${userName}*!\nYour substitution request has been *officially approved*.\n\n📅 *Updated Schedule*:\n${body}\n\n~ *LAMS Admin*`);
+                    return formatMsg('sys_sub_app', defaultTemplates['sys_sub_app']);
 
                 case 'substitution_rejected':
-                    return formatMsg('sys_sub_rej', `❌ *SUBSTITUTION DECLINED* ❌\n\nHello *${userName}*,\nUnfortunately, your substitution request has been *declined* or cancelled.\n\nℹ️ *Info*:\n${body}`);
+                    return formatMsg('sys_sub_rej', defaultTemplates['sys_sub_rej']);
 
                 case 'account_approved':
-                    return formatMsg('sys_acc_app', `👋 *WELCOME TO LAMS, ${userName}!* 🎉\n\nYour account has been *successfully approved* by the Administrator! ✅\n\nYou can now log in and manage your classes, labs, and substitutions seamlessly.\n\n🌐 _https://lams.vercel.app_`);
+                    return formatMsg('sys_acc_app', defaultTemplates['sys_acc_app']);
 
                 case 'assignment':
-                    return formatMsg('sys_new_assign', `📚 *NEW CLASS ASSIGNMENT* 📚\n\nHello *${userName}*,\n${body}\n\n~ *LAMS Admin*`);
+                    return formatMsg('sys_new_assign', defaultTemplates['sys_new_assign']);
 
                 case 'substitution_accepted':
-                    return formatMsg('sys_sub_acc', `🎉 *SUBSTITUTION ACCEPTED!* 🎉\n\nHello *${userName}*,\nYour request has been *accepted* by the target faculty member!\n\n📅 *Updated Schedule*:\n${body}\n\n~ *LAMS Admin*`);
+                    return formatMsg('sys_sub_acc', defaultTemplates['sys_sub_acc']);
 
                 case 'substitution_cancelled':
-                    return formatMsg('sys_sub_can', `⚠️ *SUBSTITUTION CANCELLED* ⚠️\n\nHello *${userName}*,\nA previously requested substitution has been *cancelled*.\n\nℹ️ *Info*:\n${body}`);
+                    return formatMsg('sys_sub_can', defaultTemplates['sys_sub_can']);
 
                 case 'manual':
                 case 'manual_alert':
@@ -231,14 +232,8 @@ export const sendToObservers = async (templateKey, templateVars) => {
         if (templateSnap.exists() && templateSnap.data()[templateKey]) {
             rawTemplate = templateSnap.data()[templateKey];
         } else {
-            // Fallbacks
-            const fallbacks = {
-                obs_sub_app: "🚨 *Admin Alert: Leave Covered* 🚨\n\n*{requesterName}* is on leave on *{day}, {date}*.\n*{subName}* will cover the *{subject}* class for ({group}) at *{time}* in Room *{room}*.",
-                obs_sub_can: "⚠️ *Admin Alert: Sub Cancelled* ⚠️\n\nThe substitution arrangement for *{subject}* on *{day}, {date}* at *{time}* in Room *{room}* has been cancelled.",
-                obs_bday: "🎉 *Admin Alert: Birthday Today!* 🎉\n\nToday is *{name}'s* birthday! Be sure to wish them!",
-                obs_anni: "🎊 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating {years} years with us today!"
-            };
-            rawTemplate = fallbacks[templateKey] || "System Alert";
+            // Use shared defaultTemplates as single source of truth
+            rawTemplate = defaultTemplates[templateKey] || "System Alert";
         }
 
         // 3. Format Message
@@ -250,7 +245,7 @@ export const sendToObservers = async (templateKey, templateVars) => {
         }
 
         for (const [k, v] of Object.entries(templateVars)) {
-            finalMessage = finalMessage.replace(new RegExp(`{${k}}`, 'g'), v);
+            finalMessage = finalMessage.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
         }
 
         // 4. Send via raw channel
