@@ -33,11 +33,11 @@ const StatCard = ({ title, value, icon, trend, gradient }) => (
 
 
 // Helper to determine if an assignment belongs to the user
-const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
+const isMyAssignment = (item, targetName, targetEmpId) => {
     // 1. Robust Check: Match by EmpID
-    if (isPersonalView && userProfile?.empId) {
-        if (item.facultyEmpId === userProfile.empId) return true;
-        if (item.faculty2EmpId === userProfile.empId) return true;
+    if (targetEmpId && targetEmpId !== 'All Assignments') {
+        if (item.facultyEmpId === targetEmpId) return true;
+        if (item.faculty2EmpId === targetEmpId) return true;
         
         // If the item HAS an empId assigned to BOTH slots, and neither matched, it's definitely NOT theirs
         if (item.facultyEmpId && (!item.faculty2 || item.faculty2EmpId)) {
@@ -45,24 +45,24 @@ const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
         }
     }
 
-    // 2. Fallback check for Admin View (or Legacy Data missing EmpIDs)
-    if (!targetName) return false;
+    // 2. Fallback check for Legacy Data missing EmpIDs
+    if (!targetName || targetName === 'All Assignments') return false;
     const targetNorm = normalizeStr(targetName);
     
     if (normalizeStr(item.faculty) === targetNorm) {
-        if (isPersonalView && item.facultyEmpId && item.facultyEmpId !== userProfile?.empId) return false;
+        if (item.facultyEmpId && item.facultyEmpId !== targetEmpId) return false;
         return true;
     }
     
     if (normalizeStr(item.faculty2) === targetNorm) {
-        if (isPersonalView && item.faculty2EmpId && item.faculty2EmpId !== userProfile?.empId) return false;
+        if (item.faculty2EmpId && item.faculty2EmpId !== targetEmpId) return false;
         return true;
     }
     
     return false;
 };
 
-const calculateTodaySchedule = (selectedFaculty, allData = [], currentDayName, adjustments = [], currentDate, isPersonalView, userProfile, myAbsences = [], activeSubstitutions = []) => {
+const calculateTodaySchedule = (selectedFaculty, selectedFacultyId, allData = [], currentDayName, adjustments = [], currentDate, myAbsences = [], activeSubstitutions = []) => {
     const targetDateStr = formatDateLocal(currentDate);
     const targetDayNorm = normalizeStr(currentDayName);
     let dailyFiltered = [];
@@ -79,7 +79,7 @@ const calculateTodaySchedule = (selectedFaculty, allData = [], currentDayName, a
         // A. Base Schedule
         dailyFiltered = (allData || []).filter(item =>
             normalizeStr(item.day) === targetDayNorm &&
-            isMyAssignment(item, selectedFaculty, userProfile, isPersonalView) &&
+            isMyAssignment(item, selectedFaculty, selectedFacultyId) &&
             !(myAbsences || []).some(a => a.originalScheduleId === item.id && a.date === targetDateStr)
         );
 
@@ -116,20 +116,23 @@ const calculateWeeklySchedule = (selectedFaculty, allData = [], weekDates = [], 
             const dayInfo = (weekDates || []).find(d => normalizeStr(d.dayName) === sDayNorm);
             if (!dayInfo) return false;
             return s.date === formatDateLocal(dayInfo.fullDate);
-        });
-
-        facultyData = [...facultyData, ...weeksSubs];
-    } else if (!selectedFaculty) {
-        facultyData = [];
-    }
-
+const calculateWeeklySchedule = (selectedFaculty, selectedFacultyId, allData = [], weekDates = [], myAbsences = [], activeSubstitutions = []) => {
     const grouped = (weekDates || []).reduce((acc, { dayName }) => {
         if (selectedFaculty !== 'All Assignments' && selectedFaculty) {
             const targetDayNorm = normalizeStr(dayName);
-            const dayClasses = facultyData
-                .filter(item => normalizeStr(item.day) === targetDayNorm)
+            let dayClasses = (allData || []).filter(item => {
+                if (normalizeStr(item.day) !== targetDayNorm) return false;
+                if (!isMyAssignment(item, selectedFaculty, selectedFacultyId)) return false;
+                const itemDateStr = formatDateLocal(weekDates.find(d => d.dayName === dayName).fullDate);
+                if ((myAbsences || []).some(a => a.originalScheduleId === item.id && a.date === itemDateStr)) return false;
+                return true;
+            });
+            
+            const daySubs = (activeSubstitutions || []).filter(s => normalizeStr(s.day) === targetDayNorm);
+            dayClasses = [...dayClasses, ...daySubs]
                 .map(item => ({ ...item, sortVal: parseTimeSlot(item.time)?.start || 0 }))
                 .sort((a, b) => (Number(a.sortVal) || 0) - (Number(b.sortVal) || 0));
+            
             acc[dayName] = dayClasses;
         }
         return acc;
@@ -147,18 +150,16 @@ const calculateDerivedSchedules = ({
     adjustments,
     currentDate,
     selectedFaculty,
+    selectedFacultyId,
     currentDayName
 }) => {
     if (!activeAcademicYear || (weekDates || []).length === 0) {
         return { todaySchedule: [], weeklySchedule: {} };
     }
 
-    const isPersonalView = dashboardView === 'personal';
-
-    // Robust Matching for Absences/Substitutions
     const matchesTarget = (nameVal, empIdVal) => {
-        if (isPersonalView && userProfile?.empId && empIdVal) {
-            return empIdVal === userProfile.empId;
+        if (selectedFacultyId && selectedFacultyId !== 'All Assignments' && empIdVal) {
+            return empIdVal === selectedFacultyId;
         }
         if (!nameVal || !selectedFaculty) return false;
         return normalizeStr(nameVal) === normalizeStr(selectedFaculty);
@@ -185,11 +186,11 @@ const calculateDerivedSchedules = ({
     }));
 
     const todaySchedule = calculateTodaySchedule(
-        selectedFaculty, allData, currentDayName, adjustments, currentDate, isPersonalView, userProfile, myAbsences, activeSubstitutions
+        selectedFaculty, selectedFacultyId, allData, currentDayName, adjustments, currentDate, myAbsences, activeSubstitutions
     );
 
     const weeklySchedule = calculateWeeklySchedule(
-        selectedFaculty, allData, weekDates, isPersonalView, userProfile, myAbsences, activeSubstitutions
+        selectedFaculty, selectedFacultyId, allData, weekDates, myAbsences, activeSubstitutions
     );
 
     return { todaySchedule, weeklySchedule };
@@ -201,8 +202,9 @@ const Dashboard = () => {
     const [roomCount, setRoomCount] = useState(0);
     const { schedule: allData = [], loading: scheduleLoading, refreshSchedule } = useScheduleContext() || {};
     const totalClasses = allData ? allData.length : 0; // Derived instead
-    const [facultyList, setFacultyList] = useState([]);
+    const [facultyList, setFacultyList] = useState([]); // Array of { name, empId }
     const [selectedFaculty, setSelectedFaculty] = useState('');
+    const [selectedFacultyId, setSelectedFacultyId] = useState('');
     const [holidays, setHolidays] = useState([]);
     const [showCelebration, setShowCelebration] = useState(true);
     const [selectedAssignment, setSelectedAssignment] = useState(null); // For Details Modal
@@ -228,8 +230,10 @@ const Dashboard = () => {
 
         if (newMode === 'personal') {
             setSelectedFaculty(userProfile.name);
+            setSelectedFacultyId(userProfile.empId);
         } else {
             setSelectedFaculty('All Assignments');
+            setSelectedFacultyId('All Assignments');
         }
     };
 
@@ -238,11 +242,17 @@ const Dashboard = () => {
         if (userProfile) {
             if (dashboardView === 'admin') {
                 if (!selectedFaculty || selectedFaculty === userProfile.name) {
-                    setTimeout(() => setSelectedFaculty('All Assignments'), 0);
+                    setTimeout(() => {
+                        setSelectedFaculty('All Assignments');
+                        setSelectedFacultyId('All Assignments');
+                    }, 0);
                 }
             } else {
                 // Force non-admins or personal view to see only their own schedule
-                setTimeout(() => setSelectedFaculty(userProfile.name), 0);
+                setTimeout(() => {
+                    setSelectedFaculty(userProfile.name);
+                    setSelectedFacultyId(userProfile.empId);
+                }, 0);
             }
         }
     }, [userProfile, dashboardView, selectedFaculty]);
@@ -307,7 +317,7 @@ const Dashboard = () => {
 
     // Sync Master Data to Local State (Reactive)
     useEffect(() => {
-        if (masterFaculty.length > 0) setTimeout(() => setFacultyList(masterFaculty.map(f => f.name)), 0);
+        if (masterFaculty.length > 0) setTimeout(() => setFacultyList(masterFaculty.map(f => ({ name: f.name, empId: f.empId }))), 0);
         if (masterRooms.length > 0) setTimeout(() => setRoomCount(masterRooms.length), 0);
 
         // Handle Holidays from Context
@@ -363,6 +373,14 @@ const Dashboard = () => {
             // Mode A: Faculty/Personal - Listen to THEIR OWN adjustments for the year (Small/Fast)
             // Mode B: Admin/All - Listen to ONLY TODAY'S adjustments (Small/Fast)
             let q;
+            
+            let targetEmpId = null;
+            if (dashboardView === 'personal' && userProfile?.empId) {
+                targetEmpId = userProfile.empId;
+            } else if (dashboardView === 'admin' && selectedFacultyId && selectedFacultyId !== 'All Assignments') {
+                targetEmpId = selectedFacultyId;
+            }
+
             if (dashboardView === 'personal' && selectedFaculty !== 'All Assignments') {
                 q = query(adjustmentsRef, 
                     and(
@@ -394,7 +412,7 @@ const Dashboard = () => {
             setAdjustments([]);
             return () => {};
         }
-    }, [activeAcademicYear, userProfile?.empId, dashboardView, selectedFaculty, currentDate]);
+    }, [activeAcademicYear, userProfile?.empId, dashboardView, selectedFaculty, selectedFacultyId, currentDate]);
 
 
     // Derived Schedules (Memoized)
@@ -408,9 +426,10 @@ const Dashboard = () => {
             adjustments,
             currentDate,
             selectedFaculty,
+            selectedFacultyId,
             currentDayName
         });
-    }, [activeAcademicYear, weekDates, currentDayName, currentDate, selectedFaculty, dashboardView, userProfile, allData, adjustments]);
+    }, [activeAcademicYear, weekDates, currentDayName, currentDate, selectedFaculty, selectedFacultyId, dashboardView, userProfile, allData, adjustments]);
 
     // Helper to get relative date label with Day
     const getDateLabel = (date) => {
@@ -932,8 +951,20 @@ const Dashboard = () => {
                         <div className="glass-panel-static" style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem', borderRadius: '50px' }}>
                             <span style={{ paddingLeft: '1rem', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>Schedule for:</span>
                             <select
-                                value={selectedFaculty}
-                                onChange={(e) => setSelectedFaculty(e.target.value)}
+                                value={selectedFacultyId || 'All Assignments'}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'All Assignments') {
+                                        setSelectedFacultyId('All Assignments');
+                                        setSelectedFaculty('All Assignments');
+                                    } else {
+                                        const fac = facultyList.find(f => f.empId === val);
+                                        if (fac) {
+                                            setSelectedFacultyId(fac.empId);
+                                            setSelectedFaculty(fac.name);
+                                        }
+                                    }
+                                }}
                                 style={{
                                     background: 'transparent',
                                     border: 'none',
@@ -947,8 +978,8 @@ const Dashboard = () => {
                             >
                                 <option value="All Assignments" style={{ background: '#1e293b', color: 'white' }}>All Assignments</option>
                                 {facultyList.map(f => (
-                                    <option key={f} value={f} style={{ background: '#1e293b', color: 'white' }}>
-                                        {f === userProfile?.name ? `${f} (Me)` : f}
+                                    <option key={f.empId} value={f.empId} style={{ background: '#1e293b', color: 'white' }}>
+                                        {f.name}
                                     </option>
                                 ))}
                             </select>
