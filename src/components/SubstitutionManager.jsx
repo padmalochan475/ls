@@ -111,6 +111,7 @@ const SubstitutionManager = () => {
 
     // Manual Entry State
     const [selectedAbsentee, setSelectedAbsentee] = useState('');
+    const [selectedAbsenteeId, setSelectedAbsenteeId] = useState('');
     const [loading, setLoading] = useState(false);
     const [expandedId, setExpandedId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -296,12 +297,17 @@ const SubstitutionManager = () => {
         const searchName = normalizeStr(selectedAbsentee);
 
         return fullSchedule
-            .filter(item =>
-                normalizeStr(item.day) === targetDay &&
-                (normalizeStr(item.faculty) === searchName || normalizeStr(item.faculty2) === searchName)
-            )
+            .filter(item => {
+                if (normalizeStr(item.day) !== targetDay) return false;
+                
+                if (selectedAbsenteeId) {
+                    if (item.facultyEmpId === selectedAbsenteeId || item.faculty2EmpId === selectedAbsenteeId) return true;
+                }
+                // Fallback to name if ID is missing or no match found (for legacy data)
+                return normalizeStr(item.faculty) === searchName || normalizeStr(item.faculty2) === searchName;
+            })
             .sort((a, b) => (parseTimeSlot(a.time)?.start || 0) - (parseTimeSlot(b.time)?.start || 0));
-    }, [fullSchedule, selectedAbsentee, selectedDayName]);
+    }, [fullSchedule, selectedAbsentee, selectedAbsenteeId, selectedDayName]);
 
     // 2. Weekly Load Calculator (Basic for now)
     const getWeeklyLoad = useCallback((facultyName) => {
@@ -372,7 +378,7 @@ const SubstitutionManager = () => {
 
     // --- ACTIONS ---
 
-    const handleAssign = async (scheduleId, subName, itemDetails) => {
+    const handleAssign = async (scheduleId, subName, subEmpId, itemDetails) => {
         // STRICT PERMISSION CHECK
         if (!checkWritePermission()) return;
 
@@ -397,9 +403,9 @@ const SubstitutionManager = () => {
                 originalScheduleId: scheduleId || "",
                 date: selectedDate || "",
                 originalFaculty: selectedAbsentee || "",
-                originalFacultyEmpId: faculty.find(f => f.name === selectedAbsentee)?.empId || "",
+                originalFacultyEmpId: selectedAbsenteeId || "",
                 substituteName: subName || "",
-                substituteEmpId: faculty.find(f => f.name === subName)?.empId || "",
+                substituteEmpId: subEmpId || "",
                 status: 'active',
                 createdAt: serverTimestamp(),
                 time: itemDetails.time || "N/A",
@@ -411,16 +417,16 @@ const SubstitutionManager = () => {
             });
 
             // NOTIFY SUBSTITUTE
-            const substituteUser = faculty.find(f => f.name === subName);
-            const subEmpId = substituteUser?.empId;
+            const substituteUser = faculty.find(f => (f.empId || f.name) === (subEmpId || subName));
+            const finalSubEmpId = substituteUser?.empId;
             const subPhone = substituteUser?.phone; // Pulling phone from user collection
 
             const cGroupStr = `${itemDetails.dept || '?'}-${itemDetails.section || itemDetails.grp || '?'}${itemDetails.group && itemDetails.group !== 'All' ? `-${itemDetails.group}` : ''}`;
             const cRoomStr = itemDetails.room || 'N/A';
 
-            if (subEmpId) {
+            if (finalSubEmpId) {
                 sendNotification({
-                    empIds: [subEmpId],
+                    empIds: [finalSubEmpId],
                     title: "New Substitution Assigned",
                     body: `You have been assigned to cover ${itemDetails.subject} for ${selectedAbsentee} on ${selectedDate} at ${itemDetails.time} for (${cGroupStr}) in Room ${cRoomStr}.`,
                     type: 'assignment',
@@ -438,7 +444,7 @@ const SubstitutionManager = () => {
             }
 
             // NOTIFY ORIGINAL FACULTY (ABSENTEE)
-            const absenteeEmpId = faculty.find(f => f.name === selectedAbsentee)?.empId;
+            const absenteeEmpId = selectedAbsenteeId;
             if (absenteeEmpId) {
                 sendNotification({
                     empIds: [absenteeEmpId],
@@ -733,13 +739,35 @@ const SubstitutionManager = () => {
                             <div style={{ flex: 1, minWidth: '250px' }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#94a3b8' }}>Absent Faculty</label>
                                 <select
-                                    value={selectedAbsentee}
-                                    onChange={e => setSelectedAbsentee(e.target.value)}
+                                    value={selectedAbsenteeId || selectedAbsentee}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        if (!val) {
+                                            setSelectedAbsentee('');
+                                            setSelectedAbsenteeId('');
+                                        } else {
+                                            const fac = faculty.find(f => (f.empId || f.name) === val);
+                                            if (fac) {
+                                                setSelectedAbsentee(fac.name);
+                                                setSelectedAbsenteeId(fac.empId || fac.name);
+                                            } else {
+                                                setSelectedAbsentee(val);
+                                                setSelectedAbsenteeId(val);
+                                            }
+                                        }
+                                    }}
                                     className="glass-input"
                                     style={{ width: '100%', background: '#1e293b', color: 'white' }}
                                 >
                                     <option value="" style={{ background: '#1e293b', color: 'white' }}>-- Select Faculty member --</option>
-                                    {faculty.map(f => <option key={f.id} value={f.name} style={{ background: '#1e293b', color: 'white' }}>{f.name}</option>)}
+                                    {faculty.map((f, index) => {
+                                        const idVal = f.empId || f.name || `unknown-${index}`;
+                                        return (
+                                            <option key={idVal} value={idVal} style={{ background: '#1e293b', color: 'white' }}>
+                                                {f.name}
+                                            </option>
+                                        );
+                                    })}
                                 </select>
                             </div>
                         </div>
@@ -819,7 +847,7 @@ const SubstitutionManager = () => {
                                                                     <button
                                                                         key={rec.id}
                                                                         disabled={rec.isBusy || loading}
-                                                                        onClick={() => handleAssign(item.id, rec.name, item)}
+                                                                        onClick={() => handleAssign(item.id, rec.name, rec.empId, item)}
                                                                         style={{
                                                                             textAlign: 'left', padding: '0.75rem', borderRadius: '8px',
                                                                             border: '1px solid rgba(255,255,255,0.05)',
