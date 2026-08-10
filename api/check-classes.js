@@ -261,6 +261,8 @@ export default async function handler(req, res) {
         const warn1Min = parseInt(notifSettings.firstWarning) || 15;
         const warn2Min = parseInt(notifSettings.secondWarning) || 5;
         const holidayTime = notifSettings.holidayTime || '09:00';
+        const morningBriefingTime = notifSettings.morningBriefingTime || '07:30';
+        const weeklyPreviewTime = notifSettings.weeklyPreviewTime || '19:00';
         const autoBirthdays = notifSettings.autoBirthdays !== false;
         const autoAnniversaries = notifSettings.autoAnniversaries !== false;
         const autoHolidays = notifSettings.autoHolidays !== false;
@@ -454,15 +456,17 @@ export default async function handler(req, res) {
             return formatMsg(templateKey, defaultTemplate, vars) + "\n";
         };
 
-        // 3. WEEKLY PREVIEW (Sunday 7:00 PM Broadcast)
+        // 3. WEEKLY PREVIEW (Sunday Broadcast)
+        const forceWeekly = req.query?.force_weekly === 'true';
         const weeklyAlertTime = new Date(nowIST);
-        weeklyAlertTime.setUTCHours(19, 0, 0, 0);
+        const [wHour, wMin] = weeklyPreviewTime.split(':').map(Number);
+        weeklyAlertTime.setUTCHours(wHour, wMin, 0, 0);
 
-        if (dayName === 'Sunday' && nowIST >= weeklyAlertTime) {
+        if (forceWeekly || (dayName === 'Sunday' && nowIST >= weeklyAlertTime)) {
             const weeklySentId = `weekly_preview_${todayDateStr}`;
             const alreadySentWeekly = await db.collection('sent_notifications').doc(weeklySentId).get();
 
-            if (!alreadySentWeekly.exists) {
+            if (forceWeekly || !alreadySentWeekly.exists) {
                 try {
                     const fullScheduleSnap = await db.collection('schedule')
                         .where('academicYear', '==', activeAcademicYear)
@@ -521,15 +525,17 @@ export default async function handler(req, res) {
             }
         }
 
-        // 4. MORNING SCHEDULE SUMMARY (7:30 AM Broadcast)
+        // 4. MORNING SCHEDULE SUMMARY (Broadcast)
+        const forceMorning = req.query?.force_morning === 'true';
         const summaryAlertTime = new Date(nowIST);
-        summaryAlertTime.setUTCHours(7, 30, 0, 0);
+        const [mHour, mMin] = morningBriefingTime.split(':').map(Number);
+        summaryAlertTime.setUTCHours(mHour, mMin, 0, 0);
 
-        if (nowIST >= summaryAlertTime) {
+        if (forceMorning || nowIST >= summaryAlertTime) {
             const summarySentId = `morning_summary_${todayDateStr}`;
             const alreadySentSummary = await db.collection('sent_notifications').doc(summarySentId).get();
 
-            if (!alreadySentSummary.exists) {
+            if (forceMorning || !alreadySentSummary.exists) {
                 try {
         
                     // 1. Fetch Today's Master Schedule for today
@@ -542,12 +548,12 @@ export default async function handler(req, res) {
                         const allTodaysClasses = dayScheduleSnap.docs.map(d => ({ id: d.id, ...d.data() }));
                         
                         // Fetch substitution data to reflect changes in summary
-                        const subSnap = await db.collection('substitutions')
+                        const subSnap = await db.collection('adjustments')
                             .where('date', '==', todayDateStr)
-                            .where('status', '==', 'approved')
+                            .where('status', '==', 'active')
                             .get();
                         const subsMap = new Map();
-                        subSnap.forEach(s => subsMap.set(s.data().assignmentId, s.data()));
+                        subSnap.forEach(s => subsMap.set(s.data().originalScheduleId, s.data()));
 
                         // UNIFIED TARGET FETCHING
                         const [uSnap, fSnap] = await Promise.all([db.collection('users').get(), db.collection('faculty').get()]);
@@ -570,7 +576,19 @@ export default async function handler(req, res) {
                             const targetClasses = allTodaysClasses.filter(cls => {
                                 const sub = subsMap.get(cls.id);
                                 if (sub) {
-                                    return sub.substituteEmpId === target.empId || sub.substituteName === target.name;
+                                    // The substitute gets the class
+                                    if (sub.substituteEmpId === target.empId || sub.substituteName === target.name) return true;
+                                    
+                                    // The primary faculty (who is substituted) does not get the class
+                                    if (sub.originalFacultyEmpId === target.empId || sub.originalFaculty === target.name) return false;
+                                    
+                                    // But the co-faculty (faculty2) should still get it if they match.
+                                    if (cls.facultyEmpId === target.empId || cls.faculty === target.name || 
+                                        cls.faculty2EmpId === target.empId || cls.faculty2 === target.name) {
+                                        return true;
+                                    }
+                                    
+                                    return false;
                                 }
                                 return cls.facultyEmpId === target.empId || cls.faculty === target.name || 
                                        cls.faculty2EmpId === target.empId || cls.faculty2 === target.name;
@@ -673,17 +691,20 @@ export default async function handler(req, res) {
                 ], cachedUsers, cachedFaculty);
 
                 // Substitution Logic
-                const subSnap = await db.collection('substitutions')
-                    .where('assignmentId', '==', cls.id)
+                const subSnap = await db.collection('adjustments')
+                    .where('originalScheduleId', '==', cls.id)
                     .where('date', '==', todayDateStr)
-                    .where('status', '==', 'approved')
+                    .where('status', '==', 'active')
                     .get();
 
                 let finalUsers = users;
                 if (!subSnap.empty) {
                     const subData = subSnap.docs[0].data();
                     const subs = await getFacultyData([{ id: subData.substituteEmpId, name: subData.substituteName }], cachedUsers, cachedFaculty);
-                    if (subs.length > 0) finalUsers = subs;
+                    
+                    // Remove original faculty from recipients, keep the other faculty, and add the substitute
+                    finalUsers = finalUsers.filter(u => u.empId !== subData.originalFacultyEmpId && u.name !== subData.originalFaculty);
+                    if (subs.length > 0) finalUsers.push(subs[0]);
                 }
 
                 if (finalUsers.length === 0) return;

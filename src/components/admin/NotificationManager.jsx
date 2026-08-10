@@ -13,6 +13,8 @@ const NotificationManager = ({ users }) => {
         firstWarning: 15, 
         secondWarning: 5, 
         holidayTime: '09:00',
+        morningBriefingTime: '07:30',
+        weeklyPreviewTime: '19:00',
         autoBirthdays: true,
         autoAnniversaries: true,
         autoHolidays: true,
@@ -38,6 +40,8 @@ const NotificationManager = ({ users }) => {
                     firstWarning: data.firstWarning || 15,
                     secondWarning: data.secondWarning || 5,
                     holidayTime: data.holidayTime || '09:00',
+                    morningBriefingTime: data.morningBriefingTime || '07:30',
+                    weeklyPreviewTime: data.weeklyPreviewTime || '19:00',
                     autoBirthdays: data.autoBirthdays !== false,
                     autoAnniversaries: data.autoAnniversaries !== false,
                     autoHolidays: data.autoHolidays !== false,
@@ -56,6 +60,8 @@ const NotificationManager = ({ users }) => {
                 firstWarning: parseInt(settings.firstWarning),
                 secondWarning: parseInt(settings.secondWarning),
                 holidayTime: settings.holidayTime,
+                morningBriefingTime: settings.morningBriefingTime,
+                weeklyPreviewTime: settings.weeklyPreviewTime,
                 autoBirthdays: settings.autoBirthdays,
                 autoAnniversaries: settings.autoAnniversaries,
                 autoHolidays: settings.autoHolidays,
@@ -112,6 +118,25 @@ const NotificationManager = ({ users }) => {
             alert(`Failed: ${e.message}`);
         }
         setIsSending(false);
+    };
+
+    const [isTriggering, setIsTriggering] = useState(false);
+    const triggerSystemEvent = async (endpoint, label) => {
+        setIsTriggering(true);
+        const toastId = toast.loading(`Triggering ${label}...`);
+        try {
+            const res = await fetch(endpoint);
+            const data = await res.json();
+            if (res.ok) {
+                toast.success(`Success: Sent messages or completed task.`, { id: toastId });
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        } catch (e) {
+            console.error("Trigger Error:", e);
+            toast.error(`Failed to trigger ${label}.`, { id: toastId });
+        }
+        setIsTriggering(false);
     };
 
     return (
@@ -178,6 +203,36 @@ const NotificationManager = ({ users }) => {
                         />
                         <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Send msg at this time</p>
                     </div>
+
+                    {/* Morning Briefing Alert */}
+                    <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+                            <Calendar size={14} /> Morning Briefing Time
+                        </label>
+                        <input
+                            type="time"
+                            className="glass-input"
+                            value={settings.morningBriefingTime || '07:30'}
+                            onChange={e => setSettings({ ...settings, morningBriefingTime: e.target.value })}
+                            style={{ colorScheme: 'dark' }}
+                        />
+                        <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Today's schedule alert</p>
+                    </div>
+
+                    {/* Weekly Preview Alert */}
+                    <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+                            <Calendar size={14} /> Weekly Preview Time
+                        </label>
+                        <input
+                            type="time"
+                            className="glass-input"
+                            value={settings.weeklyPreviewTime || '19:00'}
+                            onChange={e => setSettings({ ...settings, weeklyPreviewTime: e.target.value })}
+                            style={{ colorScheme: 'dark' }}
+                        />
+                        <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Sunday preview alert</p>
+                    </div>
                 </div>
 
                 <div style={{ padding: '1.25rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -228,6 +283,27 @@ const NotificationManager = ({ users }) => {
                             />
                             <span className="slider"></span>
                         </label>
+                    </div>
+
+                    <div style={{ marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '0.75rem' }}>
+                        <button
+                            type="button"
+                            disabled={isTriggering}
+                            onClick={() => triggerSystemEvent('/api/check-classes?force_morning=true', 'Morning Briefing')}
+                            className="btn"
+                            style={{ flex: 1, padding: '0.5rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '8px', fontSize: '0.8rem', cursor: isTriggering ? 'not-allowed' : 'pointer' }}
+                        >
+                            Send Morning Briefing Now
+                        </button>
+                        <button
+                            type="button"
+                            disabled={isTriggering}
+                            onClick={() => triggerSystemEvent('/api/check-classes?force_weekly=true', 'Weekly Preview')}
+                            className="btn"
+                            style={{ flex: 1, padding: '0.5rem', background: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa', border: '1px solid rgba(139, 92, 246, 0.3)', borderRadius: '8px', fontSize: '0.8rem', cursor: isTriggering ? 'not-allowed' : 'pointer' }}
+                        >
+                            Send Weekly Preview Now
+                        </button>
                     </div>
                 </div>
 
