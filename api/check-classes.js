@@ -221,7 +221,7 @@ export default async function handler(req, res) {
         const nowUTC = new Date();
         const istOffset = 5.5 * 60 * 60 * 1000;
         const nowIST = new Date(nowUTC.getTime() + istOffset);
-        const dayName = nowIST.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+        const dayName = nowUTC.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
         const todayDateStr = nowUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         let debugLogs = [];
