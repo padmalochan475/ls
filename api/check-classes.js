@@ -492,7 +492,7 @@ export default async function handler(req, res) {
                         };
                     }).filter(t => t.mobile && t.whatsappEnabled);
 
-                    await Promise.all(waTargets.map(async (target) => {
+                    for (const target of waTargets) {
                         const mySchedule = allSchedule.filter(cls => 
                             cls.facultyEmpId === target.empId || cls.faculty === target.name || 
                             cls.faculty2EmpId === target.empId || cls.faculty2 === target.name
@@ -521,8 +521,9 @@ export default async function handler(req, res) {
 
                             previewMsg += formatMsg('weekly_footer', `\n🌐 _Check the portal for full timetable._\nGood luck for the week! 💪`, {});
                             await sendWhatsApp(target.mobile, previewMsg);
+                            await new Promise(r => setTimeout(r, 300));
                         }
-                    }));
+                    }
                     await getDb().collection('sent_notifications').doc(weeklySentId).set({ sentAt: new Date(), type: 'weekly_preview' });
                 } catch (wErr) { console.error("Weekly Preview Error:", wErr); }
             }
@@ -576,7 +577,7 @@ export default async function handler(req, res) {
                         
                         debugLogs.push(`Total waTargets: ${waTargets.length}. Valid: ${waTargets.map(t => t.name).join(', ')}`);
 
-                        await Promise.all(waTargets.map(async (target) => {
+                        for (const target of waTargets) {
                             // Find classes where they are the primary, co-faculty, or substitute
                             const targetClasses = allTodaysClasses.filter(cls => {
                                 const sub = subsMap.get(cls.id);
@@ -620,10 +621,12 @@ export default async function handler(req, res) {
                                 const ok = await sendWhatsApp(target.mobile, waMsg);
                                 if (ok !== true) debugLogs.push(`WA FAILED for ${target.name} (${target.mobile}): ${ok}`);
                                 else debugLogs.push(`WA SUCCESS for ${target.name} (${target.mobile})`);
+                                
+                                await new Promise(r => setTimeout(r, 300));
                             }
-                        }));
-                    }
-                    await getDb().collection('sent_notifications').doc(summarySentId).set({ sentAt: new Date(), type: 'morning_summary' });
+                        }
+                        
+                        await getDb().collection('sent_notifications').doc(summarySentId).set({ sentAt: new Date(), type: 'morning_summary' });
                 } catch (summaryErr) {
                     console.error("Morning Summary Error:", summaryErr);
                 }
@@ -689,7 +692,7 @@ export default async function handler(req, res) {
         const notifDateKey = todayDateStr;
         let sentCount = 0;
 
-        await Promise.all(upcomingClasses.map(async (cls) => {
+        for (const cls of upcomingClasses) {
             try {
                 const minutesLeft = Math.round((cls.startTime - nowIST) / 60000);
                 let groupStr = `${cls.dept || ''}-${cls.section || ''}`.toUpperCase();
@@ -721,15 +724,15 @@ export default async function handler(req, res) {
                     if (subs.length > 0) finalUsers.push(subs[0]);
                 }
 
-                if (finalUsers.length === 0) return;
+                if (finalUsers.length === 0) continue;
 
                 // 🔴 USER REQUEST: Filter out unsubscribed users so they receive NO MESSAGES OF ANY KIND
                 finalUsers = finalUsers.filter(u => u.whatsappEnabled !== false);
 
-                if (finalUsers.length === 0) return;
+                if (finalUsers.length === 0) continue;
 
                 const targetPayload = finalUsers.map(u => u.uid).filter(Boolean);
-                if (targetPayload.length === 0) return;
+                if (targetPayload.length === 0) continue;
 
                 // 1st Warning Window: 6 mins left to 25 mins left (Very wide window to guarantee it fires)
                 if (minutesLeft > warn2Min && minutesLeft <= (warn1Min + 10)) {
@@ -742,7 +745,14 @@ export default async function handler(req, res) {
                         const waMsg = formatMsg('warn1_wa', '🔔 *Upcoming* 🔔\n\n🔔 Heads Up: {subject} ({group}) starts in {mins} mins at Room {room}.', vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
-                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled).map(u => sendWhatsApp(u.mobile, waMsg)));
+                        
+                        for (const u of finalUsers) {
+                            if (u.mobile && u.whatsappEnabled !== false) {
+                                await sendWhatsApp(u.mobile, waMsg);
+                                await new Promise(r => setTimeout(r, 300));
+                            }
+                        }
+                        
                         await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning' });
                         sentCount++;
                     }
@@ -759,13 +769,20 @@ export default async function handler(req, res) {
                         const waMsg = formatMsg('warn2_wa', '🚀 *Now* 🚀\n\n🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!', vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
-                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled).map(u => sendWhatsApp(u.mobile, waMsg)));
+                        
+                        for (const u of finalUsers) {
+                            if (u.mobile && u.whatsappEnabled !== false) {
+                                await sendWhatsApp(u.mobile, waMsg);
+                                await new Promise(r => setTimeout(r, 300));
+                            }
+                        }
+                        
                         await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning' });
                         sentCount++;
                     }
                 }
             } catch (err) { console.error("Reminder Error for", cls.subject, err); }
-        }));
+        }
 
         return res.status(200).json({
             success: true,
