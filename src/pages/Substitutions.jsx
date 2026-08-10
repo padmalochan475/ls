@@ -386,9 +386,9 @@ const Substitutions = () => {
                     empIds: [reqData.targetFacultyId],
                     title: 'Request Cancelled',
                     body: `${reqData.requesterName} cancelled their substitution request for ${det.subject || 'class'} of (${cGroupStr})${cCoFac}.`,
-                    type: 'substitution_cancelled',
+                    type: 'substitution_request_cancelled',
                     data: {
-                        type: 'substitution_cancelled',
+                        type: 'substitution_request_cancelled',
                         requestId: requestId,
                         subject: det.subject || 'Class',
                         date: reqData.date,

@@ -278,6 +278,11 @@ const TemplateEditor = () => {
                             {renderInput('sys_sub_can', 'Message', 'textarea', 5)}
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#f59e0b' }}>Request Withdrawn</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{cofacInline}'}</p>
+                            {renderInput('sys_req_can', 'Message', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#c084fc' }}>Account Approved</h4>
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}</p>
                             {renderInput('sys_acc_app', 'Message', 'textarea', 5)}
