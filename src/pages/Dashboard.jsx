@@ -154,8 +154,8 @@ const calculateDerivedSchedules = ({
         subject: adj.subject,
         room: adj.room,
         dept: adj.dept,
-        section: adj.section,
-        group: adj.group,
+        section: adj.group, // In adjustments, section is saved as 'group'
+        group: adj.subGroup, // In adjustments, group is saved as 'subGroup'
         sem: adj.sem,
         faculty: adj.substituteName,
         originalFacultyName: adj.originalFaculty,
