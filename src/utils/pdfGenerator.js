@@ -8,7 +8,7 @@ import { sortSemesters } from './sortUtils';
 // Fixed Public URL: Points to the Public View Page
 const getPublicScheduleUrl = () => {
     if (typeof window !== 'undefined') return window.location.origin + '/#/view';
-    return 'https://lams-final-version.vercel.app/#/view';
+    return '/#/view';
 };
 
 
