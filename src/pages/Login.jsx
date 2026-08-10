@@ -185,6 +185,10 @@ const Login = () => {
             setIsLoading(false);
             return;
           }
+      } else {
+          // If they entered an email, we bypass the emp_lookups table.
+          // Note: Firebase Auth 'Email Enumeration Protection' will silently succeed even if the email doesn't exist,
+          // so we cannot reliably tell the user if they made a typo in their email address.
       }
 
       // Step 2: Send Firebase Password Reset Email
