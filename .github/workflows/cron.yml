@@ -1,8 +1,8 @@
 name: LAMS Cron Job
 on:
   schedule:
-    # Run every 15 minutes
-    - cron: '*/15 * * * *'
+    # Run every 5 minutes to ensure smaller warning windows (like 5-min) are never skipped
+    - cron: '*/5 * * * *'
   workflow_dispatch: # Allows manual triggering from GitHub UI
 
 jobs:
