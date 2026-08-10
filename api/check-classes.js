@@ -204,12 +204,9 @@ async function sendWhatsApp(phoneNumber, message) {
             }
         });
         return true;
-    } catch (e) {
-        if (e.response && (e.response.status === 401 || e.response.status === 404)) {
-            cachedSessionId = null;
-        }
-        console.error("WhatsApp Error:", e.response?.data || e.message);
-        return false;
+    } catch (error) {
+        console.error(`WhatsApp Send Error to ${phoneNumber}:`, error.message);
+        return error.message;
     }
 }
 
@@ -618,7 +615,7 @@ export default async function handler(req, res) {
 
                                 waMsg += formatMsg('morning_footer', `Have a productive day! ✨\n_LAMS Admin_`, { name: target.name });
                                 const ok = await sendWhatsApp(target.mobile, waMsg);
-                                if (!ok) debugLogs.push(`WA FAILED for ${target.name} (${target.mobile})`);
+                                if (ok !== true) debugLogs.push(`WA FAILED for ${target.name} (${target.mobile}): ${ok}`);
                                 else debugLogs.push(`WA SUCCESS for ${target.name} (${target.mobile})`);
                             }
                         }));
