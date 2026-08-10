@@ -313,7 +313,7 @@ export default async function handler(req, res) {
                             };
                         }).filter(u => u.mobile && u.whatsappEnabled);
                         
-                        const waMsg = formatMsg('holiday_wa', '🎉 *LAMS Holiday Alert* 🎉\n\nToday is *{holiday_name}*.\nNo classes today. Enjoy!\n\n_System Admin_', { holiday_name: h.name });
+                        const waMsg = formatMsg('holiday_wa', '🏝️ *HOLIDAY ALERT!* 🏝️\n\nToday is *{holiday_name}*! 🎉\nAll classes are suspended. Enjoy your day off!\n\n~ *LAMS Admin*', { holiday_name: h.name });
                         
                         await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
                     } catch (waErr) {
@@ -370,13 +370,13 @@ export default async function handler(req, res) {
                         if (autoBirthdays && fac.dob) {
                             const [bYear, bMonth, bDay] = fac.dob.split('-').map(Number);
                             if (bMonth === todayMonth && bDay === todayDay) {
-                                let bdayMsg = formatMsg('birthday_wa', `🎂 *Happy Birthday, {name}!* 🎂\n\nOn behalf of the entire college, we wish you a fantastic day filled with joy and a year ahead full of success and happiness. Keep inspiring! ✨\n\n_Best Wishes,_\n*LAMS Administration*`, { name: fac.name });
+                                let bdayMsg = formatMsg('birthday_wa', `🎂 *HAPPY BIRTHDAY, {name}!* 🎂\n\nWishing you a fantastic day filled with joy, and a year ahead full of success and happiness! Keep inspiring! ✨🥂\n\n~ *LAMS Admin*`, { name: fac.name });
                                 greetingTasks.push(sendWhatsApp(targetNumber, bdayMsg));
                                 console.log(`Birthday greeting triggered for ${fac.name}`);
 
                                 // OBSERVER NOTIFICATION
                                 if (observerNumbers.length > 0) {
-                                    let obsBday = formatMsg('obs_bday', `🎉 *Admin Alert: Birthday Today!* 🎉\n\nToday is *{name}'s* birthday! Be sure to wish them!`, { name: fac.name });
+                                    let obsBday = formatMsg('obs_bday', `📢 *Admin Alert: Birthday Today!* 🎈\n\nToday is *{name}'s* birthday! Be sure to wish them! 🎂`, { name: fac.name });
                                     observerNumbers.forEach(num => greetingTasks.push(sendWhatsApp(num, obsBday)));
                                 }
                             }
@@ -388,13 +388,13 @@ export default async function handler(req, res) {
                             if (jMonth === todayMonth && jDay === todayDay) {
                                 const yearsCompleted = nowIST.getFullYear() - jYear;
                                 if (yearsCompleted > 0) {
-                                    let annMsg = formatMsg('anniversary_wa', `🎊 *Work Anniversary Celebration* 🎊\n\nCongratulations *{name}* on completing *{years}* with our institution! 🏫\n\nThank you for your dedication, hard work, and the positive impact you've made. We are proud to have you on our team!\n\n_Warm Regards,_\n*College Management*`, { name: fac.name, years: `${yearsCompleted} ${yearsCompleted === 1 ? 'year' : 'years'}` });
+                                    let annMsg = formatMsg('anniversary_wa', `🎊 *HAPPY WORK ANNIVERSARY!* 🎊\n\nCongratulations, *{name}*, on completing *{years}* with our institution! 🏫\n\nThank you for your incredible dedication and hard work. We are so proud to have you on our team! 🌟\n\n~ *College Management*`, { name: fac.name, years: `${yearsCompleted} ${yearsCompleted === 1 ? 'year' : 'years'}` });
                                     greetingTasks.push(sendWhatsApp(targetNumber, annMsg));
                                     console.log(`Anniversary greeting triggered for ${fac.name} (${yearsCompleted} years)`);
 
                                     // OBSERVER NOTIFICATION
                                     if (observerNumbers.length > 0) {
-                                        let obsAnn = formatMsg('obs_anni', `🎊 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating {years} years with us today!`, { name: fac.name, years: yearsCompleted });
+                                        let obsAnn = formatMsg('obs_anni', `📢 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating *{years} years* with us today! 🏫`, { name: fac.name, years: yearsCompleted });
                                         observerNumbers.forEach(num => greetingTasks.push(sendWhatsApp(num, obsAnn)));
                                     }
                                 }

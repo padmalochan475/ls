@@ -103,36 +103,36 @@ export const sendNotification = async ({
             
             switch (type) {
                 case 'substitution_request':
-                    return formatMsg('sys_sub_req', `🔄 *Substitution Request* 🔄\n\nHello *${userName}*,\nYou have received a new substitution request.\n\n📝 *Details*:\n${body}\n\n👉 _Log in to the portal to Accept or Reject._`);
+                    return formatMsg('sys_sub_req', `🔄 *NEW SUBSTITUTION REQUEST* 🔄\n\nHello *${userName}*,\nYou have received a new substitution request!\n\n📝 *Details*:\n${body}\n\n👉 _Please log in to the portal to Accept or Reject._`);
                 
                 case 'substitution_approved':
-                    return formatMsg('sys_sub_app', `✅ *Substitution Approved* ✅\n\nGood news *${userName}*,\nYour substitution has been *Approved*.\n\n📅 *Updated Schedule*:\n${body}\n\n_System Admin_`);
+                    return formatMsg('sys_sub_app', `✅ *SUBSTITUTION APPROVED!* ✅\n\nGreat news, *${userName}*!\nYour substitution request has been *officially approved*.\n\n📅 *Updated Schedule*:\n${body}\n\n~ *LAMS Admin*`);
 
                 case 'substitution_rejected':
-                    return formatMsg('sys_sub_rej', `❌ *Substitution Request Status* ❌\n\nHello *${userName}*,\nA substitution request has been *Rejected* or cancelled.\n\nℹ️ *Info*:\n${body}`);
+                    return formatMsg('sys_sub_rej', `❌ *SUBSTITUTION DECLINED* ❌\n\nHello *${userName}*,\nUnfortunately, your substitution request has been *declined* or cancelled.\n\nℹ️ *Info*:\n${body}`);
 
                 case 'account_approved':
-                    return formatMsg('sys_acc_app', `👋 *Welcome to LAMS, ${userName}!* 🎉\n\nYour account has been *Approved* by the Administrator.\n\nYou can now log in and manage your classes, labs, and substitutions.\n\n🌐 _https://lams.vercel.app_`);
+                    return formatMsg('sys_acc_app', `👋 *WELCOME TO LAMS, ${userName}!* 🎉\n\nYour account has been *successfully approved* by the Administrator! ✅\n\nYou can now log in and manage your classes, labs, and substitutions seamlessly.\n\n🌐 _https://lams.vercel.app_`);
 
                 case 'assignment':
-                    return formatMsg('sys_new_assign', `📚 *New Assignment* 📚\n\nHello *${userName}*,\n${body}\n\n_System Admin_`);
+                    return formatMsg('sys_new_assign', `📚 *NEW CLASS ASSIGNMENT* 📚\n\nHello *${userName}*,\n${body}\n\n~ *LAMS Admin*`);
 
                 case 'substitution_accepted':
-                    return formatMsg('sys_sub_acc', `🎉 *Substitution Request Confirmed* 🎉\n\nHello *${userName}*,\nYour request has been *Accepted* by the target faculty member.\n\n📅 *Schedule Updated*:\n${body}\n\n_System Admin_`);
+                    return formatMsg('sys_sub_acc', `🎉 *SUBSTITUTION ACCEPTED!* 🎉\n\nHello *${userName}*,\nYour request has been *accepted* by the target faculty member!\n\n📅 *Updated Schedule*:\n${body}\n\n~ *LAMS Admin*`);
 
                 case 'substitution_cancelled':
-                    return formatMsg('sys_sub_can', `⚠️ *Substitution Cancelled* ⚠️\n\nHello *${userName}*,\nA previously requested substitution has been *Cancelled*.\n\nℹ️ *Info*:\n${body}`);
+                    return formatMsg('sys_sub_can', `⚠️ *SUBSTITUTION CANCELLED* ⚠️\n\nHello *${userName}*,\nA previously requested substitution has been *cancelled*.\n\nℹ️ *Info*:\n${body}`);
 
                 case 'manual':
                 case 'manual_alert':
                 case 'alert':
-                    return `📢 *Admin Announcement* 📢\n\n*${title}*\n${body}\n\n_System Broadcast_`;
+                    return `📢 *ADMIN ANNOUNCEMENT* 📢\n\n*${title}*\n${body}\n\n~ *System Broadcast*`;
 
                 case 'raw':
                     return body;
 
                 default:
-                    return `🔔 *LAMS Notification* 🔔\n\n*${title}*\n${body}\n\n_Check the portal for details._`;
+                    return `🔔 *LAMS NOTIFICATION* 🔔\n\n*${title}*\n${body}\n\n_Check the portal for details._`;
             }
         };
 
