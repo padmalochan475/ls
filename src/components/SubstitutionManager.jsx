@@ -161,12 +161,14 @@ const SubstitutionManager = () => {
                     });
                 }
 
+                const cGroupStr = `${adjData.dept || '?'}-${adjData.section || adjData.group || '?'}${adjData.subGroup && adjData.subGroup !== 'All' ? `-${adjData.subGroup}` : ''}`;
                 // NOTIFY OBSERVERS
                 sendToObservers('obs_sub_can', {
                     subject: adjData.subject || 'Class',
                     date: adjData.date || '',
                     time: adjData.time || 'N/A',
-                    room: adjData.room || 'N/A'
+                    room: adjData.room || 'N/A',
+                    group: cGroupStr
                 });
 
                 // 2. Find linked 'approved' request (matches date & scheduleId)

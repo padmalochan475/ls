@@ -130,7 +130,7 @@ export const sendNotification = async ({
                 case 'manual':
                 case 'manual_alert':
                 case 'alert':
-                    return `📢 *ADMIN ANNOUNCEMENT* 📢\n\n*${title}*\n${body}\n\n~ *System Broadcast*`;
+                    return formatMsg('sys_alert', defaultTemplates['sys_alert']);
 
                 case 'raw':
                     return body;

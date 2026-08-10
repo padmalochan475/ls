@@ -156,7 +156,7 @@ const TemplateEditor = () => {
                             </div>
                             <div>
                                 <strong style={{ color: '#e2e8f0', display: 'block', marginBottom: '4px' }}>⚙️ System & Subs:</strong>
-                                <span style={{ color: '#fbbf24' }}>{'{name}'}, {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{group}'}, {'{room}'}, {'{body}'}</span>
+                                <span style={{ color: '#fbbf24' }}>{'{name}'}, {'{requesterName}'}, {'{subName}'}, {'{subject}'}, {'{date}'}, {'{day}'}, {'{time}'}, {'{group}'}, {'{room}'}, {'{title}'}, {'{body}'}</span>
                             </div>
                         </div>
                     </div>
@@ -286,6 +286,11 @@ const TemplateEditor = () => {
                             <h4 style={{ marginTop: 0, color: '#f472b6' }}>New Assignment</h4>
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{name}'}, {'{body}'}</p>
                             {renderInput('sys_new_assign', 'Message', 'textarea', 5)}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                            <h4 style={{ marginTop: 0, color: '#ef4444' }}>Admin Announcement (Alert)</h4>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Vars: {'{title}'}, {'{body}'}</p>
+                            {renderInput('sys_alert', 'Message', 'textarea', 5)}
                         </div>
                     </div>
                 )}

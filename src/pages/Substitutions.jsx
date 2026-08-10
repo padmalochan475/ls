@@ -403,6 +403,7 @@ const Substitutions = () => {
                 date: reqData.date || '',
                 time: det.time || 'N/A',
                 room: det.room || 'N/A',
+                group: cGroupStr,
                 faculty2: det.faculty2 || null
             });
 
