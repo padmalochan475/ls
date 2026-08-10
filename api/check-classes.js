@@ -224,8 +224,11 @@ export default async function handler(req, res) {
         const nowUTC = new Date();
         const istOffset = 5.5 * 60 * 60 * 1000;
         const nowIST = new Date(nowUTC.getTime() + istOffset);
-        const dayName = nowUTC.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+        const dayName = nowIST.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
         const todayDateStr = nowUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+        let debugLogs = [];
+        debugLogs.push(`force_morning received: ${req.query?.force_morning}`);
 
         console.log(`Starting check-classes (${todayDateStr} ${nowIST.toLocaleTimeString()})...`);
 
@@ -566,7 +569,7 @@ export default async function handler(req, res) {
                             return {
                                 name: fac.name,
                                 empId: fac.empId,
-                                mobile: fac.mobile || fac.phone || user?.mobile || null,
+                                mobile: user?.mobile || fac.mobile || fac.phone || null,
                                 whatsappEnabled: (fac.whatsappEnabled !== false) && (user?.whatsappEnabled !== false)
                             };
                         }).filter(t => t.mobile && t.whatsappEnabled);
@@ -597,7 +600,7 @@ export default async function handler(req, res) {
                             });
 
                             if (targetClasses.length > 0) {
-                                debugLogs.push(`Sending morning briefing for ${target.name}, found ${targetClasses.length} classes`);
+                                debugLogs.push(`Sending morning briefing for ${target.name} (Mobile: ${target.mobile}), found ${targetClasses.length} classes`);
                                 // Sort by time
                                 targetClasses.sort((a,b) => {
                                     if (!a.time || !b.time) return 0;
@@ -614,7 +617,9 @@ export default async function handler(req, res) {
                                 });
 
                                 waMsg += formatMsg('morning_footer', `Have a productive day! ✨\n_LAMS Admin_`, { name: target.name });
-                                await sendWhatsApp(target.mobile, waMsg);
+                                const ok = await sendWhatsApp(target.mobile, waMsg);
+                                if (!ok) debugLogs.push(`WA FAILED for ${target.name} (${target.mobile})`);
+                                else debugLogs.push(`WA SUCCESS for ${target.name} (${target.mobile})`);
                             }
                         }));
                     }
@@ -647,7 +652,6 @@ export default async function handler(req, res) {
         let cachedFaculty = null;
         
         const upcomingClasses = [];
-        const debugLogs = [];
         const lookaheadMinutes = warn1Min + 15;
 
         // Filter Upcoming Classes
@@ -764,10 +768,9 @@ export default async function handler(req, res) {
             upcoming: upcomingClasses.length,
             sent: sentCount,
             academicYear: activeAcademicYear,
-            serverTimeIST: nowIST.toISOString().replace('T', ' ').replace('Z', ' IST'),
-            debug: upcomingClasses.map(c => ({ id: c.id, time: c.startTime, name: c.subject }))
+            serverTimeIST: `${todayDateStr} ${nowIST.toLocaleTimeString()} IST`,
+            debug: debugLogs.concat(upcomingClasses.map(c => ({ id: c.id, time: c.startTime, name: c.subject })))
         });
-
     } catch (error) {
         console.error('Check Classes API Error:', error);
         return res.status(500).json({ error: 'Internal Server Error', details: error.message });
