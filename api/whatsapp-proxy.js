@@ -54,11 +54,11 @@ export default async function handler(req, res) {
     try {
         const db = getDb();
         const configDoc = await db.collection('settings').doc('config').get();
-        let whatsappApiUrl = 'http://129.225.114.212:2785'; // Fallback
-
-        if (configDoc.exists && configDoc.data().whatsappApiUrl) {
-            whatsappApiUrl = configDoc.data().whatsappApiUrl;
+        if (!configDoc.exists || !configDoc.data().whatsappApiUrl) {
+            return res.status(500).json({ error: 'WhatsApp API URL not configured in Master Data Settings.' });
         }
+
+        let whatsappApiUrl = configDoc.data().whatsappApiUrl;
 
         // Clean up URL in case it has trailing slashes
         whatsappApiUrl = whatsappApiUrl.replace(/\/+$/, '');

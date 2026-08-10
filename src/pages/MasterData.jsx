@@ -394,6 +394,8 @@ const MasterData = ({ initialTab }) => {
             console.error("Error updating config:", e);
             toast.error(`Failed to update: ${e.message}`);
         }
+    };
+
     const handleUpdateGroqKey = async () => {
         if (!checkWritePermission()) return;
         try {

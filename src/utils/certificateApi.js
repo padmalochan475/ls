@@ -2,8 +2,6 @@ import toast from 'react-hot-toast';
 import { db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
-const FALLBACK_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxafCLI6Y6if5d7XMxQfBj4OyKROVsP404AwpUucUDfb4TL3aufbHLjOllCFVAvTXteAA/exec";
-
 let cachedApiUrl = null;
 
 const getApiUrl = async () => {
@@ -15,10 +13,9 @@ const getApiUrl = async () => {
             return cachedApiUrl;
         }
     } catch (e) {
-        console.warn("Could not fetch dynamic certApiUrl, falling back.", e);
+        console.warn("Could not fetch dynamic certApiUrl.", e);
     }
-    cachedApiUrl = FALLBACK_APPS_SCRIPT_URL;
-    return cachedApiUrl;
+    return null;
 };
 
 export const certApi = {

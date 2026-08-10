@@ -185,9 +185,8 @@ async function getWhatsappApiBase() {
     } catch (e) {
         console.error("Failed to fetch WhatsApp API config:", e);
     }
-    // Fallback to environment variable or hardcoded
-    cachedWhatsappApiUrl = process.env.VITE_WHATSAPP_API_URL ? process.env.VITE_WHATSAPP_API_URL.replace(/\/api\/sendText$/, '') : 'http://129.225.114.212:2785';
-    return cachedWhatsappApiUrl;
+    // If no config found, throw an error to prevent hardcoded behavior
+    throw new Error("WhatsApp API URL not configured in Master Data Settings.");
 }
 
 async function sendWhatsApp(phoneNumber, message) {

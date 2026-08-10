@@ -38,8 +38,15 @@ const Login = () => {
     if (currentUser && userProfile) {
       navigate('/');
     } else if (currentUser && profileMissing) {
-      setError("Your profile is incomplete or missing. Please register again or contact Admin.");
-      logout().catch(console.error);
+      // Auto-heal: If Firestore profile was deleted (e.g. by a cleanup script) but Auth remains,
+      // delete the Auth user so they can sign up again cleanly without "Email already in use" errors.
+      currentUser.delete().then(() => {
+          setError("Your old profile data was cleared during a system cleanup. Please click 'Sign Up' below to create a fresh profile.");
+      }).catch((err) => {
+          console.error("Failed to auto-delete orphaned auth:", err);
+          setError("Your profile is missing. Please contact Admin.");
+          logout().catch(console.error);
+      });
     }
   }, [currentUser, userProfile, profileMissing, loading, navigate, logout]);
 
