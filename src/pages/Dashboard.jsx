@@ -92,30 +92,6 @@ const calculateTodaySchedule = (selectedFaculty, selectedFacultyId, allData = []
         .sort((a, b) => (Number(a.sortVal) || 0) - (Number(b.sortVal) || 0));
 };
 
-const calculateWeeklySchedule = (selectedFaculty, allData = [], weekDates = [], isPersonalView, userProfile, myAbsences = [], activeSubstitutions = []) => {
-    let facultyData = allData || [];
-    if (selectedFaculty !== 'All Assignments' && selectedFaculty) {
-        // Filter out absences that occur THIS WEEK
-        facultyData = (allData || []).filter(item => {
-            if (!isMyAssignment(item, selectedFaculty, userProfile, isPersonalView)) return false;
-
-            // Fuzzy Find Day
-            const itemDayNorm = normalizeStr(item.day);
-            const dayInfo = (weekDates || []).find(d => normalizeStr(d.dayName) === itemDayNorm);
-
-            if (!dayInfo) return true; // Keep if we can't map it (safety)
-
-            const itemDateStr = formatDateLocal(dayInfo.fullDate);
-            if ((myAbsences || []).some(a => a.originalScheduleId === item.id && a.date === itemDateStr)) return false;
-            return true;
-        });
-
-        // Add Substitutions that occur THIS WEEK
-        const weeksSubs = (activeSubstitutions || []).filter(s => {
-            const sDayNorm = normalizeStr(s.day);
-            const dayInfo = (weekDates || []).find(d => normalizeStr(d.dayName) === sDayNorm);
-            if (!dayInfo) return false;
-            return s.date === formatDateLocal(dayInfo.fullDate);
 const calculateWeeklySchedule = (selectedFaculty, selectedFacultyId, allData = [], weekDates = [], myAbsences = [], activeSubstitutions = []) => {
     const grouped = (weekDates || []).reduce((acc, { dayName }) => {
         if (selectedFaculty !== 'All Assignments' && selectedFaculty) {
