@@ -437,13 +437,13 @@ export default async function handler(req, res) {
                 }
 
                 const otherFac = (cls.facultyEmpId === primaryTarget || cls.faculty === primaryTargetName) ? cls.faculty2 : cls.faculty;
-                if (otherFac) cofacStr = ` WITH ${otherFac.toUpperCase()}`;
+                if (otherFac) cofacStr = `\n 👥 *With:* ${otherFac.toUpperCase()}`;
             }
-            const roomStr = cls.room ? ` AT ${cls.room.toUpperCase()}` : '';
-            const semStr = (cls.semester || cls.sem) ? ` (${cls.semester || cls.sem} SEM)` : '';
-            const subStr = isSub && cls.faculty ? ` (SUB FOR ${cls.faculty.toUpperCase()})` : '';
+            const roomStr = cls.room ? `\n 🏫 *Room:* ${cls.room.toUpperCase()}` : '';
+            const semStr = (cls.semester || cls.sem) ? `\n 🎓 *Sem:* ${cls.semester || cls.sem}` : '';
+            const subStr = isSub && cls.faculty ? `\n ⚠️ *SUB FOR:* ${cls.faculty.toUpperCase()}` : '';
 
-            const defaultTemplate = "{idx}. {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}";
+            const defaultTemplate = "🔹 *[{idx}]* ⏰ _{time}_\n 📌 *{subject}* ({group}){roomStr}{semStr}{cofacStr}{subStr}\n";
             
             const vars = {
                 idx: String(idx + 1),
@@ -499,7 +499,7 @@ export default async function handler(req, res) {
                         );
 
                         if (mySchedule.length > 0) {
-                            let previewMsg = formatMsg('weekly_header', `🗓️ *Weekly Preview for {name}* 🗓️\n\nPrep for the upcoming week! You have *{total_sessions} sessions* scheduled.\n\n`, { name: target.name, total_sessions: mySchedule.length });
+                            let previewMsg = formatMsg('weekly_header', `🗓️ *WEEKLY PREVIEW: {name}* 🗓️\n\n🎯 _Prep for the upcoming week!_\nYou have *{total_sessions} sessions* scheduled.\n\n`, { name: target.name, total_sessions: mySchedule.length });
                             
                             // Group by day
                             const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -606,7 +606,7 @@ export default async function handler(req, res) {
                                     return parseTimeStr(a.time.split(' - ')[0], nowIST) - parseTimeStr(b.time.split(' - ')[0], nowIST);
                                 });
 
-                                let waMsg = formatMsg('morning_header', `📅 *Today's Briefing: {name}* 📅\nDay: *{day}* | Classes: *{total_classes}*\n\n`, { name: target.name, day: dayName, total_classes: targetClasses.length });
+                                let waMsg = formatMsg('morning_header', `✨ *GOOD MORNING, {name}!* ✨\n🗓️ _{day}_ | 📚 *{total_classes} Classes Today*\n\n`, { name: target.name, day: dayName, total_classes: targetClasses.length });
                                 
                                 targetClasses.forEach((cls, idx) => {
                                     const sub = subsMap.get(cls.id);
@@ -615,7 +615,7 @@ export default async function handler(req, res) {
                                     waMsg += formatClassLine('morning_class_line', idx, cls, target, isSub);
                                 });
 
-                                waMsg += formatMsg('morning_footer', `Have a productive day! ✨\n_LAMS Admin_`, { name: target.name });
+                                waMsg += formatMsg('morning_footer', `\n💡 _Have a highly productive day!_\n~ *LAMS Admin*`, { name: target.name });
                                 const ok = await sendWhatsApp(target.mobile, waMsg);
                                 if (ok !== true) debugLogs.push(`WA FAILED for ${target.name} (${target.mobile}): ${ok}`);
                                 else debugLogs.push(`WA SUCCESS for ${target.name} (${target.mobile})`);
@@ -693,7 +693,7 @@ export default async function handler(req, res) {
         for (const cls of upcomingClasses) {
             try {
                 const minutesLeft = Math.round((cls.startTime - nowIST) / 60000);
-                let groupStr = `${cls.dept || ''}-${cls.section || ''}`.toUpperCase();
+                let groupStr = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-').toUpperCase();
                 
                 // Get Full User Objects using CACHED data
                 const users = await getFacultyData([
@@ -739,7 +739,7 @@ export default async function handler(req, res) {
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft };
                         const pushTitle = formatMsg('warn1_push_title', 'Upcoming Class', vars);
                         const pushBody = formatMsg('warn1_push_body', '🔔 Heads Up: {subject} ({group}) starts in {mins} mins at Room {room}.', vars);
-                        const waMsg = formatMsg('warn1_wa', '🔔 *Upcoming* 🔔\n\n🔔 Heads Up: {subject} ({group}) starts in {mins} mins at Room {room}.', vars);
+                        const waMsg = formatMsg('warn1_wa', '🔔 *UPCOMING CLASS* 🔔\n\n📌 *{subject}* ({group})\n⏰ _Starts in:_ *{mins} mins*\n🏫 _Room:_ *{room}*', vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
                         
@@ -763,7 +763,7 @@ export default async function handler(req, res) {
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft };
                         const pushTitle = formatMsg('warn2_push_title', 'Class Starting!', vars);
                         const pushBody = formatMsg('warn2_push_body', '🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!', vars);
-                        const waMsg = formatMsg('warn2_wa', '🚀 *Now* 🚀\n\n🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!', vars);
+                        const waMsg = formatMsg('warn2_wa', '🚀 *CLASS STARTING NOW!* 🚀\n\n🚨 _ACTION REQUIRED:_ Run to *Room {room}!*\n\n📌 *{subject}* ({group}) is starting *NOW!*', vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
                         
