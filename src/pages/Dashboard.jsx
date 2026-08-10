@@ -347,28 +347,20 @@ const Dashboard = () => {
             const adjustmentsRef = collection(db, 'adjustments');
             
             // --- SURGICAL DASHBOARD ADJUSTMENTS ---
-            // Mode A: Faculty/Personal - Listen to THEIR OWN adjustments for the year (Small/Fast)
-            // Mode B: Admin/All - Listen to ONLY TODAY'S adjustments (Small/Fast)
-            let q;
+            // Calculate target dates for the current week
+            const targetDates = weekDates.length > 0 
+                ? weekDates.map(d => formatDateLocal(d.fullDate)) 
+                : [formatDateLocal(currentDate)];
 
-            if (dashboardView === 'personal' && selectedFaculty !== 'All Assignments') {
-                q = query(adjustmentsRef, 
-                    and(
-                        where('academicYear', '==', activeAcademicYear),
-                        or(
-                            where('originalFacultyEmpId', '==', myId),
-                            where('substituteEmpId', '==', myId)
-                        )
-                    )
-                );
-            } else {
-                q = query(adjustmentsRef, 
-                    and(
-                        where('academicYear', '==', activeAcademicYear),
-                        where('date', '==', targetDateStr)
-                    )
-                );
-            }
+            // We fetch ALL adjustments for the current week to ensure the Weekly Schedule view 
+            // has complete substitution data, and to bypass legacy index limitations for empId.
+            // The `calculateDerivedSchedules` function perfectly filters them in-memory.
+            const q = query(adjustmentsRef, 
+                and(
+                    where('academicYear', '==', activeAcademicYear),
+                    where('date', 'in', targetDates)
+                )
+            );
 
             return onSnapshot(q, (snap) => {
                 if (!isActiveRef.current) return;
@@ -382,7 +374,7 @@ const Dashboard = () => {
             setAdjustments([]);
             return () => {};
         }
-    }, [activeAcademicYear, userProfile?.empId, dashboardView, selectedFaculty, selectedFacultyId, currentDate]);
+    }, [activeAcademicYear, userProfile?.empId, dashboardView, selectedFaculty, selectedFacultyId, currentDate, weekDates]);
 
 
     // Derived Schedules (Memoized)
