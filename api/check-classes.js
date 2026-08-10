@@ -313,7 +313,7 @@ export default async function handler(req, res) {
                             };
                         }).filter(u => u.mobile && u.whatsappEnabled);
                         
-                        const waMsg = formatMsg('holiday_wa', '🏝️ *HOLIDAY ALERT!* 🏝️\n\nToday is *{holiday_name}*! 🎉\nAll classes are suspended. Enjoy your day off!\n\n~ *LAMS Admin*', { holiday_name: h.name });
+                        const waMsg = formatMsg('holiday_wa', '🏝️ *HAPPY HOLIDAY!* 🏝️\n\nWishing everyone a wonderful *{holiday_name}*! 🎉\nHave a great time!\n\n~ *LAMS Admin*', { holiday_name: h.name });
                         
                         await Promise.all(waTargets.map(u => sendWhatsApp(u.mobile, waMsg)));
                     } catch (waErr) {
