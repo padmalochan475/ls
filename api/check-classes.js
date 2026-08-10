@@ -742,7 +742,7 @@ export default async function handler(req, res) {
                         const waMsg = formatMsg('warn1_wa', '🔔 *Upcoming* 🔔\n\n🔔 Heads Up: {subject} ({group}) starts in {mins} mins at Room {room}.', vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
-                        await Promise.all(finalUsers.filter(u => u.mobile).map(u => sendWhatsApp(u.mobile, waMsg)));
+                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled).map(u => sendWhatsApp(u.mobile, waMsg)));
                         await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning' });
                         sentCount++;
                     }
@@ -759,7 +759,7 @@ export default async function handler(req, res) {
                         const waMsg = formatMsg('warn2_wa', '🚀 *Now* 🚀\n\n🚀 ACTION: Run to Room {room}! {subject} ({group}) is starting NOW!', vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
-                        await Promise.all(finalUsers.filter(u => u.mobile).map(u => sendWhatsApp(u.mobile, waMsg)));
+                        await Promise.all(finalUsers.filter(u => u.mobile && u.whatsappEnabled).map(u => sendWhatsApp(u.mobile, waMsg)));
                         await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning' });
                         sentCount++;
                     }
