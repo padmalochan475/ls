@@ -1801,12 +1801,12 @@ const RequestCard = ({ req, type, isMobile, onAction, onCancel, fullSchedule, fa
 
     let coFaculty = null;
     if (m.faculty && m.faculty2) {
-        const checkName = (isSent ? (req.requesterName || "") : (req.targetFacultyName || "")).toLowerCase().trim();
-        const checkId = req.requesterId;
+        const absentName = (req.requesterName || "").toLowerCase().trim();
+        const absentId = req.requesterId;
 
-        if (checkId === m.facultyEmpId || f1.includes(checkName) || checkName.includes(f1)) {
+        if ((absentId && m.facultyEmpId && String(absentId) === String(m.facultyEmpId)) || (absentName && f1 && (f1.includes(absentName) || absentName.includes(f1)))) {
             coFaculty = { name: m.faculty2, type: 'Secondary' };
-        } else if (checkId === m.faculty2EmpId || f2.includes(checkName) || checkName.includes(f2)) {
+        } else if ((absentId && m.faculty2EmpId && String(absentId) === String(m.faculty2EmpId)) || (absentName && f2 && (f2.includes(absentName) || absentName.includes(f2)))) {
             coFaculty = { name: m.faculty, type: 'Primary' };
         }
     }

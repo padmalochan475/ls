@@ -1,10 +1,11 @@
 /* eslint-env node */
-import admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // Singleton Initialization
-if (!admin.apps.length) {
+if (!getApps().length) {
     try {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
             let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -13,13 +14,13 @@ if (!admin.apps.length) {
             }
             serviceAccountStr = serviceAccountStr.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
             const serviceAccount = JSON.parse(serviceAccountStr);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
+            initializeApp({
+                credential: cert(serviceAccount)
             });
             console.log("Firebase Admin Initialized Successfully from ENV");
         } else {
             // Fallback to Application Default Credentials
-            admin.initializeApp();
+            initializeApp();
             console.log("Firebase Admin Initialized Successfully with Default Credentials");
         }
     } catch (error) {
@@ -38,9 +39,9 @@ export default async function handler(req, res) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
-        if (!admin.apps.length) throw new Error("Firebase Admin not initialized.");
+        if (!getApps().length) throw new Error("Firebase Admin not initialized.");
 
-        const db = admin.firestore();
+        const db = getFirestore();
 
         // 1. Get Config
         const configSnap = await db.collection('settings').doc('config').get();

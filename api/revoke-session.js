@@ -1,8 +1,10 @@
 /* eslint-env node */
-import admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Singleton Initialization
-if (!admin.apps.length) {
+if (!getApps().length) {
     try {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
             let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -11,13 +13,13 @@ if (!admin.apps.length) {
             }
             serviceAccountStr = serviceAccountStr.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
             const serviceAccount = JSON.parse(serviceAccountStr);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
+            initializeApp({
+                credential: cert(serviceAccount)
             });
             console.log("Firebase Admin Initialized Successfully from ENV");
         } else {
             // Fallback to Application Default Credentials
-            admin.initializeApp();
+            initializeApp();
             console.log("Firebase Admin Initialized Successfully with Default Credentials");
         }
     } catch (error) {
@@ -51,21 +53,16 @@ export default async function handler(req, res) {
     const idToken = authHeader.split('Bearer ')[1];
 
     try {
-        if (!admin.apps.length) {
+        if (!getApps().length) {
             throw new Error("Firebase Admin not initialized. Check server logs.");
         }
 
         // 2. Verify Token
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const decodedToken = await getAuth().verifyIdToken(idToken);
         const uid = decodedToken.uid;
 
         // 3. Revoke Refresh Tokens
-        await admin.auth().revokeRefreshTokens(uid);
-
-        // 4. (Optional) Update Firestore timestamp to enforce client-side checks
-        // await admin.firestore().collection('users').doc(uid).update({ 
-        //    lastLogoutAt: admin.firestore.FieldValue.serverTimestamp() 
-        // });
+        await getAuth().revokeRefreshTokens(uid);
 
         console.log(`Sessions revoked for user: ${uid}`);
         return res.status(200).json({ success: true, message: 'All other sessions have been revoked.' });

@@ -65,7 +65,7 @@ export const validateBooking = (newBooking, schedule, options = {}) => {
         const isSamePerson = (name1, id1, name2, id2) => {  
             // 1. If BOTH IDs exist, rely strictly on IDs for absolute precision
             if (id1 && id2) {
-                return id1 === id2;
+                return String(id1) === String(id2);
             }
 
             // 2. Fallback to fuzzy Name match if IDs are missing

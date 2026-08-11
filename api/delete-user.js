@@ -1,8 +1,10 @@
 /* eslint-env node */
-import admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Singleton Initialization
-if (!admin.apps.length) {
+if (!getApps().length) {
     try {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
             let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -11,13 +13,13 @@ if (!admin.apps.length) {
             }
             serviceAccountStr = serviceAccountStr.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
             const serviceAccount = JSON.parse(serviceAccountStr);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
+            initializeApp({
+                credential: cert(serviceAccount)
             });
             console.log("Firebase Admin Initialized Successfully from ENV");
         } else {
             // Fallback to Application Default Credentials
-            admin.initializeApp();
+            initializeApp();
             console.log("Firebase Admin Initialized Successfully with Default Credentials");
         }
     } catch (error) {
@@ -51,16 +53,16 @@ export default async function handler(req, res) {
     const idToken = authHeader.split('Bearer ')[1];
 
     try {
-        if (!admin.apps.length) {
+        if (!getApps().length) {
             throw new Error("Firebase Admin not initialized. Check server logs.");
         }
 
         // 2. Verify Token
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const decodedToken = await getAuth().verifyIdToken(idToken);
         const callerUid = decodedToken.uid;
 
         // 3. Verify Caller is Admin
-        const callerDoc = await admin.firestore().collection('users').doc(callerUid).get();
+        const callerDoc = await getFirestore().collection('users').doc(callerUid).get();
         if (!callerDoc.exists || callerDoc.data().role !== 'admin') {
             console.warn(`Unauthorized delete attempt by UID: ${callerUid}`);
             return res.status(403).json({ error: 'Forbidden: Requires admin privileges' });
@@ -77,7 +79,7 @@ export default async function handler(req, res) {
         }
 
         // 5. Delete User from Firebase Auth
-        await admin.auth().deleteUser(targetUid);
+        await getAuth().deleteUser(targetUid);
         console.log(`Successfully deleted user ${targetUid} from Firebase Auth by Admin ${callerUid}`);
 
         return res.status(200).json({ success: true, message: 'User permanently deleted from Authentication.' });
