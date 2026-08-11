@@ -374,14 +374,12 @@ const Substitutions = () => {
                 adminComment: 'Cancelled by requester'
             });
 
+            const det = reqData.scheduleDetails || {};
+            const cGroupStr = `${det.dept || '?'}-${det.grp || '?'}${det.subgrp ? `-${det.subgrp}` : ''}`;
+            const cCoFac = det.faculty2 ? ` WITH ${det.faculty2}` : '';
+
             // Send notification to the target faculty
             if (reqData.targetFacultyId) {
-                const det = reqData.scheduleDetails || {};
-                // eslint-disable-next-line sonarjs/no-nested-template-literals
-                const cGroupStr = `${det.dept || '?'}-${det.grp || '?'}${det.subgrp ? `-${det.subgrp}` : ''}`;
-                const cCoFac = det.faculty2 ? ` WITH ${det.faculty2}` : '';
-                // formatting best effort without full schedule fetch
-
                 await sendNotification({
                     empIds: [reqData.targetFacultyId],
                     title: 'Request Cancelled',
