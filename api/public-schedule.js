@@ -1,8 +1,7 @@
 /* eslint-env node */
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+
 
 // Singleton Initialization
 if (!getApps().length) {
