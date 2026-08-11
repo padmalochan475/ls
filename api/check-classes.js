@@ -495,8 +495,8 @@ export default async function handler(req, res) {
 
                     for (const target of waTargets) {
                         const mySchedule = allSchedule.filter(cls => 
-                            (target.empId && cls.facultyEmpId === target.empId) || 
-                            (target.empId && cls.faculty2EmpId === target.empId)
+                            (target.empId && cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) || 
+                            (target.empId && cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId))
                         );
 
                         if (mySchedule.length > 0) {
@@ -582,21 +582,21 @@ export default async function handler(req, res) {
                             // Find classes where they are the primary, co-faculty, or substitute
                             const targetClasses = allTodaysClasses.filter(cls => {
                                 const sub = subsMap.get(cls.id);
-                                if (sub) {
-                                    // The substitute gets the class
-                                    if (target.empId && sub.substituteEmpId === target.empId) return true;
-                                    
-                                    // The primary faculty (who is substituted) does not get the class
-                                    if (target.empId && sub.originalFacultyEmpId === target.empId) return false;
-                                    
-                                    // But the co-faculty (faculty2) should still get it if they match.
-                                    if (target.empId && (cls.facultyEmpId === target.empId || cls.faculty2EmpId === target.empId)) {
-                                        return true;
-                                    }
-                                    
-                                    return false;
-                                }
-                                return target.empId && (cls.facultyEmpId === target.empId || cls.faculty2EmpId === target.empId);
+                        if (sub) {
+                            // The substitute gets the class
+                            if (target.empId && sub.substituteEmpId && String(sub.substituteEmpId) === String(target.empId)) return true;
+                            
+                            // The primary faculty (who is substituted) does not get the class
+                            if (target.empId && sub.originalFacultyEmpId && String(sub.originalFacultyEmpId) === String(target.empId)) return false;
+                            
+                            // But the co-faculty (faculty2) should still get it if they match.
+                            if (target.empId && ((cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) || (cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)))) {
+                                return true;
+                            }
+                            
+                            return false;
+                        }
+                        return target.empId && ((cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) || (cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)));
                             });
 
                             if (targetClasses.length > 0) {
@@ -611,7 +611,7 @@ export default async function handler(req, res) {
                                 
                                 targetClasses.forEach((cls, idx) => {
                                     const sub = subsMap.get(cls.id);
-                                    const isSub = sub && target.empId && (sub.substituteEmpId === target.empId);
+                                    const isSub = sub && target.empId && sub.substituteEmpId && String(sub.substituteEmpId) === String(target.empId);
                                     
                                     waMsg += formatClassLine('morning_class_line', idx, cls, target, isSub);
                                 });
