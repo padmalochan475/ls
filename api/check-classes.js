@@ -437,7 +437,7 @@ export default async function handler(req, res) {
                     primaryTargetName = cls.faculty;
                 }
 
-                const otherFac = (cls.facultyEmpId === primaryTarget || cls.faculty === primaryTargetName) ? cls.faculty2 : cls.faculty;
+                const otherFac = ((cls.facultyEmpId && primaryTarget && String(cls.facultyEmpId) === String(primaryTarget)) || cls.faculty === primaryTargetName) ? cls.faculty2 : cls.faculty;
                 if (otherFac) cofacStr = `\n 👥 *With:* ${otherFac.toUpperCase()}`;
             }
             const roomStr = cls.room ? `\n 🏫 *Room:* ${cls.room.toUpperCase()}` : '';
