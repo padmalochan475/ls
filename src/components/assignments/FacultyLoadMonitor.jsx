@@ -14,7 +14,7 @@ const FacultyLoadMonitor = ({ facultyId, fullSchedule, faculty }) => {
     fullSchedule.forEach(s => {
         let match = false;
         // logic matches checkFacultyBusy
-        if (empId && (s.facultyEmpId === empId || s.faculty2EmpId === empId)) {
+        if (empId && (s.facultyEmpId && String(s.facultyEmpId) === String(empId) || s.faculty2EmpId && String(s.faculty2EmpId) === String(empId))) {
             match = true;
         } else {
             // Fallback to Fuzzy Name Match

@@ -36,8 +36,8 @@ const StatCard = ({ title, value, icon, trend, gradient }) => (
 const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
     // 1. Robust Check: Match by EmpID
     if (isPersonalView && userProfile?.empId) {
-        if (item.facultyEmpId === userProfile.empId) return true;
-        if (item.faculty2EmpId === userProfile.empId) return true;
+        if (item.facultyEmpId && String(item.facultyEmpId) === String(userProfile.empId)) return true;
+        if (item.faculty2EmpId && String(item.faculty2EmpId) === String(userProfile.empId)) return true;
         
         // If the item HAS an empId assigned to BOTH slots, and neither matched, it's definitely NOT theirs
         if (item.facultyEmpId && (!item.faculty2 || item.faculty2EmpId)) {

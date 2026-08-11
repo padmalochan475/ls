@@ -92,7 +92,7 @@ const NotificationManager = ({ users }) => {
                 targetUids = users.map(u => u.id).filter(Boolean);
             } else {
                 // Try to find by ID (default behavior of select)
-                const found = users.find(u => u.id === targetUser || u.empId === targetUser);
+                const found = users.find(u => u.id === targetUser || (u.empId && String(u.empId) === String(targetUser)));
                 if (found && found.id) targetUids = [found.id];
             }
 

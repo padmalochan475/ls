@@ -274,7 +274,7 @@ const Scheduler = () => {
                     // eslint-disable-next-line sonarjs/no-nested-functions
                     const facObj = faculty.find(f => f.name === facName);
                     if (facObj?.empId) {
-                        if (item.facultyEmpId === facObj.empId || item.faculty2EmpId === facObj.empId) return true;
+                        if (item.facultyEmpId && String(item.facultyEmpId) === String(facObj.empId) || item.faculty2EmpId && String(item.faculty2EmpId) === String(facObj.empId)) return true;
                     }
 
                     return false;
@@ -341,7 +341,7 @@ const Scheduler = () => {
         const resolveName = (val) => {
             if (!val) return '';
             // Check if 'faculty' list is available in scope (it is from props/context)
-            const found = faculty.find(f => f.name === val || f.empId === val || f.uid === val || f.id === val);
+            const found = faculty.find(f => f.name === val || (f.empId && String(f.empId) === String(val)) || (f.uid && String(f.uid) === String(val)) || f.id === val);
             return found ? found.name : val;
         };
 

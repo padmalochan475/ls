@@ -430,7 +430,7 @@ const Substitutions = () => {
 
             // 1. Match by EmpID (Gold Standard)
             if (userProfile?.empId) {
-                if (s.facultyEmpId === userProfile.empId || s.faculty2EmpId === userProfile.empId) return true;
+                if (s.facultyEmpId && String(s.facultyEmpId) === String(userProfile.empId) || s.faculty2EmpId && String(s.faculty2EmpId) === String(userProfile.empId)) return true;
             }
 
             return false; // Name matching is disabled to prevent duplicate name collisions
@@ -1014,7 +1014,7 @@ const Substitutions = () => {
                                                                         const f2Norm = normalizeStr(c.faculty2);
 
                                                                         // Check if user is faculty2 (co-faculty)
-                                                                        const isCoFaculty = (f2Norm === userNameNorm) || (userEmpId && c.faculty2EmpId === userEmpId);
+                                                                        const isCoFaculty = (f2Norm === userNameNorm) || (userEmpId && c.faculty2EmpId && String(c.faculty2EmpId) === String(userEmpId));
 
                                                                         if (isCoFaculty) {
                                                                             return `w/ ${c.faculty}`;

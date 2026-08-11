@@ -70,7 +70,7 @@ const Profile = () => {
         const myAssignments = assignments.filter(a => {
             const f1 = normalizeStr(a.faculty);
             const f2 = normalizeStr(a.faculty2);
-            const matchesId = userProfile.empId && (a.facultyEmpId === userProfile.empId || a.faculty2EmpId === userProfile.empId);
+            const matchesId = userProfile.empId && (a.facultyEmpId && String(a.facultyEmpId) === String(userProfile.empId) || a.faculty2EmpId && String(a.faculty2EmpId) === String(userProfile.empId));
             return f1 === myNameNorm || f2 === myNameNorm || matchesId;
         });
 

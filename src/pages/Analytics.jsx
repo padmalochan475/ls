@@ -526,7 +526,7 @@ const Analytics = () => {
 
                 const targetFacultyObj = data.faculty.find(f => normalizeStr(f.name) === search);
                 if (targetFacultyObj?.empId) {
-                    if (a.facultyEmpId === targetFacultyObj.empId || a.faculty2EmpId === targetFacultyObj.empId) return true;
+                    if (a.facultyEmpId && String(a.facultyEmpId) === String(targetFacultyObj.empId) || a.faculty2EmpId && String(a.faculty2EmpId) === String(targetFacultyObj.empId)) return true;
                 }
                 return false;
             });
@@ -1100,7 +1100,7 @@ const Analytics = () => {
 
                                             const targetFacultyObj = data.faculty.find(f => normalizeStr(f.name) === search);
                                             if (targetFacultyObj?.empId) {
-                                                if (a.facultyEmpId === targetFacultyObj.empId || a.faculty2EmpId === targetFacultyObj.empId) return true;
+                                                if (a.facultyEmpId && String(a.facultyEmpId) === String(targetFacultyObj.empId) || a.faculty2EmpId && String(a.faculty2EmpId) === String(targetFacultyObj.empId)) return true;
                                             }
                                             return false;
                                         })
@@ -1307,7 +1307,7 @@ const Analytics = () => {
                                         if (f1.includes(search) || f2.includes(search)) return true;
                                         const targetFacultyObj = data.faculty.find(f => normalizeStr(f.name) === search);
                                         if (targetFacultyObj?.empId) {
-                                            if (a.facultyEmpId === targetFacultyObj.empId || a.faculty2EmpId === targetFacultyObj.empId) return true;
+                                            if (a.facultyEmpId && String(a.facultyEmpId) === String(targetFacultyObj.empId) || a.faculty2EmpId && String(a.faculty2EmpId) === String(targetFacultyObj.empId)) return true;
                                         }
                                         return false;
                                     }).length === 0 && (
@@ -2252,7 +2252,7 @@ const Analytics = () => {
 
                                     const targetFacultyObj = data.faculty.find(f => normalizeStr(f.name) === search);
                                     if (targetFacultyObj?.empId) {
-                                        if (a.facultyEmpId === targetFacultyObj.empId || a.faculty2EmpId === targetFacultyObj.empId) return true;
+                                        if (a.facultyEmpId && String(a.facultyEmpId) === String(targetFacultyObj.empId) || a.faculty2EmpId && String(a.faculty2EmpId) === String(targetFacultyObj.empId)) return true;
                                     }
                                     return false;
                                 });

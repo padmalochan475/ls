@@ -562,7 +562,7 @@ const Assignments = () => {
 
         const facObj = faculty.find(f => normalizeStr(f.name) === search);
         if (facObj?.empId) {
-            if (s.facultyEmpId === facObj.empId || s.faculty2EmpId === facObj.empId) return true;
+            if (s.facultyEmpId && String(s.facultyEmpId) === String(facObj.empId) || s.faculty2EmpId && String(s.faculty2EmpId) === String(facObj.empId)) return true;
         }
         return false;
     }, [faculty]);

@@ -38,7 +38,7 @@ export const validateBooking = (newBooking, schedule, options = {}) => {
     // 1. Self Validations
     if (faculty && faculty2) {
         if (normalizeStr(faculty) === normalizeStr(faculty2)) return "Invalid: Cannot select the same faculty twice.";
-        if (facultyEmpId && faculty2EmpId && facultyEmpId === faculty2EmpId) {
+        if (facultyEmpId && faculty2EmpId && String(facultyEmpId) === String(faculty2EmpId)) {
             return "Invalid: Selected faculty members have the same Employee ID.";
         }
     }
@@ -178,7 +178,7 @@ export const analyzeSchedule = (booking, schedule, metadata = {}) => {
         const count = dailySchedule.filter(s => {
             const f1 = normalizeStr(s.faculty);
             const f2 = normalizeStr(s.faculty2);
-            const matchesId = facEmpId && (s.facultyEmpId === facEmpId || s.faculty2EmpId === facEmpId);
+            const matchesId = facEmpId && (s.facultyEmpId && String(s.facultyEmpId) === String(facEmpId) || s.faculty2EmpId && String(s.faculty2EmpId) === String(facEmpId));
             return f1 === normSearch || f2 === normSearch || matchesId;
         }).length;
 
