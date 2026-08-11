@@ -434,9 +434,20 @@ export default async function handler(req, res) {
                     primaryTarget = subData.originalFacultyEmpId || cls.facultyEmpId;
                     primaryTargetName = (String(primaryTarget) === String(cls.faculty2EmpId)) ? cls.faculty2 : cls.faculty;
                 }
+                if (isSub) {
+                    primaryTarget = cls.facultyEmpId;
+                    primaryTargetName = cls.faculty;
+                }
 
-                const otherFac = ((cls.facultyEmpId && primaryTarget && String(cls.facultyEmpId) === String(primaryTarget)) || cls.faculty === primaryTargetName) ? cls.faculty2 : cls.faculty;
-                if (otherFac) cofacStr = `\n 👥 *With:* ${otherFac.toUpperCase()}`;
+                // Match by empId if available, fallback to case-insensitive name match
+                const isPrimary = (cls.facultyEmpId && primaryTarget && String(cls.facultyEmpId) === String(primaryTarget)) || 
+                                  (!cls.facultyEmpId && cls.faculty && primaryTargetName && String(cls.faculty).trim().toLowerCase() === String(primaryTargetName).trim().toLowerCase());
+                
+                const otherFac = isPrimary ? cls.faculty2 : cls.faculty;
+                // Only show co-faculty if it's a non-empty string and not the person's own name again
+                if (otherFac && otherFac.trim() !== '' && String(otherFac).trim().toLowerCase() !== String(target.name).trim().toLowerCase()) {
+                    cofacStr = ` WITH ${otherFac.trim().toUpperCase()}`;
+                }
             }
             const roomStr = cls.room ? `\n 🏫 *Room:* ${cls.room.toUpperCase()}` : '';
             const semStr = (cls.semester || cls.sem) ? `\n 🎓 *Sem:* ${cls.semester || cls.sem}` : '';
@@ -492,10 +503,13 @@ export default async function handler(req, res) {
                     }).filter(t => t.mobile && t.whatsappEnabled);
 
                     for (const target of waTargets) {
-                        const mySchedule = allSchedule.filter(cls => 
-                            (target.empId && cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) || 
-                            (target.empId && cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId))
-                        );
+                        const mySchedule = allSchedule.filter(cls => {
+                            const match1 = (target.empId && cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) ||
+                                           (cls.faculty && target.name && String(cls.faculty).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                            const match2 = (target.empId && cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)) ||
+                                           (cls.faculty2 && target.name && String(cls.faculty2).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                            return match1 || match2;
+                        });
 
                         if (mySchedule.length > 0) {
                             let previewMsg = formatMsg('weekly_header', defaultTemplates.weekly_header, { name: target.name, total_sessions: mySchedule.length });
@@ -582,19 +596,27 @@ export default async function handler(req, res) {
                                 const sub = subsMap.get(cls.id);
                         if (sub) {
                             // The substitute gets the class
-                            if (target.empId && sub.substituteEmpId && String(sub.substituteEmpId) === String(target.empId)) return true;
+                            const subMatch = (target.empId && sub.substituteEmpId && String(sub.substituteEmpId) === String(target.empId)) ||
+                                             (sub.substituteName && target.name && String(sub.substituteName).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                            if (subMatch) return true;
                             
                             // The primary faculty (who is substituted) does not get the class
-                            if (target.empId && sub.originalFacultyEmpId && String(sub.originalFacultyEmpId) === String(target.empId)) return false;
+                            const origMatch = (target.empId && sub.originalFacultyEmpId && String(sub.originalFacultyEmpId) === String(target.empId)) ||
+                                              (sub.originalFacultyName && target.name && String(sub.originalFacultyName).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                            if (origMatch) return false;
                             
                             // But the co-faculty (faculty2) should still get it if they match.
-                            if (target.empId && ((cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) || (cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)))) {
-                                return true;
-                            }
+                            const match2 = (target.empId && cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)) ||
+                                           (cls.faculty2 && target.name && String(cls.faculty2).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                            if (match2) return true;
                             
                             return false;
                         }
-                        return target.empId && ((cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) || (cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)));
+                        const match1 = (target.empId && cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) ||
+                                       (cls.faculty && target.name && String(cls.faculty).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                        const match2 = (target.empId && cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)) ||
+                                       (cls.faculty2 && target.name && String(cls.faculty2).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                        return match1 || match2;
                             });
 
                             if (targetClasses.length > 0) {
@@ -748,8 +770,13 @@ export default async function handler(req, res) {
                             if (u.mobile && u.whatsappEnabled !== false) {
                                 let otherFac = cls.faculty2;
                                 if (cls.faculty && cls.faculty2) {
-                                    const isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
+                                    const isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
+                                                        (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
                                     if (isSecondary) otherFac = cls.faculty;
+                                }
+                                // Ensure it doesn't print self name
+                                if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
+                                    otherFac = '';
                                 }
                                 const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
                                 const uCofacStr = otherFac ? `\n🔹 *Cofaculty:* ${otherFac}` : '';
@@ -783,8 +810,13 @@ export default async function handler(req, res) {
                             if (u.mobile && u.whatsappEnabled !== false) {
                                 let otherFac = cls.faculty2;
                                 if (cls.faculty && cls.faculty2) {
-                                    const isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
+                                    const isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
+                                                        (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
                                     if (isSecondary) otherFac = cls.faculty;
+                                }
+                                // Ensure it doesn't print self name
+                                if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
+                                    otherFac = '';
                                 }
                                 const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
                                 const uCofacStr = otherFac ? `\n🔹 *Cofaculty:* ${otherFac}` : '';
