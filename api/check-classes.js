@@ -418,7 +418,8 @@ export default async function handler(req, res) {
         }
 
         // HELPER: Format Class String
-        const formatClassLine = (templateKey, idx, cls, target, isSub = false) => {
+        const formatClassLine = (templateKey, idx, cls, target, subData = null) => {
+            const isSub = Boolean(subData);
             const time = cls.time ? cls.time.replace(/\s+/g, '') : "N/A";
             const group = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-');
             const subject = cls.subject ? `${cls.subject.toUpperCase()}` : 'CLASS';
@@ -429,12 +430,9 @@ export default async function handler(req, res) {
                 let primaryTargetName = target.name;
                 
                 // If they are a substitute, figure out who they are replacing
-                // We assume if they are substituting, they usually replace `faculty`.
-                // For a more robust check, we'd need the substitute record, but `isSub` means they replace someone.
-                // Usually substitutions are tracked per `faculty`.
-                if (isSub) {
-                    primaryTarget = cls.facultyEmpId;
-                    primaryTargetName = cls.faculty;
+                if (subData) {
+                    primaryTarget = subData.originalFacultyEmpId || cls.facultyEmpId;
+                    primaryTargetName = (String(primaryTarget) === String(cls.faculty2EmpId)) ? cls.faculty2 : cls.faculty;
                 }
 
                 const otherFac = ((cls.facultyEmpId && primaryTarget && String(cls.facultyEmpId) === String(primaryTarget)) || cls.faculty === primaryTargetName) ? cls.faculty2 : cls.faculty;
@@ -613,7 +611,7 @@ export default async function handler(req, res) {
                                     const sub = subsMap.get(cls.id);
                                     const isSub = sub && target.empId && sub.substituteEmpId && String(sub.substituteEmpId) === String(target.empId);
                                     
-                                    waMsg += formatClassLine('morning_class_line', idx, cls, target, isSub);
+                                    waMsg += formatClassLine('morning_class_line', idx, cls, target, isSub ? sub : null);
                                 });
 
                                 waMsg += formatMsg('morning_footer', defaultTemplates.morning_footer, { name: target.name });
@@ -743,12 +741,21 @@ export default async function handler(req, res) {
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft, cofacInline, cofacStr };
                         const pushTitle = formatMsg('warn1_push_title', defaultTemplates.warn1_push_title, vars);
                         const pushBody = formatMsg('warn1_push_body', defaultTemplates.warn1_push_body, vars);
-                        const waMsg = formatMsg('warn1_wa', defaultTemplates.warn1_wa, vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
                         
                         for (const u of finalUsers) {
                             if (u.mobile && u.whatsappEnabled !== false) {
+                                let otherFac = cls.faculty2;
+                                if (cls.faculty && cls.faculty2) {
+                                    const isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
+                                    if (isSecondary) otherFac = cls.faculty;
+                                }
+                                const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
+                                const uCofacStr = otherFac ? `\n🔹 *Cofaculty:* ${otherFac}` : '';
+                                const uVars = { ...vars, cofacInline: uCofacInline, cofacStr: uCofacStr };
+                                const waMsg = formatMsg('warn1_wa', defaultTemplates.warn1_wa, uVars);
+                                
                                 await sendWhatsApp(u.mobile, waMsg);
                                 await new Promise(r => setTimeout(r, 300));
                             }
@@ -769,12 +776,21 @@ export default async function handler(req, res) {
                         const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft, cofacInline, cofacStr };
                         const pushTitle = formatMsg('warn2_push_title', defaultTemplates.warn2_push_title, vars);
                         const pushBody = formatMsg('warn2_push_body', defaultTemplates.warn2_push_body, vars);
-                        const waMsg = formatMsg('warn2_wa', defaultTemplates.warn2_wa, vars);
 
                         await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
                         
                         for (const u of finalUsers) {
                             if (u.mobile && u.whatsappEnabled !== false) {
+                                let otherFac = cls.faculty2;
+                                if (cls.faculty && cls.faculty2) {
+                                    const isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
+                                    if (isSecondary) otherFac = cls.faculty;
+                                }
+                                const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
+                                const uCofacStr = otherFac ? `\n🔹 *Cofaculty:* ${otherFac}` : '';
+                                const uVars = { ...vars, cofacInline: uCofacInline, cofacStr: uCofacStr };
+                                const waMsg = formatMsg('warn2_wa', defaultTemplates.warn2_wa, uVars);
+                                
                                 await sendWhatsApp(u.mobile, waMsg);
                                 await new Promise(r => setTimeout(r, 300));
                             }
