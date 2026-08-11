@@ -435,8 +435,17 @@ export default async function handler(req, res) {
                     primaryTargetName = (String(primaryTarget) === String(cls.faculty2EmpId)) ? cls.faculty2 : cls.faculty;
                 }
                 if (isSub) {
-                    primaryTarget = cls.facultyEmpId;
-                    primaryTargetName = cls.faculty;
+                    if (typeof isSub === 'object') {
+                        primaryTarget = isSub.originalFacultyEmpId || cls.facultyEmpId;
+                        primaryTargetName = isSub.originalFacultyName || cls.faculty;
+                        // If they are replacing faculty2, set primaryTargetName to faculty2
+                        if (String(primaryTarget) === String(cls.faculty2EmpId)) {
+                            primaryTargetName = cls.faculty2;
+                        }
+                    } else {
+                        primaryTarget = cls.facultyEmpId;
+                        primaryTargetName = cls.faculty;
+                    }
                 }
 
                 // Match by empId if available, fallback to case-insensitive name match
@@ -770,8 +779,13 @@ export default async function handler(req, res) {
                             if (u.mobile && u.whatsappEnabled !== false) {
                                 let otherFac = cls.faculty2;
                                 if (cls.faculty && cls.faculty2) {
-                                    const isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
+                                    let isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
                                                         (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
+                                    // If this user is a substitute, determine who they are replacing
+                                    if (subData && (String(u.empId) === String(subData.substituteEmpId) || String(u.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase())) {
+                                        isSecondary = (subData.originalFacultyEmpId && cls.faculty2EmpId && String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId)) || 
+                                                      (subData.originalFacultyName && cls.faculty2 && String(subData.originalFacultyName).trim().toLowerCase() === String(cls.faculty2).trim().toLowerCase());
+                                    }
                                     if (isSecondary) otherFac = cls.faculty;
                                 }
                                 // Ensure it doesn't print self name
@@ -810,8 +824,13 @@ export default async function handler(req, res) {
                             if (u.mobile && u.whatsappEnabled !== false) {
                                 let otherFac = cls.faculty2;
                                 if (cls.faculty && cls.faculty2) {
-                                    const isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
+                                    let isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
                                                         (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
+                                    // If this user is a substitute, determine who they are replacing
+                                    if (subData && (String(u.empId) === String(subData.substituteEmpId) || String(u.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase())) {
+                                        isSecondary = (subData.originalFacultyEmpId && cls.faculty2EmpId && String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId)) || 
+                                                      (subData.originalFacultyName && cls.faculty2 && String(subData.originalFacultyName).trim().toLowerCase() === String(cls.faculty2).trim().toLowerCase());
+                                    }
                                     if (isSecondary) otherFac = cls.faculty;
                                 }
                                 // Ensure it doesn't print self name
