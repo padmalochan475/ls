@@ -458,11 +458,11 @@ export default async function handler(req, res) {
                     cofacStr = ` WITH ${otherFac.trim().toUpperCase()}`;
                 }
             }
-            const roomStr = cls.room ? `\n 🏫 *Room:* ${cls.room.toUpperCase()}` : '';
-            const semStr = (cls.semester || cls.sem) ? `\n 🎓 *Sem:* ${cls.semester || cls.sem}` : '';
-            const subStr = isSub && cls.faculty ? `\n ⚠️ *SUB FOR:* ${cls.faculty.toUpperCase()}` : '';
+            const roomStr = cls.room ? ` AT ${cls.room.toUpperCase()}` : '';
+            const semStr = (cls.semester || cls.sem) ? ` (${cls.semester || cls.sem} SEM)` : '';
+            const subStr = isSub && cls.faculty ? ` [⚠️ SUB FOR ${cls.faculty.toUpperCase()}]` : '';
 
-            const defaultTemplate = defaultTemplates[templateKey] || "🔹 *[{idx}]* ⏰ _{time}_\n 📌 *{subject}* ({group}){roomStr}{semStr}{cofacStr}{subStr}\n";
+            const defaultTemplate = defaultTemplates[templateKey] || "🔹 *{idx}.* {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}\n";
             
             const vars = {
                 idx: String(idx + 1),
