@@ -912,6 +912,7 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                 );
 
                 if (userMatch || facMatch) {
+                    foundById = true;
                     discoveredUsers.push({
                         uid: userMatch?.uid || facMatch?.uid || facMatch?.id,
                         fcmTokens: userMatch?.fcmTokens || null,
@@ -920,6 +921,29 @@ async function getFacultyData(targets, existingUsers = null, existingFaculty = n
                         mobile: userMatch?.mobile || facMatch?.mobile || facMatch?.phone || null,
                         whatsappEnabled: (userMatch?.whatsappEnabled !== false) && (facMatch?.whatsappEnabled !== false),
                         isExactMatch: true
+                    });
+                }
+            }
+
+            // 2. SEARCH BY NAME (FALLBACK)
+            if (!foundById && targetName) {
+                const userMatch = allUsers.find(u => 
+                    u.name && u.name.toString().trim().toLowerCase() === targetName
+                );
+                
+                const facMatch = allFaculty.find(f => 
+                    f.name && f.name.toString().trim().toLowerCase() === targetName
+                );
+
+                if (userMatch || facMatch) {
+                    discoveredUsers.push({
+                        uid: userMatch?.uid || facMatch?.uid || facMatch?.id,
+                        fcmTokens: userMatch?.fcmTokens || null,
+                        name: userMatch?.name || facMatch?.name,
+                        empId: userMatch?.empId || facMatch?.empId,
+                        mobile: userMatch?.mobile || facMatch?.mobile || facMatch?.phone || null,
+                        whatsappEnabled: (userMatch?.whatsappEnabled !== false) && (facMatch?.whatsappEnabled !== false),
+                        isExactMatch: false
                     });
                 }
             }
