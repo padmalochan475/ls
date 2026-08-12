@@ -27,12 +27,7 @@ export const defaultTemplates = {
     sys_alert: "[LAMS ADMIN ANNOUNCEMENT]\n\n{title}\n\n{body}\n\n--\nSystem Broadcast",
     sys_acc_app: "[LAMS NOTIFICATION: ACCOUNT APPROVED]\n\nDear {name},\n\nYour faculty account has been successfully verified and approved by the Administration.\n\nYou may now log in to the LAMS portal to access your schedule.\nPortal: https://lams.vercel.app\n\n--\nCollege Administration",
     obs_sub_app: "[LAMS ADMIN ALERT: LEAVE COVERED]\n\nA substitution arrangement has been finalized.\n\nDETAILS:\nOn Leave: {requesterName}\nSubstitute: {subName}\nClass: {subject} ({group}){cofacInline}\nSchedule: {day}, {date} at {time}\nRoom: {room}",
-    obs_sub_can: "[LAMS ADMIN ALERT: SUB CANCELLED]\n\nA substitution arrangement has been revoked.\n\nDETAILS:\nClass: {subject} ({group}){cofacInline}\nSchedule: {day}, {date} at {time}\nRoom: {room}"
-};━━━━━━━━━━━━\n\n~ *College Administration*",
-    sys_alert: "📢 *ADMIN ANNOUNCEMENT* 📢\n\n*{title}*\n{body}\n\n~ *System Broadcast*",
-    sys_acc_app: "👋 *WELCOME TO LAMS!* 🎉\n\nHello *{name}*,\nYour faculty account has been *successfully verified and approved* by the Administration! ✅\n\nYou can now log in to manage your timetable, track attendance, and process substitutions seamlessly.\n\n🌐 _https://lams.vercel.app_",
-    obs_sub_app: "🚨 *ADMIN ALERT: LEAVE COVERED* 🚨\n\nA substitution arrangement has been finalized.\n\n━━━━━━━━━━━━━━\n📋 *COVERAGE DETAILS*\n🔹 *On Leave:* {requesterName}\n🔹 *Substitute:* {subName}\n🔹 *Class:* {subject} ({group}){cofacInline}\n🔹 *When:* {day}, {date} at {time}\n🔹 *Room:* {room}\n━━━━━━━━━━━━━━",
-    obs_sub_can: "⚠️ *ADMIN ALERT: SUB CANCELLED* ⚠️\n\nA substitution arrangement has been revoked.\n\n━━━━━━━━━━━━━━\n📋 *CANCELLATION DETAILS*\n🔹 *Class:* {subject} ({group}){cofacInline}\n🔹 *When:* {day}, {date} at {time}\n🔹 *Room:* {room}\n━━━━━━━━━━━━━━",
-    obs_bday: "📢 *Admin Alert: Birthday Today!* 🎈\n\nToday is *{name}'s* birthday! Be sure to wish them! 🎂",
-    obs_anni: "📢 *Admin Alert: Work Anniversary!* 🎊\n\n*{name}* is celebrating *{years} years* with us today! 🏫"
+    obs_sub_can: "[LAMS ADMIN ALERT: SUB CANCELLED]\n\nA substitution arrangement has been revoked.\n\nDETAILS:\nClass: {subject} ({group}){cofacInline}\nSchedule: {day}, {date} at {time}\nRoom: {room}",
+    obs_bday: "[LAMS ADMIN ALERT: BIRTHDAY]\n\nToday is {name}'s birthday!",
+    obs_anni: "[LAMS ADMIN ALERT: WORK ANNIVERSARY]\n\n{name} is celebrating {years} years with us today!"
 };
