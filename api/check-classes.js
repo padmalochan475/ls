@@ -695,7 +695,7 @@ export default async function handler(req, res) {
             const classTime = parseTimeStr(startStr, nowIST);
             const diffMinutes = (classTime.getTime() - nowIST.getTime()) / 60000;
 
-            if (diffMinutes > 0 && diffMinutes <= lookaheadMinutes) {
+            if (diffMinutes >= -15 && diffMinutes <= lookaheadMinutes) {
                 upcomingClasses.push({ ...data, startTime: classTime });
             }
         }
