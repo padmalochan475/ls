@@ -246,7 +246,41 @@ const Substitutions = () => {
                         throw "Invalid request data: missing academic year";
                     }
 
-                    // Check Deterministic ID for Double Booking
+                    // *** NEW DOUBLE-BOOKING PREVENTION LOGIC ***
+                    const targetTime = normalizeTime(reqData.scheduleDetails.time);
+                    const dayName = new Date(reqData.date).toLocaleDateString('en-US', { weekday: 'long' });
+
+                    // 1. Check Permanent Schedule
+                    const permanentConflict = fullSchedule.find(s => 
+                        s.day === dayName && 
+                        normalizeTime(s.time) === targetTime && 
+                        (String(s.facultyEmpId) === String(userProfile.empId) || String(s.faculty2EmpId) === String(userProfile.empId))
+                    );
+                    if (permanentConflict) {
+                        throw `Double Booking: You are already teaching ${permanentConflict.subject} at this time.`;
+                    }
+
+                    // 2. Check Existing Adjustments (Already Approved Subs)
+                    const adjConflict = incomingAdjustments.find(adj => 
+                        adj.date === reqData.date && 
+                        normalizeTime(adj.time) === targetTime
+                    );
+                    if (adjConflict) {
+                        throw `Double Booking: You are already covering ${adjConflict.subject} at this time.`;
+                    }
+
+                    // 3. Check Other Accepted Requests (Pending Admin Approval)
+                    const reqConflict = incomingRequests.find(r => 
+                        r.id !== requestId && 
+                        r.date === reqData.date && 
+                        normalizeTime(r.scheduleDetails.time) === targetTime && 
+                        (r.targetResponse === 'accepted' || r.status === 'approved')
+                    );
+                    if (reqConflict) {
+                        throw `Double Booking: You have already accepted a request for ${reqConflict.scheduleDetails.subject} at this time.`;
+                    }
+
+                    // Check Deterministic ID for Double Booking (Someone ELSE accepted this specific class)
                     const adjustmentId = `${reqData.date}_${reqData.originalScheduleId}`;
                     const adjRef = doc(db, 'adjustments', adjustmentId);
                     const adjSnap = await transaction.get(adjRef);
