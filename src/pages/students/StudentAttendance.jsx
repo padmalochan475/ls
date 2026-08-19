@@ -144,10 +144,10 @@ const StudentAttendance = () => {
         let idealRowHeight = (targetTableHeight / sheetStudents.length);
         idealRowHeight = Math.max(9, Math.min(idealRowHeight, 75));
         
-        // Dramatically increased font size multiplier to 0.65 so the text fills the row height better
-        let idealFontSize = idealRowHeight * 0.65;
-        // Capped at 14px to guarantee Regd No fits in 12% width without overlapping
-        idealFontSize = Math.max(7.5, Math.min(idealFontSize, 14));
+        // The font size dynamically fills the row height (70% height).
+        // Since we now use mathematical scaleX to prevent overlap, we can safely allow much larger fonts (up to 24px) for empty space!
+        let idealFontSize = idealRowHeight * 0.70;
+        idealFontSize = Math.max(8, Math.min(idealFontSize, 24));
         
         const finalRowHeight = Number(idealRowHeight.toFixed(2));
         const finalFontSize = Number(idealFontSize.toFixed(2));
@@ -253,21 +253,32 @@ const StudentAttendance = () => {
         
         let timeoutId;
         const calculateExactWidths = () => {
-            const containers = document.querySelectorAll('.name-cell-container');
+            const containers = document.querySelectorAll('.dynamic-scale-container');
             containers.forEach(container => {
-                const textSpan = container.querySelector('.name-scale-target');
+                const textSpan = container.querySelector('.dynamic-scale-target');
                 if (!textSpan) return;
                 
                 // Reset scale to measure natural width
                 textSpan.style.transform = 'scaleX(1)';
                 
-                const availableWidth = container.clientWidth;
-                const naturalWidth = textSpan.scrollWidth;
+                const availableWidth = container.getBoundingClientRect().width;
+                const naturalWidth = textSpan.getBoundingClientRect().width;
                 
                 if (naturalWidth > availableWidth && availableWidth > 0) {
-                    // Exact mathematical scale to squeeze the name horizontally, minus 1px for pixel rounding safety
-                    const scale = (availableWidth - 1) / naturalWidth;
-                    textSpan.style.transform = `scaleX(${scale})`;
+                    const exactScale = (availableWidth - 1) / naturalWidth;
+                    
+                    // Advanced Typographical Scaling
+                    if (exactScale >= 0.80) {
+                        // Mild overflow: Squeeze horizontally to maintain uniform row height (like a condensed font)
+                        textSpan.style.transform = `scaleX(${exactScale})`;
+                    } else {
+                        // Extreme overflow (Future-proof for massive names/numbers):
+                        // Squeezing purely horizontally below 80% creates an unreadable 'barcode' effect.
+                        // We lock the horizontal compression at an aesthetically pleasing 80% (0.8), 
+                        // and proportionally shrink the vertical height for the remainder to preserve readability!
+                        const verticalScale = exactScale / 0.80;
+                        textSpan.style.transform = `scale(${exactScale}, ${verticalScale})`;
+                    }
                 }
             });
         };
@@ -522,7 +533,7 @@ const StudentAttendance = () => {
                                         <span style={{ fontWeight: '900', marginRight: '5px' }}>Branch:</span><span style={{ borderBottom: '1px dotted black', flex: 1, textAlign: 'center', fontWeight: '900' }}>{config.group}</span>
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', borderBottom: '1.5px solid black', fontSize: '13px' }}>
+                                <div style={{ display: 'flex', borderBottom: '1px solid black', fontSize: '13px' }}>
                                     <div style={{ width: '25%', borderRight: '1px solid black', padding: '4px 8px', display: 'flex' }}>
                                         <span style={{ fontWeight: '900', marginRight: '5px' }}>Sem:</span><span style={{ borderBottom: '1px dotted black', flex: 1, textAlign: 'center', fontWeight: '900' }}>{config.semester ? getOrdinal(parseInt(config.semester)).toUpperCase() : ''}</span>
                                     </div>
@@ -535,17 +546,17 @@ const StudentAttendance = () => {
                                 </div>
                             </div>
                             <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: `${printSettings.fontSize}px`, tableLayout: 'fixed' }}>
-                                    <thead>
+                                    <thead style={{ fontSize: `${Math.min(printSettings.fontSize, 13)}px` }}>
                                         <tr>
                                             <th style={{ width: '5%', padding: `${cellPadding}px` }}>Roll<br/>No</th>
                                             <th style={{ width: '12%', padding: `${cellPadding}px` }}>Regd. No</th>
                                             <th style={{ width: '25%', padding: `${cellPadding}px` }}>Name of the Student</th>
                                             <th style={{ width: '28%', padding: `${cellPadding}px` }}>Signature</th>
-                                            <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>DP&A<br/>(2)</th>
-                                            <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>LR<br/>(2)</th>
-                                            <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>LQ<br/>(1)</th>
-                                            <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>E&V<br/>(5)</th>
-                                            <th style={{ width: '6%', fontSize: '0.9em', padding: `${cellPadding}px` }}>TOTAL<br/>(10)</th>
+                                            <th style={{ width: '6%', fontSize: '0.75em', letterSpacing: '-0.2px', padding: `${cellPadding}px` }}>DP&A<br/>(2)</th>
+                                            <th style={{ width: '6%', fontSize: '0.75em', letterSpacing: '-0.2px', padding: `${cellPadding}px` }}>LR<br/>(2)</th>
+                                            <th style={{ width: '6%', fontSize: '0.75em', letterSpacing: '-0.2px', padding: `${cellPadding}px` }}>LQ<br/>(1)</th>
+                                            <th style={{ width: '6%', fontSize: '0.75em', letterSpacing: '-0.2px', padding: `${cellPadding}px` }}>E&V<br/>(5)</th>
+                                            <th style={{ width: '6%', fontSize: '0.75em', letterSpacing: '-0.2px', padding: `${cellPadding}px` }}>TOTAL<br/>(10)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -562,28 +573,56 @@ const StudentAttendance = () => {
 
                                             return (
                                                 <tr key={student.id} style={{ height: `${printSettings.rowHeight}px` }}>
-                                                    <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, whiteSpace: 'nowrap', overflow: 'hidden' }}>{student.rollNo || '--'}</td>
                                                     <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, overflow: 'hidden' }}>
-                                                        <div style={{
-                                                            fontSize: `${(printSettings.fontSize * 0.85).toFixed(2)}px`,
+                                                        <div className="dynamic-scale-container" style={{
+                                                            width: '100%',
+                                                            fontSize: `${printSettings.fontSize}px`,
                                                             whiteSpace: 'nowrap',
-                                                            overflow: 'hidden'
+                                                            overflow: 'hidden',
+                                                            display: 'flex',
+                                                            justifyContent: 'center'
                                                         }}>
-                                                            {student.regNo || ''}
+                                                            <span className="dynamic-scale-target" style={{
+                                                                display: 'inline-block',
+                                                                flexShrink: 0,
+                                                                transformOrigin: 'center center',
+                                                                whiteSpace: 'nowrap'
+                                                            }}>
+                                                                {student.rollNo || '--'}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center', fontWeight: 'bold', padding: `${cellPadding}px`, overflow: 'hidden' }}>
+                                                        <div className="dynamic-scale-container" style={{
+                                                            width: '100%',
+                                                            fontSize: `${printSettings.fontSize}px`,
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            display: 'flex',
+                                                            justifyContent: 'center'
+                                                        }}>
+                                                            <span className="dynamic-scale-target" style={{
+                                                                display: 'inline-block',
+                                                                flexShrink: 0,
+                                                                transformOrigin: 'center center',
+                                                                whiteSpace: 'nowrap'
+                                                            }}>
+                                                                {student.regNo || ''}
+                                                            </span>
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: `0 ${cellPadding + 4}px`, fontWeight: '500', overflow: 'hidden' }}>
-                                                        <div className="name-cell-container" style={{
+                                                        <div className="dynamic-scale-container" style={{
                                                             width: '100%',
-                                                            fontSize: `${(printSettings.fontSize * 0.95).toFixed(2)}px`,
+                                                            fontSize: `${printSettings.fontSize}px`,
                                                             whiteSpace: 'nowrap',
                                                             overflow: 'hidden'
                                                         }}>
-                                                            <span className="name-scale-target" style={{
+                                                            <span className="dynamic-scale-target" style={{
                                                                 display: 'inline-block',
+                                                                flexShrink: 0,
                                                                 transformOrigin: 'left center',
-                                                                whiteSpace: 'nowrap',
-                                                                transition: 'transform 0.1s ease-out'
+                                                                whiteSpace: 'nowrap'
                                                             }}>
                                                                 {(student.name || '').toUpperCase()}
                                                             </span>
