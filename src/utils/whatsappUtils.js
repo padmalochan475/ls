@@ -56,7 +56,7 @@ export const sendWhatsAppNotification = async (phoneNumber, textMessage) => {
         
         const endpoint = `${baseUrl}/api/sessions/${sessionId}/messages/send-text`;
 
-        const response = await fetch(endpoint, {
+        let response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -68,15 +68,38 @@ export const sendWhatsAppNotification = async (phoneNumber, textMessage) => {
                 text: textMessage
             }),
         });
+
+        if (!response.ok && (response.status === 400 || response.status === 404 || response.status === 401)) {
+            // The session might have expired or gateway restarted
+            cachedSessionId = null;
+            const sessionsRes = await fetch(`${baseUrl}/api/sessions`, {
+                headers: { 'x-api-key': API_KEY }
+            });
+            const sessions = await sessionsRes.json();
+            
+            if (Array.isArray(sessions) && sessions.length > 0) {
+                cachedSessionId = sessions[0].id;
+                const retryEndpoint = `${baseUrl}/api/sessions/${cachedSessionId}/messages/send-text`;
+                response = await fetch(retryEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'x-api-key': API_KEY 
+                    },
+                    body: JSON.stringify({
+                        chatId: chatId,
+                        text: textMessage
+                    }),
+                });
+            }
+        }
         
         if(response.ok) {
             console.log("WhatsApp message successfully dispatched!");
             return true;
         } else {
-            if (response.status === 400 || response.status === 404 || response.status === 401) {
-                // The session might have expired or gateway restarted, clear cache so we fetch new session next time
-                cachedSessionId = null;
-            }
+            cachedSessionId = null;
             const data = await response.json().catch(() => ({}));
             const errMsg = data.message || response.statusText || 'Unknown API Error';
             console.warn("WhatsApp API returned false status:", errMsg);

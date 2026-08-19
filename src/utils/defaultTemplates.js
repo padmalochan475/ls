@@ -1,33 +1,52 @@
 export const defaultTemplates = {
-    birthday_wa: "[LAMS NOTIFICATION]\n\nDear {name},\n\nWishing you a very Happy Birthday from the College Administration. We hope you have a wonderful day and a successful year ahead!\n\n--\nCollege Administration",
-    anniversary_wa: "[LAMS NOTIFICATION]\n\nDear {name},\n\nCongratulations on completing {years} of dedicated service with our institution. We appreciate your continued commitment.\n\n--\nCollege Administration",
-    holiday_push_title: "Holiday Notification",
+    birthday_wa: "🎉 *HAPPY BIRTHDAY!* 🎉\n\nDear *{name}*,\n\nWishing you a fantastic birthday from the College Administration! \nWe hope you have a wonderful day and a highly successful year ahead. 🎂🥳",
+    
+    anniversary_wa: "🎊 *WORK ANNIVERSARY* 🎊\n\nDear *{name}*,\n\nCongratulations on completing *{years}* of dedicated service with our institution! \nWe deeply appreciate your continued commitment and hard work. 🌟",
+    
+    holiday_push_title: "🏖️ Holiday Notification",
     holiday_push_body: "Today is {holiday_name}. Regular classes are suspended.",
-    holiday_wa: "[LAMS NOTIFICATION]\n\nDear Faculty & Staff,\n\nPlease be informed that today is {holiday_name}. Regular classes and academic activities are suspended for the day.\n\n--\nCollege Administration",
-    warn1_push_title: "Upcoming Class",
+    holiday_wa: "🏖️ *HOLIDAY ALERT* 🏖️\n\nDear Faculty & Staff,\n\nPlease be informed that today is *{holiday_name}*.\n\n━━━━━━━━━━━━━━━━━━━━━\n🚫 Regular classes and academic activities are *suspended* for the day.\n━━━━━━━━━━━━━━━━━━━━━\n\nHave a great day off! ✨\n-- College Administration",
+    
+    warn1_push_title: "⏳ Upcoming Class",
     warn1_push_body: "Reminder: {subject} ({group}){cofacInline} begins in {mins} mins at Room {room}.",
-    warn1_wa: "[LAMS REMINDER]\n\nDear Faculty,\n\nYou have an upcoming class scheduled to begin in {mins} minutes.\n\nDETAILS:\nSubject: {subject} ({group})\nStarts In: {mins} mins\nRoom: {room}{cofacStr}\n\nPlease proceed to your designated classroom.\n\n--\nLAMS System",
-    warn2_push_title: "Class Starting",
+    warn1_wa: "⚠️ *CLASS REMINDER [ T-Minus {mins} mins ]* ⚠️\n\nDear *{name}*,\nYour next class is approaching rapidly.\n\n*SESSION DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}\n👥 *Group:* {group}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n🏃 Please proceed to your designated classroom.\n-- LAMS System",
+    
+    warn2_push_title: "🚨 Class Starting",
     warn2_push_body: "Action Required: {subject} ({group}){cofacInline} is starting now at Room {room}.",
-    warn2_wa: "[LAMS ALERT]\n\nDear Faculty,\n\nYour scheduled class is starting now. Please proceed to your classroom immediately.\n\nDETAILS:\nSubject: {subject} ({group})\nStatus: Starting Now\nRoom: {room}{cofacStr}\n\n--\nLAMS System",
-    weekly_header: "[LAMS WEEKLY SCHEDULE]\n\nDear {name},\n\nHere is your official schedule for the upcoming week. Total assigned sessions: {total_sessions}.\n\n",
-    weekly_class_line: "{idx}. {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}\n",
-    weekly_footer: "\nPlease verify this schedule on the LAMS portal.\n\n--\nCollege Administration",
-    morning_header: "[LAMS DAILY SCHEDULE]\n\nDear {name},\n\nHere is your official itinerary for today ({day}). Total assigned classes: {total_classes}.\n\n",
-    morning_class_line: "{idx}. {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}\n",
-    morning_footer: "\n--\nCollege Administration",
-    sys_sub_req: "[LAMS NOTIFICATION: SUBSTITUTION REQUEST]\n\nDear {name},\n\nYou have received a substitution request from {requesterName}.\n\nDETAILS:\nSubject: {subject} ({group})\nRoom: {room}\nSchedule: {day}, {date} at {time}{cofacStr}\n\nPlease log in to the LAMS portal to formally accept or decline this request.\n\n--\nLAMS System",
-    sys_sub_app: "[LAMS NOTIFICATION: SUBSTITUTION APPROVED]\n\nDear {name},\n\nYour substitution arrangement has been formally processed and approved by the Administration.\n\nDETAILS:\nSubject: {subject}{cofacInline}\nSchedule: {day}, {date}\nCovered By: {subName}\n\n--\nCollege Administration",
-    sys_sub_rej: "[LAMS NOTIFICATION: SUBSTITUTION DECLINED]\n\nDear {name},\n\nYour substitution arrangement has been declined or cancelled.\n\nDETAILS:\nSubject: {subject}{cofacInline}\nSchedule: {day}, {date}\nStatus: Declined / Cancelled\n\nPlease log in to the portal to review your schedule.\n\n--\nCollege Administration",
-    sys_sub_acc: "[LAMS NOTIFICATION: SUBSTITUTION ACCEPTED]\n\nDear {name},\n\nYour substitution request has been accepted by {subName}.\n\nDETAILS:\nSubject: {subject}{cofacInline}\nSchedule: {day}, {date}\nAccepted By: {subName}\n\nStatus: Pending final Administrative approval.\n\n--\nLAMS System",
-    sys_sub_can: "[LAMS NOTIFICATION: SUBSTITUTION CANCELLED]\n\nDear {name},\n\nA previously requested substitution has been cancelled.\n\nDETAILS:\nSubject: {subject}{cofacInline}\nSchedule: {day}, {date}\n\nYou are now expected to conduct this class yourself.\n\n--\nCollege Administration",
-    sys_sub_can_sub: "[LAMS NOTIFICATION: COVERAGE CANCELLED]\n\nDear {name},\n\nA substitution arrangement you were assigned to cover has been cancelled.\n\nDETAILS:\nSubject: {subject}{cofacInline}\nSchedule: {day}, {date}\n\nYou are no longer required to cover this class.\n\n--\nCollege Administration",
-    sys_req_can: "[LAMS NOTIFICATION: REQUEST WITHDRAWN]\n\nDear {name},\n\nA peer has withdrawn their request for you to cover their class.\n\nDETAILS:\nSubject: {subject}{cofacInline}\nSchedule: {day}, {date}\nStatus: Request Withdrawn\n\n--\nCollege Administration",
-    sys_new_assign: "[LAMS NOTIFICATION: NEW ASSIGNMENT]\n\nDear {name},\n\nA new academic assignment has been added to your profile.\n\nDETAILS:\n{body}\n\n--\nCollege Administration",
-    sys_alert: "[LAMS ADMIN ANNOUNCEMENT]\n\n{title}\n\n{body}\n\n--\nSystem Broadcast",
-    sys_acc_app: "[LAMS NOTIFICATION: ACCOUNT APPROVED]\n\nDear {name},\n\nYour faculty account has been successfully verified and approved by the Administration.\n\nYou may now log in to the LAMS portal to access your schedule.\nPortal: https://lams.vercel.app\n\n--\nCollege Administration",
-    obs_sub_app: "[LAMS ADMIN ALERT: LEAVE COVERED]\n\nA substitution arrangement has been finalized.\n\nDETAILS:\nOn Leave: {requesterName}\nSubstitute: {subName}\nClass: {subject} ({group}){cofacInline}\nSchedule: {day}, {date} at {time}\nRoom: {room}",
-    obs_sub_can: "[LAMS ADMIN ALERT: SUB CANCELLED]\n\nA substitution arrangement has been revoked.\n\nDETAILS:\nClass: {subject} ({group}){cofacInline}\nSchedule: {day}, {date} at {time}\nRoom: {room}",
-    obs_bday: "[LAMS ADMIN ALERT: BIRTHDAY]\n\nToday is {name}'s birthday!",
-    obs_anni: "[LAMS ADMIN ALERT: WORK ANNIVERSARY]\n\n{name} is celebrating {years} years with us today!"
+    warn2_wa: "🚨 *CLASS STARTING NOW* 🚨\n\nDear *{name}*,\nYour scheduled class is beginning *immediately*.\n\n*SESSION DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}\n👥 *Group:* {group}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n⚡ Please ensure you are in the classroom.\n-- LAMS System",
+    
+    weekly_header: "📅 *LAMS WEEKLY ITINERARY* 📅\n\nHello *{name}*,\n\nHere is your official schedule for the upcoming week. \nYou have a total of *{total_sessions}* assigned sessions.\n\n━━━━━━━━━━━━━━━━━━━━━\n",
+    weekly_class_line: "🔹 *Session {idx}*\n   ⏰ {time} | 📍 Room: {room}\n   📚 {subject} | 👥 {group}{semStr}{cofacStr}{subStr}\n\n",
+    weekly_footer: "━━━━━━━━━━━━━━━━━━━━━\n\n🔗 Please verify this schedule on the LAMS portal.\n-- College Administration",
+    
+    morning_header: "🌅 *LAMS DAILY BRIEFING* 🌅\n\nHello *{name}*,\n\nHere is your official academic itinerary for today (*{day}*). \nYou have a total of *{total_classes}* sessions.\n\n━━━━━━━━━━━━━━━━━━━━━\n",
+    morning_class_line: "🔹 *Session {idx}*\n   ⏰ {time} | 📍 Room: {room}\n   📚 {subject} | 👥 {group}{semStr}{cofacStr}{subStr}\n\n",
+    morning_footer: "━━━━━━━━━━━━━━━━━━━━━\n\nHave a productive day! 🚀\n-- College Administration",
+    
+    sys_sub_req: "🔄 *SUBSTITUTION REQUEST* 🔄\n\nDear *{name}*,\n*{requesterName}* has requested you to cover a class.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject} ({group})\n🗓️ *Schedule:* {day}, {date} at {time}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n⚡ *ACTION REQUIRED:*\nPlease log in to the LAMS portal to *ACCEPT* or *DECLINE* this request.\n-- LAMS System",
+    
+    sys_sub_app: "✅ *SUBSTITUTION APPROVED* ✅\n\nDear *{name}*,\nYour substitution arrangement has been formally processed and *approved*.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}{cofacInline}\n🗓️ *Schedule:* {day}, {date}\n👤 *Covered By:* {subName}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n-- College Administration",
+    
+    sys_sub_rej: "❌ *SUBSTITUTION DECLINED* ❌\n\nDear *{name}*,\nYour substitution arrangement has been *declined* or *cancelled*.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}{cofacInline}\n🗓️ *Schedule:* {day}, {date}\n⚠️ *Status:* Declined / Cancelled\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\nPlease log in to the portal to review your schedule.\n-- College Administration",
+    
+    sys_sub_acc: "🤝 *SUBSTITUTION ACCEPTED* 🤝\n\nDear *{name}*,\nYour substitution request has been *accepted* by *{subName}*.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}{cofacInline}\n🗓️ *Schedule:* {day}, {date}\n👤 *Accepted By:* {subName}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n⏳ *Status:* Pending final Administrative approval.\n-- LAMS System",
+    
+    sys_sub_can: "🚫 *SUBSTITUTION CANCELLED* 🚫\n\nDear *{name}*,\nA previously requested substitution has been *cancelled*.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}{cofacInline}\n🗓️ *Schedule:* {day}, {date}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n⚠️ You are now expected to conduct this class yourself.\n-- College Administration",
+    
+    sys_sub_can_sub: "🛑 *COVERAGE CANCELLED* 🛑\n\nDear *{name}*,\nA substitution arrangement you were assigned to cover has been *cancelled*.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}{cofacInline}\n🗓️ *Schedule:* {day}, {date}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n✅ You are no longer required to cover this class.\n-- College Administration",
+    
+    sys_req_can: "🔙 *REQUEST WITHDRAWN* 🔙\n\nDear *{name}*,\nA peer has withdrawn their request for you to cover their class.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}{cofacInline}\n🗓️ *Schedule:* {day}, {date}\n⚠️ *Status:* Request Withdrawn\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n-- College Administration",
+    
+    sys_new_assign: "📋 *NEW ASSIGNMENT* 📋\n\nDear *{name}*,\nA new academic assignment has been added to your profile.\n\n*DETAILS:*\n━━━━━━━━━━━━━━━━━━━━━\n{body}\n━━━━━━━━━━━━━━━━━━━━━\n\n-- College Administration",
+    
+    sys_alert: "📢 *LAMS ADMIN ANNOUNCEMENT* 📢\n\n*{title}*\n\n{body}\n\n-- System Broadcast",
+    
+    sys_acc_app: "🎓 *ACCOUNT APPROVED* 🎓\n\nDear *{name}*,\nYour faculty account has been successfully verified and *approved* by the Administration.\n\n━━━━━━━━━━━━━━━━━━━━━\nYou may now log in to the LAMS portal to access your schedule.\n🔗 *Portal:* https://lams.vercel.app\n━━━━━━━━━━━━━━━━━━━━━\n\nWelcome aboard! 🚀\n-- College Administration",
+    
+    obs_sub_app: "👀 *ADMIN ALERT: LEAVE COVERED* 👀\n\nA substitution arrangement has been finalized.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n🛌 *On Leave:* {requesterName}\n🦸 *Substitute:* {subName}\n📚 *Class:* {subject} ({group}){cofacInline}\n🗓️ *Schedule:* {day}, {date} at {time}\n📍 *Room:* {room}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈",
+    
+    obs_sub_can: "👀 *ADMIN ALERT: SUB CANCELLED* 👀\n\nA substitution arrangement has been revoked.\n\n*DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Class:* {subject} ({group}){cofacInline}\n🗓️ *Schedule:* {day}, {date} at {time}\n📍 *Room:* {room}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈",
+    
+    obs_bday: "🎂 *ADMIN ALERT: BIRTHDAY* 🎂\n\nToday is *{name}*'s birthday! 🎉",
+    obs_anni: "🌟 *ADMIN ALERT: WORK ANNIVERSARY* 🌟\n\n*{name}* is celebrating *{years}* with us today! 🎊"
 };

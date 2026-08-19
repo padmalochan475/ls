@@ -206,7 +206,32 @@ async function sendWhatsApp(phoneNumber, message) {
         });
         return true;
     } catch (error) {
-        // Invalidate cached session on failure so it fetches a fresh one next time
+        if (error.response && [400, 401, 404].includes(error.response.status)) {
+            // Session expired, clear cache and retry ONCE
+            cachedSessionId = null;
+            try {
+                const sessionsRes = await axios.get(`${WHATSAPP_API_BASE}/api/sessions`, {
+                    headers: { 'x-api-key': WHATSAPP_API_KEY }
+                });
+                if (sessionsRes.data && sessionsRes.data.length > 0) {
+                    cachedSessionId = sessionsRes.data[0].id;
+                    await axios.post(`${WHATSAPP_API_BASE}/api/sessions/${cachedSessionId}/messages/send-text`, {
+                        chatId: chatId,
+                        text: message
+                    }, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${WHATSAPP_API_KEY}`,
+                            'x-api-key': WHATSAPP_API_KEY
+                        }
+                    });
+                    return true;
+                }
+            } catch (retryError) {
+                console.error(`WhatsApp Retry Error to ${phoneNumber}:`, retryError.message);
+                return retryError.message;
+            }
+        }
         cachedSessionId = null;
         console.error(`WhatsApp Send Error to ${phoneNumber}:`, error.message);
         return error.message;
@@ -282,17 +307,20 @@ export default async function handler(req, res) {
 
         // 3. CHECK HOLIDAYS
         const holidayDoc = holidayDocs.find(d => d.type === 'holiday');
+        let isHolidayActive = false;
 
-        if (holidayDoc && autoHolidays) {
-            const h = holidayDoc;
-            const [hHour, hMin] = holidayTime.split(':').map(Number);
-            const holidayAlertTime = new Date(nowIST);
-            holidayAlertTime.setUTCHours(hHour, hMin, 0, 0);
+        if (holidayDoc) {
+            isHolidayActive = true;
+            if (autoHolidays) {
+                const h = holidayDoc;
+                const [hHour, hMin] = holidayTime.split(':').map(Number);
+                const holidayAlertTime = new Date(nowIST);
+                holidayAlertTime.setUTCHours(hHour, hMin, 0, 0);
 
-            const notifIdHoliday = `holiday_notif_${todayDateStr}`;
-            const alreadySentHoliday = await db.collection('sent_notifications').doc(notifIdHoliday).get();
+                const notifIdHoliday = `holiday_notif_${todayDateStr}`;
+                const alreadySentHoliday = await db.collection('sent_notifications').doc(notifIdHoliday).get();
 
-            if (!alreadySentHoliday.exists && nowIST >= holidayAlertTime) {
+                if (!alreadySentHoliday.exists && nowIST >= holidayAlertTime) {
                     const title = formatMsg('holiday_push_title', defaultTemplates.holiday_push_title, { holiday_name: h.name });
                     const body = formatMsg('holiday_push_body', defaultTemplates.holiday_push_body, { holiday_name: h.name });
                     
@@ -326,9 +354,8 @@ export default async function handler(req, res) {
                     await db.collection('sent_notifications').doc(notifIdHoliday).set({
                         sentAt: new Date(), type: 'holiday_alert', holidayName: h.name
                     });
-                    return res.status(200).json({ message: `Holiday Broadcast Sent: ${h.name}`, count: 1 });
                 }
-            return res.status(200).json({ message: `Holiday: ${h.name}. Automation Active.`, count: 0 });
+            }
         }
 
         // 3. BIRTHDAY & ANNIVERSARY GREETINGS (8:00 AM IST) - Done first so they fire even on holidays
@@ -413,7 +440,7 @@ export default async function handler(req, res) {
             }
         }
 
-        if (holidayDoc && autoHolidays) {
+        if (isHolidayActive) {
              return res.status(200).json({ status: "holiday", message: "Classes paused for holiday." });
         }
 
@@ -469,6 +496,7 @@ export default async function handler(req, res) {
                 time,
                 group,
                 subject,
+                room: cls.room || 'TBA',
                 cofacStr,
                 roomStr,
                 semStr,
@@ -760,7 +788,8 @@ export default async function handler(req, res) {
                 if (finalUsers.length === 0) continue;
 
                 const targetPayload = finalUsers.map(u => u.uid).filter(Boolean);
-                if (targetPayload.length === 0) continue;
+                const hasMobileTargets = finalUsers.some(u => u.mobile && u.whatsappEnabled !== false);
+                if (targetPayload.length === 0 && !hasMobileTargets) continue;
 
                 // 1st Warning Window: 6 mins left to 25 mins left (Very wide window to guarantee it fires)
                 if (minutesLeft > warn2Min && minutesLeft <= (warn1Min + 10)) {
@@ -794,7 +823,7 @@ export default async function handler(req, res) {
                                 }
                                 const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
                                 const uCofacStr = otherFac ? `\n🔹 *Cofaculty:* ${otherFac}` : '';
-                                const uVars = { ...vars, cofacInline: uCofacInline, cofacStr: uCofacStr };
+                                const uVars = { ...vars, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
                                 const waMsg = formatMsg('warn1_wa', defaultTemplates.warn1_wa, uVars);
                                 
                                 await sendWhatsApp(u.mobile, waMsg);
@@ -839,7 +868,7 @@ export default async function handler(req, res) {
                                 }
                                 const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
                                 const uCofacStr = otherFac ? `\n🔹 *Cofaculty:* ${otherFac}` : '';
-                                const uVars = { ...vars, cofacInline: uCofacInline, cofacStr: uCofacStr };
+                                const uVars = { ...vars, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
                                 const waMsg = formatMsg('warn2_wa', defaultTemplates.warn2_wa, uVars);
                                 
                                 await sendWhatsApp(u.mobile, waMsg);
