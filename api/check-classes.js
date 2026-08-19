@@ -446,7 +446,11 @@ export default async function handler(req, res) {
 
         // HELPER: Format Class String
         const formatClassLine = (templateKey, idx, cls, target, subData = null) => {
-            const isSub = Boolean(subData);
+            let isSub = false;
+            if (subData) {
+                isSub = (target.empId && subData.substituteEmpId && String(subData.substituteEmpId) === String(target.empId)) ||
+                        (target.name && subData.substituteName && String(target.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase());
+            }
             const time = cls.time ? cls.time.replace(/\s+/g, '') : "N/A";
             const group = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-');
             const subject = cls.subject ? `${cls.subject.toUpperCase()}` : 'CLASS';
@@ -456,31 +460,27 @@ export default async function handler(req, res) {
                 let primaryTarget = target.empId;
                 let primaryTargetName = target.name;
                 
-                // If they are a substitute, figure out who they are replacing
-                if (subData) {
-                    primaryTarget = subData.originalFacultyEmpId || cls.facultyEmpId;
-                    primaryTargetName = (String(primaryTarget) === String(cls.faculty2EmpId)) ? cls.faculty2 : cls.faculty;
-                }
                 if (isSub) {
-                    if (typeof isSub === 'object') {
-                        primaryTarget = isSub.originalFacultyEmpId || cls.facultyEmpId;
-                        primaryTargetName = isSub.originalFacultyName || cls.faculty;
-                        // If they are replacing faculty2, set primaryTargetName to faculty2
-                        if (String(primaryTarget) === String(cls.faculty2EmpId)) {
-                            primaryTargetName = cls.faculty2;
-                        }
-                    } else {
-                        primaryTarget = cls.facultyEmpId;
-                        primaryTargetName = cls.faculty;
+                    primaryTarget = subData.originalFacultyEmpId || cls.facultyEmpId;
+                    primaryTargetName = subData.originalFacultyName || cls.faculty;
+                    if (String(primaryTarget) === String(cls.faculty2EmpId)) {
+                        primaryTargetName = cls.faculty2;
                     }
                 }
 
-                // Match by empId if available, fallback to case-insensitive name match
                 const isPrimary = (cls.facultyEmpId && primaryTarget && String(cls.facultyEmpId) === String(primaryTarget)) || 
                                   (!cls.facultyEmpId && cls.faculty && primaryTargetName && String(cls.faculty).trim().toLowerCase() === String(primaryTargetName).trim().toLowerCase());
                 
-                const otherFac = isPrimary ? cls.faculty2 : cls.faculty;
-                // Only show co-faculty if it's a non-empty string and not the person's own name again
+                let otherFac = isPrimary ? cls.faculty2 : cls.faculty;
+                
+                if (subData) {
+                    const origName = (subData.originalFacultyName || (String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId) ? cls.faculty2 : cls.faculty) || '').trim().toLowerCase();
+                    const subName = subData.substituteName;
+                    if (otherFac && origName && String(otherFac).trim().toLowerCase() === origName) {
+                        otherFac = subName;
+                    }
+                }
+
                 if (otherFac && otherFac.trim() !== '' && String(otherFac).trim().toLowerCase() !== String(target.name).trim().toLowerCase()) {
                     cofacStr = ` WITH ${otherFac.trim().toUpperCase()}`;
                 }
@@ -539,20 +539,64 @@ export default async function handler(req, res) {
                         };
                     }).filter(t => t.mobile && t.whatsappEnabled);
 
+                    // Fetch upcoming week dates (Mon-Sat)
+                    const dayToDateMap = {};
+                    for(let i=1; i<=7; i++) {
+                        const nextD = new Date(nowIST);
+                        nextD.setDate(nowIST.getDate() + i);
+                        const isoDateStr = nextD.toISOString().split('T')[0];
+                        const dName = nextD.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+                        dayToDateMap[dName] = isoDateStr;
+                    }
+                    
+                    const activeSubSnap = await db.collection('adjustments').where('status', '==', 'active').get();
+                    const allActiveSubs = activeSubSnap.docs.map(d => d.data());
+
+                    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
                     for (const target of waTargets) {
-                        const mySchedule = allSchedule.filter(cls => {
-                            const match1 = (target.empId && cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) ||
-                                           (cls.faculty && target.name && String(cls.faculty).trim().toLowerCase() === String(target.name).trim().toLowerCase());
-                            const match2 = (target.empId && cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)) ||
-                                           (cls.faculty2 && target.name && String(cls.faculty2).trim().toLowerCase() === String(target.name).trim().toLowerCase());
-                            return match1 || match2;
+                        let mySchedule = [];
+                        
+                        days.forEach(d => {
+                            const dateStr = dayToDateMap[d];
+                            if (!dateStr) return;
+                            
+                            const dayClasses = allSchedule.filter(cls => cls.day === d);
+                            dayClasses.forEach(cls => {
+                                const sub = allActiveSubs.find(a => a.originalScheduleId === cls.id && a.date === dateStr);
+                                let includeClass = false;
+                                let passSub = null;
+
+                                if (sub) {
+                                    const subMatch = (target.empId && sub.substituteEmpId && String(sub.substituteEmpId) === String(target.empId)) ||
+                                                     (sub.substituteName && target.name && String(sub.substituteName).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                                    const origMatch = (target.empId && sub.originalFacultyEmpId && String(sub.originalFacultyEmpId) === String(target.empId)) ||
+                                                      (sub.originalFacultyName && target.name && String(sub.originalFacultyName).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                                    const match2 = (target.empId && cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)) ||
+                                                   (cls.faculty2 && target.name && String(cls.faculty2).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                                    
+                                    if (subMatch || match2) {
+                                        includeClass = true;
+                                        passSub = sub;
+                                    }
+                                } else {
+                                    const match1 = (target.empId && cls.facultyEmpId && String(cls.facultyEmpId) === String(target.empId)) ||
+                                                   (cls.faculty && target.name && String(cls.faculty).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                                    const match2 = (target.empId && cls.faculty2EmpId && String(cls.faculty2EmpId) === String(target.empId)) ||
+                                                   (cls.faculty2 && target.name && String(cls.faculty2).trim().toLowerCase() === String(target.name).trim().toLowerCase());
+                                    if (match1 || match2) includeClass = true;
+                                }
+
+                                if (includeClass) {
+                                    mySchedule.push({ ...cls, _subData: passSub });
+                                }
+                            });
                         });
 
                         if (mySchedule.length > 0) {
                             let previewMsg = formatMsg('weekly_header', defaultTemplates.weekly_header, { name: target.name, total_sessions: mySchedule.length });
                             
                             // Group by day
-                            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                             days.forEach(d => {
                                 const dayClasses = mySchedule.filter(cls => cls.day === d);
                                 if (dayClasses.length > 0) {
@@ -564,7 +608,7 @@ export default async function handler(req, res) {
                                     
                                     previewMsg += `\n*${d}* (${dayClasses.length} classes):\n`;
                                     dayClasses.forEach((cls, idx) => {
-                                        previewMsg += formatClassLine('weekly_class_line', idx, cls, target, false);
+                                        previewMsg += formatClassLine('weekly_class_line', idx, cls, target, cls._subData || null);
                                     });
                                 }
                             });
@@ -818,6 +862,14 @@ export default async function handler(req, res) {
                                     }
                                     if (isSecondary) otherFac = cls.faculty;
                                 }
+                                
+                                if (subData) {
+                                    const origName = (subData.originalFacultyName || (String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId) ? cls.faculty2 : cls.faculty) || '').trim().toLowerCase();
+                                    if (otherFac && origName && String(otherFac).trim().toLowerCase() === origName) {
+                                        otherFac = subData.substituteName;
+                                    }
+                                }
+
                                 // Ensure it doesn't print self name
                                 if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
                                     otherFac = '';
@@ -863,6 +915,14 @@ export default async function handler(req, res) {
                                     }
                                     if (isSecondary) otherFac = cls.faculty;
                                 }
+                                
+                                if (subData) {
+                                    const origName = (subData.originalFacultyName || (String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId) ? cls.faculty2 : cls.faculty) || '').trim().toLowerCase();
+                                    if (otherFac && origName && String(otherFac).trim().toLowerCase() === origName) {
+                                        otherFac = subData.substituteName;
+                                    }
+                                }
+
                                 // Ensure it doesn't print self name
                                 if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
                                     otherFac = '';
