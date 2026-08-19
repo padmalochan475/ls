@@ -822,7 +822,7 @@ export default async function handler(req, res) {
                                     otherFac = '';
                                 }
                                 const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
-                                const uCofacStr = otherFac ? `\n🔹 *Cofaculty:* ${otherFac}` : '';
+                                const uCofacStr = otherFac ? `\n🤝 *Co-Faculty:* ${otherFac}` : '';
                                 const uVars = { ...vars, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
                                 const waMsg = formatMsg('warn1_wa', defaultTemplates.warn1_wa, uVars);
                                 
@@ -867,7 +867,7 @@ export default async function handler(req, res) {
                                     otherFac = '';
                                 }
                                 const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
-                                const uCofacStr = otherFac ? `\n🔹 *Cofaculty:* ${otherFac}` : '';
+                                const uCofacStr = otherFac ? `\n🤝 *Co-Faculty:* ${otherFac}` : '';
                                 const uVars = { ...vars, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
                                 const waMsg = formatMsg('warn2_wa', defaultTemplates.warn2_wa, uVars);
                                 
