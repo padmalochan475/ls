@@ -498,8 +498,8 @@ const SubstitutionManager = () => {
                     empIds: [adjData.substituteEmpId],
                     title: "Substitution Cancelled",
                     body: `Your assigned substitution for ${adjData.subject} on ${adjData.date} has been CANCELLED by the administration.`,
-                    type: 'substitution_cancelled',
-                    data: { type: 'substitution_cancelled', date: adjData.date }
+                    type: 'substitution_cancelled_sub',
+                    data: { type: 'substitution_cancelled_sub', date: adjData.date, subject: adjData.subject || 'Class' }
                 });
             }
             if (adjData.originalFacultyEmpId) {
@@ -508,7 +508,7 @@ const SubstitutionManager = () => {
                     title: "Substitution Cancelled",
                     body: `The substitution arrangement for your ${adjData.subject} class on ${adjData.date} has been CANCELLED. You are now expected to take the class.`,
                     type: 'substitution_cancelled',
-                    data: { type: 'substitution_cancelled', date: adjData.date }
+                    data: { type: 'substitution_cancelled', date: adjData.date, subject: adjData.subject || 'Class' }
                 });
             }
 
