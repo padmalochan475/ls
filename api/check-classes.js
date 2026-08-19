@@ -768,8 +768,9 @@ export default async function handler(req, res) {
                     .get();
 
                 let finalUsers = users;
+                let subData = null;
                 if (!subSnap.empty) {
-                    const subData = subSnap.docs[0].data();
+                    subData = subSnap.docs[0].data();
                     const subs = await getFacultyData([{ id: subData.substituteEmpId, name: subData.substituteName }], cachedUsers, cachedFaculty);
                     
                     // Remove ONLY the original faculty from recipients, keep the other faculty, and add the substitute

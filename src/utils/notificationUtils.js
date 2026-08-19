@@ -95,7 +95,7 @@ export const sendNotification = async ({
             }
             
             vars.cofacInline = vars.faculty2 ? ` (w/ ${vars.faculty2})` : '';
-            vars.cofacStr = vars.faculty2 ? `\n🔹 *Cofaculty:* ${vars.faculty2}` : '';
+            vars.cofacStr = vars.faculty2 ? `\n🤝 *Co-Faculty:* ${vars.faculty2}` : '';
             
             const formatMsg = (key, defaultText) => {
                 let str = customTemplates[key] || defaultText;
