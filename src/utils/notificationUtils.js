@@ -25,6 +25,12 @@ export const sendNotification = async ({
     data = {}
 }) => {
     try {
+        let processedBody = body ? String(body) : '';
+        processedBody = processedBody.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (match, y, m, d) => {
+            const dayName = getDayName(match);
+            return `${d}-${m}-${y} (${dayName})`;
+        });
+
         let targetUids = [...userIds];
 
         // 1. Resolve EmpIDs to UIDs
@@ -56,7 +62,7 @@ export const sendNotification = async ({
             const notifRef = doc(collection(db, 'users', uid, 'notifications'));
             currentBatch.set(notifRef, {
                 title,
-                body,
+                body: processedBody,
                 type,
                 read: false,
                 createdAt: serverTimestamp(),
@@ -88,10 +94,16 @@ export const sendNotification = async ({
 
         const getWhatsAppTemplate = (profile) => {
             const userName = profile.name || 'Faculty';
-            const vars = { name: userName, title: title || '', body: body || '', ...data };
+            const vars = { name: userName, title: title || '', body: processedBody, ...data };
             
-            if (vars.date && !vars.day) {
-                vars.day = getDayName(vars.date);
+            if (vars.date) {
+                if (!vars.day) {
+                    vars.day = getDayName(vars.date);
+                }
+                const parts = String(vars.date).split('-');
+                if (parts.length === 3 && parts[0].length === 4) {
+                    vars.date = `${parts[2]}-${parts[1]}-${parts[0]} (${vars.day})`;
+                }
             }
             
             vars.cofacInline = vars.faculty2 ? ` (w/ ${vars.faculty2})` : '';
@@ -99,8 +111,10 @@ export const sendNotification = async ({
             
             const formatMsg = (key, defaultText) => {
                 let str = customTemplates[key] || defaultText;
+                str = str.replace(/\{day\}[^a-zA-Z0-9_\{]*\{date\}/g, '{date}');
+                str = str.replace(/\{date\}[^a-zA-Z0-9_\{]*\{day\}/g, '{date}');
                 for (const [vKey, vVal] of Object.entries(vars)) {
-                    str = str.replace(new RegExp(`\\{${vKey}\\}`, 'g'), vVal);
+                    str = str.replace(new RegExp(`\\{${vKey}\\}`, 'g'), () => vVal);
                 }
                 return str;
             };
@@ -139,10 +153,10 @@ export const sendNotification = async ({
                     return formatMsg('sys_alert', defaultTemplates['sys_alert']);
 
                 case 'raw':
-                    return body;
+                    return processedBody;
 
                 default:
-                    return `🔔 *LAMS NOTIFICATION* 🔔\n\n*${title}*\n${body}\n\n_Check the portal for details._`;
+                    return `🔔 *LAMS NOTIFICATION* 🔔\n\n*${title}*\n${processedBody}\n\n_Check the portal for details._`;
             }
         };
 
@@ -186,7 +200,7 @@ export const sendNotification = async ({
                     targetUids,
                     targetType: 'external_id',
                     title,
-                    body,
+                    body: processedBody,
                     data: { ...data, type }
                 })
             });
@@ -249,15 +263,24 @@ export const sendToObservers = async (templateKey, templateVars) => {
         let finalMessage = rawTemplate;
         
         // Auto-inject day if date exists
-        if (templateVars.date && !templateVars.day) {
-            templateVars.day = getDayName(templateVars.date);
+        if (templateVars.date) {
+            if (!templateVars.day) {
+                templateVars.day = getDayName(templateVars.date);
+            }
+            const parts = String(templateVars.date).split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                templateVars.date = `${parts[2]}-${parts[1]}-${parts[0]} (${templateVars.day})`;
+            }
         }
         
         templateVars.cofacInline = templateVars.faculty2 ? ` (w/ ${templateVars.faculty2})` : '';
         templateVars.cofacStr = templateVars.faculty2 ? `\n👥 _Cofaculty:_ ${templateVars.faculty2}` : '';
 
+        finalMessage = finalMessage.replace(/\{day\}[^a-zA-Z0-9_\{]*\{date\}/g, '{date}');
+        finalMessage = finalMessage.replace(/\{date\}[^a-zA-Z0-9_\{]*\{day\}/g, '{date}');
+
         for (const [k, v] of Object.entries(templateVars)) {
-            finalMessage = finalMessage.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+            finalMessage = finalMessage.replace(new RegExp(`\\{${k}\\}`, 'g'), () => v);
         }
 
         // 4. Send via raw channel

@@ -9,7 +9,7 @@ export const defaultTemplates = {
     
     warn1_push_title: "⏳ Upcoming Class",
     warn1_push_body: "Reminder: {subject} ({group}){cofacInline} begins in {mins} mins at Room {room}.",
-    warn1_wa: "⚠️ *CLASS REMINDER [ T-Minus {mins} mins ]* ⚠️\n\nDear *{name}*,\nYour next class is approaching rapidly.\n\n*SESSION DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}\n👥 *Group:* {group}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n🏃 Please proceed to your designated classroom.\n-- LAMS System",
+    warn1_wa: "⚠️ *CLASS REMINDER [ Starts in {mins} mins ]* ⚠️\n\nDear *{name}*,\nYour next class is approaching rapidly.\n\n*SESSION DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}\n👥 *Group:* {group}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n🏃 Please proceed to your designated classroom.\n-- LAMS System",
     
     warn2_push_title: "🚨 Class Starting",
     warn2_push_body: "Action Required: {subject} ({group}){cofacInline} is starting now at Room {room}.",

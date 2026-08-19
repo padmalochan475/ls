@@ -894,7 +894,7 @@ const Dashboard = () => {
                     </h2>
                     <p style={{ margin: '0.5rem 0 0 0', color: 'var(--color-text-muted)', fontSize: '1.1rem' }}>
                         {dashboardView === 'admin' ? 'Admin Overview & Management' : 'My Schedule & Stats'}
-                        <span style={{ fontSize: '0.9rem', marginLeft: '1rem', background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', padding: '4px 10px', borderRadius: '6px', fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                        <span className="animated-time-badge">
                             <Clock size={14} />
                             {liveTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                         </span>

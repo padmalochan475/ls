@@ -1406,3 +1406,45 @@ input:checked:hover + .slider {
     background-clip: text;
     -webkit-text-fill-color: transparent;
 }
+
+/* Animated Time Badge */
+.animated-time-badge {
+    position: relative;
+    background: linear-gradient(120deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15), rgba(236, 72, 153, 0.15));
+    background-size: 200% 200%;
+    color: #93c5fd;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(147, 51, 234, 0.3);
+    box-shadow: 0 0 10px rgba(147, 51, 234, 0.1);
+    animation: gradient-shift 4s ease infinite;
+    overflow: hidden;
+    margin-left: 1rem;
+}
+
+.animated-time-badge::before {
+    content: "";
+    position: absolute;
+    top: 0; left: -100%; width: 50%; height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent);
+    transform: skewX(-20deg);
+    animation: shine-sweep 5s infinite;
+}
+
+@keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes shine-sweep {
+    0% { left: -100%; }
+    20% { left: 200%; }
+    100% { left: 200%; }
+}
