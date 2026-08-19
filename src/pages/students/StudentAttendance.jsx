@@ -142,12 +142,12 @@ const StudentAttendance = () => {
         const targetTableHeight = PAGE_HEIGHT - exactFixedSpace;
         
         let idealRowHeight = (targetTableHeight / sheetStudents.length);
-        idealRowHeight = Math.max(9, Math.min(idealRowHeight, 75));
+        // Cap at 28 to ensure the sheet looks like a normal sheet (spawning empty rows) instead of massive text boxes
+        idealRowHeight = Math.max(9, Math.min(idealRowHeight, 28));
         
         // The font size dynamically fills the row height (70% height).
-        // Since we now use mathematical scaleX to prevent overlap, we can safely allow much larger fonts (up to 24px) for empty space!
         let idealFontSize = idealRowHeight * 0.70;
-        idealFontSize = Math.max(8, Math.min(idealFontSize, 24));
+        idealFontSize = Math.max(8, Math.min(idealFontSize, 14));
         
         const finalRowHeight = Number(idealRowHeight.toFixed(2));
         const finalFontSize = Number(idealFontSize.toFixed(2));
@@ -637,6 +637,20 @@ const StudentAttendance = () => {
                                                 </tr>
                                             );
                                         })}
+                                        {/* Render empty rows to fill the rest of the page */}
+                                        {Array.from({ length: Math.max(0, Math.floor(((PAPER_SIZES[printSettings.paperSize]?.maxSafeHeight || 1000) - 320) / printSettings.rowHeight) - sheetStudents.length) }).map((_, i) => (
+                                            <tr key={`empty-${i}`} style={{ height: `${printSettings.rowHeight}px` }}>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                                <td style={{ padding: `${cellPadding}px` }}></td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                         </div>
