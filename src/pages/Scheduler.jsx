@@ -9,6 +9,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, deleteDoc, doc, updateDoc, getDocs, getDoc, writeBatch, and } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
+import { formatSemester } from '../utils/sortUtils';
 import { useScheduleData } from '../hooks/useScheduleData';
 import { useWritePermission } from '../hooks/useWritePermission';
 import { analyzeSchedule } from '../utils/conflictDetection';
@@ -1620,7 +1621,7 @@ const Scheduler = () => {
                                                                     {getFacultyShortCode(a.faculty)}{a.faculty2 ? `,${getFacultyShortCode(a.faculty2)}` : ''}
                                                                 </div>
                                                                 <div className="print-pill pill-sem">
-                                                                    {a.sem ? `${a.sem.replace(/Semester/i, '').replace(/Sem/i, '').trim()} Sem` : ''}
+                                                                    {a.sem ? formatSemester(a.sem) : ''}
                                                                 </div>
                                                             </div>
                                                         </div>

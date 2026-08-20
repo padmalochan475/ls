@@ -97,9 +97,11 @@ export default async function handler(req, res) {
         const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
         const subjectMap = {};
+        const subjectTypeMap = {};
         subjectsSnap.docs.forEach(doc => {
             const d = doc.data();
             if (d.name && d.shortCode) subjectMap[normalize(d.name)] = d.shortCode.trim();
+            if (d.name && d.type) subjectTypeMap[normalize(d.name)] = d.type.toLowerCase().trim();
         });
 
         const deptMap = {};
@@ -131,6 +133,16 @@ export default async function handler(req, res) {
         // CRITICAL SECURITY STEP: Data Scrubbing
         const schedule = scheduleSnap.docs.map(doc => {
             const d = doc.data();
+            const subjectNorm = normalize(d.subject || '');
+            const roomNorm = normalize(d.room || '');
+            
+            let isLab = false;
+            if (subjectTypeMap[subjectNorm] === 'lab') {
+                isLab = true;
+            } else if (subjectNorm.includes('lab') || roomNorm.includes('lab')) {
+                isLab = true;
+            }
+
             return {
                 // Public Fields ONLY
                 day: d.day || '',
@@ -143,7 +155,7 @@ export default async function handler(req, res) {
                 sem: d.sem || '',
                 section: d.section || '',
                 group: d.group || '',
-                isLab: !!d.isLab // Helper if stored, though client filters often override
+                isLab: isLab
             };
         });
 
