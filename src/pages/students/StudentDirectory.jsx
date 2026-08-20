@@ -9,8 +9,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMasterData } from '../../contexts/MasterDataContext';
 import { useDynamicListener } from '../../hooks/useDynamicListener';
 import { 
-  Users, Search, Filter, Download, Upload, Plus, Edit, Trash2, 
-  MapPin, Phone, Mail, BookOpen, GraduationCap, Calendar, Save, X 
+  Plus, Search, Edit, Trash2, Users, Upload, Download, Eye,
+  CheckCircle, X, Clock, BookOpen, Filter, UserCheck, UserX,
+  GraduationCap, AlertCircle, MapPin, Phone, Mail, Calendar, Save 
 } from 'lucide-react';
 import { formatSemester } from '../../utils/sortUtils';
 import toast from 'react-hot-toast';
