@@ -446,6 +446,14 @@ export const AuthProvider = ({ children }) => {
                             return isMeaningfulChange ? newData : prev;
                         });
                     } else {
+                        const creationTime = currentUser.metadata?.creationTime;
+                        const isNewlyCreated = creationTime && (Date.now() - Date.parse(creationTime) < 15000);
+                        
+                        if (isNewlyCreated) {
+                            console.log("Account just created, waiting for profile generation...");
+                            return; // Do not call setLoading(false) yet, wait for the profile creation setDoc to trigger a re-render
+                        }
+                        
                         console.warn("User Profile Missing!");
                         setUserProfile(null);
                         setProfileMissing(true);
