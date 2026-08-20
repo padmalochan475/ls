@@ -482,12 +482,16 @@ export default async function handler(req, res) {
                 }
 
                 if (otherFac && otherFac.trim() !== '' && String(otherFac).trim().toLowerCase() !== String(target.name).trim().toLowerCase()) {
-                    cofacStr = ` WITH ${otherFac.trim().toUpperCase()}`;
+                    cofacStr = `\n   🤝 Co-faculty: ${otherFac.trim().toUpperCase()}`;
                 }
             }
             const roomStr = cls.room ? ` AT ${cls.room.toUpperCase()}` : '';
-            const semStr = (cls.semester || cls.sem) ? ` (${cls.semester || cls.sem} SEM)` : '';
-            const subStr = isSub && cls.faculty ? ` [⚠️ SUB FOR ${cls.faculty.toUpperCase()}]` : '';
+            let semValue = cls.semester || cls.sem || '';
+            if (typeof semValue === 'string') {
+                semValue = semValue.replace(/Semester/ig, '').replace(/Sem/ig, '').trim();
+            }
+            const semStr = semValue ? ` (${semValue} Sem)` : '';
+            const subStr = isSub && cls.faculty ? `\n   ⚠️ Covering for: ${cls.faculty.toUpperCase()}` : '';
 
             const defaultTemplate = defaultTemplates[templateKey] || "🔹 *{idx}.* {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}\n";
             

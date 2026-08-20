@@ -353,7 +353,7 @@ function renderCompactCell(doc, items, x, y, w, h, unitHeight, baseFontSize) {
         // Sem: Use passed short code + Ordinal + " SEM"
         let semStr = '';
         if (item.sem) {
-            let sVal = item.sem.toString();
+            let sVal = item.sem.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim();
 
             // Helper: Add ordinal suffix if it's a raw number (e.g. "4" -> "4th")
              
@@ -364,12 +364,11 @@ function renderCompactCell(doc, items, x, y, w, h, unitHeight, baseFontSize) {
             };
 
             // If strict number, format it. If "4th" or "IV", leave it.
-            if (!isNaN(sVal)) {
+            if (!isNaN(sVal) && sVal !== '') {
                 sVal = addOrdinal(parseInt(sVal, 10));
             }
 
-            // User Request: "4th SEM"
-            semStr = `-${sVal} SEM`;
+            semStr = sVal ? `-${sVal} SEM` : '';
         }
 
         // Faculty: Always show short codes

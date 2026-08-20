@@ -78,11 +78,11 @@ export const styledExportToExcel = async ({
                     const subj = getSubjectShortCode(a.subject);
                     const fac1 = getFacultyShortCode(a.faculty);
                     const fac2 = a.faculty2 ? getFacultyShortCode(a.faculty2) : null;
-                    const semStr = a.sem ? a.sem.replace(/Semester/i, '').replace(/Sem/i, '').trim() : '';
+                    const semStr = a.sem ? a.sem.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim() : '';
 
                     // Format: DEPT-SEC-GRP-[SUB]-[FAC]-ROOM-SEM
                     // Matches PDF 'pdfLabel' logic exactly
-                    const cellText = `${a.dept}-${a.section}${(a.group && a.group !== 'All' && a.group !== a.section) ? `-${a.group}` : ''}-[${subj}]-[${fac1}${fac2 ? `,${fac2}` : ''}]-${a.room}-${semStr} SEM`; // eslint-disable-line sonarjs/no-nested-template-literals
+                    const cellText = `${a.dept}-${a.section}${(a.group && a.group !== 'All' && a.group !== a.section) ? `-${a.group}` : ''}-[${subj}]-[${fac1}${fac2 ? `,${fac2}` : ''}]-${a.room}${semStr ? `-${semStr} SEM` : ''}`; // eslint-disable-line sonarjs/no-nested-template-literals
 
                     rowData.push(cellText);
                 } else {
