@@ -4,6 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import axios from 'axios';
 import { defaultTemplates } from '../src/utils/defaultTemplates.js';
+import { formatSemester } from '../src/utils/sortUtils.js';
 
 // Increase Vercel function timeout to 60 seconds (maximum for Hobby tier)
 // This gives the Render WhatsApp bot time to wake up from cold starts.
@@ -452,7 +453,7 @@ export default async function handler(req, res) {
                         (target.name && subData.substituteName && String(target.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase());
             }
             const time = cls.time ? cls.time.replace(/\s+/g, '') : "N/A";
-            const group = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-');
+            const group = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join(' ');
             const subject = cls.subject ? `${cls.subject.toUpperCase()}` : 'CLASS';
             
             let cofacStr = "";
@@ -486,11 +487,7 @@ export default async function handler(req, res) {
                 }
             }
             const roomStr = cls.room ? ` AT ${cls.room.toUpperCase()}` : '';
-            let semValue = cls.semester || cls.sem || '';
-            if (typeof semValue === 'string') {
-                semValue = semValue.replace(/Semester/ig, '').replace(/Sem/ig, '').trim();
-            }
-            const semStr = semValue ? ` (${semValue} Sem)` : '';
+            const semStr = (cls.semester || cls.sem) ? ` (${formatSemester(cls.semester || cls.sem)})` : '';
             const subStr = isSub && cls.faculty ? `\n   ⚠️ Covering for: ${cls.faculty.toUpperCase()}` : '';
 
             const defaultTemplate = defaultTemplates[templateKey] || "🔹 *{idx}.* {time} : {group} [{subject}]{cofacStr}{roomStr}{semStr}{subStr}\n";
@@ -800,7 +797,7 @@ export default async function handler(req, res) {
         for (const cls of upcomingClasses) {
             try {
                 const minutesLeft = Math.round((cls.startTime - nowIST) / 60000);
-                let groupStr = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-').toUpperCase();
+                let groupStr = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join(' ').toUpperCase();
                 
                 // Get Full User Objects using CACHED data
                 const users = await getFacultyData([
