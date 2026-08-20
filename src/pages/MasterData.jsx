@@ -1110,6 +1110,7 @@ const MasterData = ({ initialTab }) => {
                         const userSnap = await getDoc(userRef);
                         if (userSnap.exists()) {
                             const userUpdates = {
+                                name: formData.name || userSnap.data().name,
                                 empId: formData.empId || null,
                                 isFaculty: true,
                                 dept: formData.department || formData.dept || null,
@@ -1120,6 +1121,16 @@ const MasterData = ({ initialTab }) => {
                             if (formData.shortCode) userUpdates.shortCode = formData.shortCode;
                             if (formData.photoURL) userUpdates.photoURL = formData.photoURL;
                             await updateDoc(userRef, userUpdates);
+                        }
+                        
+                        // SYNC EMP_LOOKUPS (If EmpId or Email changed)
+                        if (formData.empId && formData.email) {
+                            await setDoc(doc(db, 'emp_lookups', formData.empId), {
+                                uid: formData.uid,
+                                email: formData.email,
+                                syncedAt: new Date().toISOString(),
+                                source: 'auto-sync-edit'
+                            });
                         }
                     } catch (uErr) {
                         console.warn("User Profile Sync Skipped:", uErr);

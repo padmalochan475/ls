@@ -140,7 +140,62 @@ export const AuthProvider = ({ children }) => {
             // Ignore permission/network errors here, let the actual signup fail if necessary
         }
 
+        let linkedDept = null;
+        let isFaculty = false;
+        let syncedPhotoURL = null;
+        let syncedDesignation = null;
+        let syncedShortCode = null;
+        let syncedMobile = mobileNumber;
+        let syncedName = name; // Default to user-provided name
+        let facDocIdToUpdate = null;
+
+        // PRE-FLIGHT FACULTY SECURITY CHECK: Ensure they are allowed to claim this Faculty ID
+        try {
+            let facultySnap = await getDocs(query(collection(db, 'faculty'), where('empId', '==', empId)));
+            if (facultySnap.empty && recoveryEmail) {
+                facultySnap = await getDocs(query(collection(db, 'faculty'), where('email', '==', recoveryEmail)));
+            }
+            if (!facultySnap.empty) {
+                const facDoc = facultySnap.docs[0];
+                const facData = facDoc.data();
+                
+                // STRICT SECURITY: If Admin has set an email for this faculty, the signup email MUST match!
+                if (facData.email && facData.email.toLowerCase() !== recoveryEmail.toLowerCase()) {
+                    throw new Error(`This Employee ID is securely linked to a different email. Please use the correct email or contact Admin.`);
+                }
+                
+                facDocIdToUpdate = facDoc.id;
+                linkedDept = facData.department || facData.dept;
+                isFaculty = true;
+                
+                // MASTER DATA SYNC: Sync attributes directly from Admin's Master Data
+                if (facData.name) syncedName = facData.name; 
+                if (facData.photoURL) syncedPhotoURL = facData.photoURL;
+                if (facData.designation) syncedDesignation = facData.designation;
+                if (facData.shortCode) syncedShortCode = facData.shortCode;
+                if (facData.phone || facData.mobile) syncedMobile = facData.mobile || facData.phone;
+            }
+        } catch (facErr) {
+            if (facErr.message.includes("securely linked")) throw facErr;
+            console.warn("Faculty lookup/link failed during signup:", facErr);
+        }
+
+        // CREATE AUTHENTICATION ACCOUNT (Only happens if security checks passed)
         const { user } = await createUserWithEmailAndPassword(auth, recoveryEmail, password);
+
+        // POST-CREATION: Link Faculty Document to new UID
+        if (facDocIdToUpdate) {
+            try {
+                await updateDoc(doc(db, 'faculty', facDocIdToUpdate), {
+                    uid: user.uid,
+                    isRegistered: true,
+                    email: recoveryEmail,
+                    empId: empId
+                });
+            } catch (err) {
+                console.warn("Failed to link faculty document:", err);
+            }
+        }
 
         let isFirstUser = false;
         try {
@@ -150,42 +205,9 @@ export const AuthProvider = ({ children }) => {
             console.warn("First-user check failed, defaulting to pending user:", e);
         }
 
-        let linkedDept = null;
-        let isFaculty = false;
-        let syncedPhotoURL = null;
-        let syncedDesignation = null;
-        let syncedShortCode = null;
-        let syncedMobile = mobileNumber;
-        
-        try {
-            let facultySnap = await getDocs(query(collection(db, 'faculty'), where('empId', '==', empId)));
-            if (facultySnap.empty && recoveryEmail) {
-                facultySnap = await getDocs(query(collection(db, 'faculty'), where('email', '==', recoveryEmail)));
-            }
-            if (!facultySnap.empty) {
-                const facDoc = facultySnap.docs[0];
-                const facData = facDoc.data();
-                linkedDept = facData.department || facData.dept;
-                isFaculty = true;
-                if (facData.photoURL) syncedPhotoURL = facData.photoURL;
-                if (facData.designation) syncedDesignation = facData.designation;
-                if (facData.shortCode) syncedShortCode = facData.shortCode;
-                if (facData.phone || facData.mobile) syncedMobile = facData.mobile || facData.phone;
-                
-                await updateDoc(doc(db, 'faculty', facDoc.id), {
-                    uid: user.uid,
-                    isRegistered: true,
-                    email: recoveryEmail,
-                    empId: empId
-                });
-            }
-        } catch (facErr) {
-            console.warn("Faculty lookup/link failed during signup:", facErr);
-        }
-
         const userProfileData = {
             empId,
-            name,
+            name: syncedName,
             email: recoveryEmail,
             mobile: syncedMobile,
             role: isFirstUser ? 'admin' : 'user',
