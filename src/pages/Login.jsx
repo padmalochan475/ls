@@ -78,14 +78,19 @@ const Login = () => {
 
   const handleSignupStep1 = async () => {
     const cleanEmpId = formData.empId.trim();
-    const empIdRegex = /^[a-zA-Z0-9]+$/;
+    const empIdRegex = /^[a-zA-Z0-9-_]+$/;
     if (!empIdRegex.test(cleanEmpId)) {
-      setError('Employee ID must contain only letters and numbers (no special characters).');
+      setError('Employee ID can only contain letters, numbers, hyphens, and underscores.');
       return;
     }
 
     if (formData.password.length < 6) {
       setError('Password should be at least 6 characters.');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
 
