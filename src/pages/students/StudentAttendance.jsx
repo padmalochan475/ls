@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Printer, Download, Calendar, Type, Maximize2, FileText, SlidersHorizontal } from 'lucide-react';
+import { formatSemester } from '../../utils/sortUtils';
 import { useMasterData } from '../../contexts/MasterDataContext';
 import QuantumLoader from '../../components/QuantumLoader';
 import toast from 'react-hot-toast';
@@ -338,7 +339,7 @@ const StudentAttendance = () => {
                             </label>
                             <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.95rem', outline: 'none' }} value={config.semester} onChange={e => setConfig({ ...config, semester: e.target.value })}>
                                 <option value="" style={{ background: '#0f172a' }}>— Select Semester —</option>
-                                {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>{s.number?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} Sem</option>)}
+                                {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>{formatSemester(s.number)}</option>)}
                             </select>
                         </div>
                         <div>

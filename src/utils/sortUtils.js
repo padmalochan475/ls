@@ -48,3 +48,22 @@ export const sortSemesters = (a, b) => {
     const semB = (b && typeof b === 'object') ? (b.sem || '') : (b || '');
     return getSemesterNumber(semA) - getSemesterNumber(semB);
 };
+
+/**
+ * Format a semester number to an ordinal string (e.g. "1" -> "1st Sem")
+ * Preserves the string if it already contains ordinals or doesn't map cleanly.
+ *
+ * @param {string|number} semStr
+ * @returns {string}
+ */
+export const formatSemester = (semStr) => {
+    if (!semStr) return '';
+    let sVal = String(semStr).replace(/Semester/ig, '').replace(/Sem/ig, '').trim();
+    if (!isNaN(sVal) && sVal !== '') {
+        const n = parseInt(sVal, 10);
+        const s = ["th", "st", "nd", "rd"];
+        const v = n % 100;
+        sVal = n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+    return `${sVal} Sem`;
+};

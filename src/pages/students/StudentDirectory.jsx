@@ -8,11 +8,11 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useMasterData } from '../../contexts/MasterDataContext';
 import { useDynamicListener } from '../../hooks/useDynamicListener';
-import {
-  Plus, Search, Edit2, Trash2, Users, Upload, Download, Eye,
-  CheckCircle, X, Clock, BookOpen, Filter, UserCheck, UserX,
-  GraduationCap, AlertCircle
+import { 
+  Users, Search, Filter, Download, Upload, Plus, Edit, Trash2, 
+  MapPin, Phone, Mail, BookOpen, GraduationCap, Calendar, Save, X 
 } from 'lucide-react';
+import { formatSemester } from '../../utils/sortUtils';
 import toast from 'react-hot-toast';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -441,7 +441,7 @@ function ProfileModal({ student, onClose }) {
                   <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, padding: '10px 14px' }}>
                     <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 700, marginBottom: 4 }}>{h.academicYear || h.year || `Entry ${i + 1}`}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                      {h.semester && <span style={{ fontSize: 12, color: '#94a3b8' }}>{h.semester?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} Sem</span>}
+                      {h.semester && <span style={{ fontSize: 12, color: '#94a3b8' }}>{formatSemester(h.semester)}</span>}
                       {h.section && <span style={{ fontSize: 12, color: '#94a3b8' }}>Batch {h.section}</span>}
                       {h.rollNo && <span style={{ fontSize: 12, color: '#94a3b8' }}>Roll {h.rollNo}</span>}
                     </div>
@@ -674,7 +674,7 @@ function AddEditModal({ student, groups, availableBatches, semesters, students, 
             <select style={{ ...fieldStyle(errors.semester), appearance: 'none' }} value={form.semester} onChange={e => set('semester', e.target.value)}>
               <option value="">Select Semester</option>
               {(semesters || []).map(s => (
-                <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s}>{s.label || s.name || `Semester ${s.number || s.value || s}`}</option>
+                <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s}>{formatSemester(s.number || s.value || s)}</option>
               ))}
             </select>
           </div>
@@ -1112,7 +1112,7 @@ function ImportModal({ semesters, activeAcademicYear, onClose, onImported }) {
                 <option value="">-- No Default Semester --</option>
                 {semesters.map(s => (
                   <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s}>
-                    {s.label || s.name || `Semester ${s.number || s.value || s}`}
+                    {formatSemester(s.number || s.value || s)}
                   </option>
                 ))}
               </select>
@@ -1513,7 +1513,7 @@ export default function StudentDirectory() {
                   </label>
                   <select style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.95rem', outline: 'none' }} value={filterSemester} onChange={e => { setFilterSemester(e.target.value); setFilterBatch(''); }}>
                       <option value="" style={{ background: '#0f172a' }}>— All Semesters —</option>
-                      {semesters.map(s => <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s} style={{ background: '#0f172a' }}>{s.label || s.name || `Semester ${s.number || s.value || s}`}</option>)}
+                      {semesters.map(s => <option key={s.id || s.number || s} value={s.number || s.name || s.value || s.id || s} style={{ background: '#0f172a' }}>{formatSemester(s.number || s.value || s)}</option>)}
                   </select>
               </div>
 
