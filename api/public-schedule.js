@@ -155,7 +155,8 @@ export default async function handler(req, res) {
                 sem: d.sem || '',
                 section: d.section || '',
                 group: d.group || '',
-                isLab: isLab
+                isLab: isLab,
+                isTheory: !isLab
             };
         });
 
