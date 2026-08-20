@@ -129,9 +129,11 @@ export const AuthProvider = ({ children }) => {
     };
 
     const signup = async (empId, password, name, recoveryEmail, mobileNumber) => {
+        let finalEmpId = empId; // We will use this to auto-correct typos if matched by email
+
         // Pre-flight check: ensure EmpID is not already taken
         try {
-            const lookupDoc = await getDoc(doc(db, 'emp_lookups', empId));
+            const lookupDoc = await getDoc(doc(db, 'emp_lookups', finalEmpId));
             if (lookupDoc.exists()) {
                 throw new Error("This Employee ID is already registered. Please login or contact Admin.");
             }
@@ -159,14 +161,22 @@ export const AuthProvider = ({ children }) => {
                 const facDoc = facultySnap.docs[0];
                 const facData = facDoc.data();
                 
-                // STRICT SECURITY: If Admin has set an email for this faculty, the signup email MUST match!
-                if (facData.email && facData.email.toLowerCase() !== recoveryEmail.toLowerCase()) {
-                    throw new Error(`This Employee ID is securely linked to a different email. Please use the correct email or contact Admin.`);
+                // STRICT SECURITY: If Admin has NOT set an email, block the hijack attempt!
+                if (!facData.email) {
+                    throw new Error(`This Faculty profile is locked because no official email is assigned. Please ask Admin to update your email in Master Data before you can register.`);
+                }
+                
+                // STRICT SECURITY: If Admin has set an email, the signup email MUST match!
+                if (facData.email.toLowerCase() !== recoveryEmail.toLowerCase()) {
+                    throw new Error(`This Employee ID is securely linked to a different official email. Please use the correct email or contact Admin.`);
                 }
                 
                 facDocIdToUpdate = facDoc.id;
                 linkedDept = facData.department || facData.dept;
                 isFaculty = true;
+                
+                // MASTER DATA AUTO-CORRECT: If they made a typo in EmpID but email matched, fix it!
+                if (facData.empId) finalEmpId = facData.empId;
                 
                 // MASTER DATA SYNC: Sync attributes directly from Admin's Master Data
                 if (facData.name) syncedName = facData.name; 
@@ -188,9 +198,8 @@ export const AuthProvider = ({ children }) => {
             try {
                 await updateDoc(doc(db, 'faculty', facDocIdToUpdate), {
                     uid: user.uid,
-                    isRegistered: true,
-                    email: recoveryEmail,
-                    empId: empId
+                    isRegistered: true
+                    // We DO NOT overwrite email or empId in Master Data anymore. Master Data is the Source of Truth!
                 });
             } catch (err) {
                 console.warn("Failed to link faculty document:", err);
@@ -206,7 +215,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         const userProfileData = {
-            empId,
+            empId: finalEmpId,
             name: syncedName,
             email: recoveryEmail,
             mobile: syncedMobile,
@@ -235,9 +244,9 @@ export const AuthProvider = ({ children }) => {
             throw new Error("Failed to create user profile in database. Please try again.");
         }
 
-        if (empId) {
+        if (finalEmpId) {
             try {
-                await setDoc(doc(db, 'emp_lookups', empId), { email: recoveryEmail, uid: user.uid });
+                await setDoc(doc(db, 'emp_lookups', finalEmpId), { email: recoveryEmail, uid: user.uid });
             } catch (lookupErr) {
                 console.warn("Emp lookup write failed:", lookupErr);
             }
