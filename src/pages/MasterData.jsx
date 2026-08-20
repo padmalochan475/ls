@@ -1100,6 +1100,18 @@ const MasterData = ({ initialTab }) => {
                     formData.phone = cleanPhone;
                     formData.mobile = cleanPhone;
                 }
+                let oldEmpId = null;
+                if (activeCollection === 'faculty') {
+                    try {
+                        const oldDocSnap = await getDoc(doc(db, activeCollection, editingId));
+                        if (oldDocSnap.exists()) {
+                            oldEmpId = oldDocSnap.data().empId;
+                        }
+                    } catch (e) {
+                        console.warn("Failed to fetch old faculty doc for lookup cleanup:", e);
+                    }
+                }
+
                 await updateDoc(doc(db, activeCollection, editingId), formData);
 
                 // FORCE SYNC: Ensure User Profile is always up to date when editing Faculty
@@ -1125,6 +1137,14 @@ const MasterData = ({ initialTab }) => {
                         
                         // SYNC EMP_LOOKUPS (If EmpId or Email changed)
                         if (formData.empId && formData.email) {
+                            // CLEANUP: If the Admin changed the EmpId, delete the old one from lookups to prevent stranded profiles!
+                            if (oldEmpId && oldEmpId !== formData.empId) {
+                                try {
+                                    await deleteDoc(doc(db, 'emp_lookups', oldEmpId));
+                                } catch (cleanupErr) {
+                                    console.warn("Failed to cleanup old emp_lookup:", cleanupErr);
+                                }
+                            }
                             await setDoc(doc(db, 'emp_lookups', formData.empId), {
                                 uid: formData.uid,
                                 email: formData.email,
