@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
 import { storage } from '../lib/firebase';
 import { ref, uploadBytes } from 'firebase/storage';
-import { sortSemesters } from './sortUtils';
+import { sortSemesters, formatSemester } from './sortUtils';
 
 // Fixed Public URL: Points to the Public View Page
 const getPublicScheduleUrl = () => {
@@ -353,22 +353,9 @@ function renderCompactCell(doc, items, x, y, w, h, unitHeight, baseFontSize) {
         // Sem: Use passed short code + Ordinal + " Sem"
         let semStr = '';
         if (item.sem) {
-            let sVal = item.sem.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim();
-
-            // Helper: Add ordinal suffix if it's a raw number (e.g. "4" -> "4th")
-             
-            const addOrdinal = (n) => {
-                const s = ["th", "st", "nd", "rd"];
-                const v = n % 100;
-                return n + (s[(v - 20) % 10] || s[v] || s[0]);
-            };
-
-            // If strict number, format it. If "4th" or "IV", leave it.
-            if (!isNaN(sVal) && sVal !== '') {
-                sVal = addOrdinal(parseInt(sVal, 10));
-            }
-
-            semStr = sVal ? `-${sVal} SEM` : '';
+            const formatted = formatSemester(item.sem);
+            // formatSemester returns "1st Sem", we want "-1st SEM"
+            semStr = formatted ? `-${formatted.toUpperCase()}` : '';
         }
 
         // Faculty: Always show short codes
