@@ -1101,18 +1101,29 @@ const MasterData = ({ initialTab }) => {
                     formData.mobile = cleanPhone;
                 }
                 let oldEmpId = null;
-                if (activeCollection === 'faculty') {
-                    try {
-                        const oldDocSnap = await getDoc(doc(db, activeCollection, editingId));
-                        if (oldDocSnap.exists()) {
-                            oldEmpId = oldDocSnap.data().empId;
+                let oldData = null;
+                try {
+                    const oldDocSnap = await getDoc(doc(db, activeCollection, editingId));
+                    if (oldDocSnap.exists()) {
+                        oldData = oldDocSnap.data();
+                        if (activeCollection === 'faculty') {
+                            oldEmpId = oldData.empId;
                         }
-                    } catch (e) {
-                        console.warn("Failed to fetch old faculty doc for lookup cleanup:", e);
                     }
+                } catch (e) {
+                    console.warn("Failed to fetch old doc for cascade/cleanup:", e);
                 }
 
                 await updateDoc(doc(db, activeCollection, editingId), formData);
+                
+                // 🔥 DYNAMIC CASCADE AI: Safely update all related schedules when names/IDs change!
+                if (oldData) {
+                    try {
+                        await handleCascadeUpdate(activeCollection, oldData, formData);
+                    } catch (cascadeErr) {
+                        console.error("Cascade update failed:", cascadeErr);
+                    }
+                }
 
                 // FORCE SYNC: Ensure User Profile is always up to date when editing Faculty
                 if (activeCollection === 'faculty' && formData.uid) {
