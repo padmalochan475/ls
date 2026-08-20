@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatSemester } from '../utils/sortUtils';
 import { generateTimetablePDF } from '../utils/pdfGenerator';
 import { RefreshCw, Download, AlertTriangle, Calendar } from 'lucide-react';
 import QuantumLoader from '../components/QuantumLoader';
@@ -69,22 +70,8 @@ const PublicView = () => {
         const getSemesterFormatted = (name) => {
             if (!name) return '';
             const key = normalize(name);
-            // Lookup Code (Normalized Key)
             let code = (semMap && semMap[key]) ? semMap[key] : name.trim();
-
-            // FALLBACK: Manual strip if "Semester" or "Sem" is still in the string
-            // This handles cases where map lookup fails or map contains the full name
-            if (typeof code === 'string' && (code.includes('Semester') || code.includes('Sem'))) {
-                code = code.replace(/Semester/i, '').replace(/Sem/i, '').trim();
-            }
-
-            // Add ordinal only if it's a raw number
-            if (!isNaN(code)) {
-                const s = ["th", "st", "nd", "rd"];
-                const v = code % 100;
-                return code + (s[(v - 20) % 10] || s[v] || s[0]) + " SEM";
-            }
-            return code; // Returns "4th" or "2nd" which pdfGenerator turns into "-2nd SEM"
+            return formatSemester(code);
         };
 
         // Helper for map lookup with normalization

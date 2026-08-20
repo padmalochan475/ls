@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMasterData } from '../contexts/MasterDataContext';
 import { useDynamicListener } from '../hooks/useDynamicListener';
 import { Save, Plus, Trash2, GripVertical, AlertTriangle, Layers, Sparkles } from 'lucide-react';
+import { formatSemester } from '../utils/sortUtils';
 import toast from 'react-hot-toast';
 
 // ─── Colour per group ──────────────────────────────────────────────────────────
@@ -393,7 +394,7 @@ const GroupManager = () => {
                             setFilterGroup('1');
                         }}>
                             <option value="">-- Select Sem --</option>
-                            {semesters.map(s => <option key={s.id} value={s.number}>{s.number?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} Sem</option>)}
+                            {semesters.map(s => <option key={s.id} value={s.number}>{formatSemester(s.number)}</option>)}
                         </select>
                     </div>
                     {/* Section */}

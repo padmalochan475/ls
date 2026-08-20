@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs/dist/exceljs.min.js';
 import { saveAs } from 'file-saver';
-import { sortSemesters } from './sortUtils';
+import { sortSemesters, formatSemester } from './sortUtils';
 
 export const styledExportToExcel = async ({
     days,
@@ -75,14 +75,14 @@ export const styledExportToExcel = async ({
                 const assignments = slotsMap[time];
                 if (assignments && assignments[i]) {
                     const a = assignments[i];
-                    const subj = getSubjectShortCode(a.subject);
-                    const fac1 = getFacultyShortCode(a.faculty);
-                    const fac2 = a.faculty2 ? getFacultyShortCode(a.faculty2) : null;
-                    const semStr = a.sem ? a.sem.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim() : '';
+                    const subj = getSubjectShortCode ? getSubjectShortCode(a.subject) : a.subject;
+                    const fac1 = getFacultyShortCode ? getFacultyShortCode(a.faculty) : a.faculty;
+                    const fac2 = a.faculty2 ? (getFacultyShortCode ? getFacultyShortCode(a.faculty2) : a.faculty2) : '';
+                    const semStr = a.sem ? formatSemester(a.sem) : '';
 
                     // Format: DEPT-SEC-GRP-[SUB]-[FAC]-ROOM-SEM
                     // Matches PDF 'pdfLabel' logic exactly
-                    const cellText = `${a.dept}-${a.section}${(a.group && a.group !== 'All' && a.group !== a.section) ? `-${a.group}` : ''}-[${subj}]-[${fac1}${fac2 ? `,${fac2}` : ''}]-${a.room}${semStr ? `-${semStr} Sem` : ''}`; // eslint-disable-line sonarjs/no-nested-template-literals
+                    const cellText = `${a.dept}-${a.section}${(a.group && a.group !== 'All' && a.group !== a.section) ? `-${a.group}` : ''}-[${subj}]-[${fac1}${fac2 ? `,${fac2}` : ''}]-${a.room}${semStr ? `-${semStr}` : ''}`; // eslint-disable-line sonarjs/no-nested-template-literals
 
                     rowData.push(cellText);
                 } else {
