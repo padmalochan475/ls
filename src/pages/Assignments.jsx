@@ -472,12 +472,12 @@ const Assignments = () => {
             // --- FREE TIER NOTIFICATION LOGIC ---
             // Send to Faculty 1
             if (facultyObj?.empId) {
-                handleSendNotification(facultyObj.empId, selectedSubject, selectedDept, selectedDay, selectedTime, notifType, selectedMainGroup, selectedSubGroup, selectedFaculty2)
+                handleSendNotification(facultyObj.empId, selectedSubject, selectedDept, selectedDay, selectedTime, notifType, selectedMainGroup, selectedSubGroup, faculty2Obj?.name)
                     .catch(e => console.error("Notif Error:", e));
             }
             // Send to Faculty 2
             if (faculty2Obj?.empId) {
-                handleSendNotification(faculty2Obj.empId, selectedSubject, selectedDept, selectedDay, selectedTime, notifType, selectedMainGroup, selectedSubGroup, selectedFaculty)
+                handleSendNotification(faculty2Obj.empId, selectedSubject, selectedDept, selectedDay, selectedTime, notifType, selectedMainGroup, selectedSubGroup, facultyObj?.name)
                     .catch(e => console.error("Notif Error:", e));
             }
             // ------------------------------------
