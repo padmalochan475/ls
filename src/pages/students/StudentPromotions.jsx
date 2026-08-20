@@ -154,7 +154,7 @@ const StudentPromotions = () => {
 
         const batchNote = targetGroup ? `to ${targetGroup}` : `(keeping their existing section)`;
         if (!window.confirm(
-            `Promote ${selectedIds.size} students to Sem ${targetSem?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} ${batchNote}?\n\nTheir current Sem/Section/Group will be saved to academic history before updating.${clearRollNos ? '\n\nWARNING: Roll Numbers will be cleared for the promoted students!' : ''}`
+            `Promote ${selectedIds.size} students to ${targetSem?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} Sem ${batchNote}?\n\nTheir current Sem/Section/Group will be saved to academic history before updating.${clearRollNos ? '\n\nWARNING: Roll Numbers will be cleared for the promoted students!' : ''}`
         )) return;
 
         setProcessing(true);
@@ -249,7 +249,7 @@ const StudentPromotions = () => {
                             <label style={{ display: 'block', color: '#94a3b8', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Current Semester <span style={{ color: '#f87171' }}>*</span></label>
                             <select style={{ boxSizing: 'border-box', width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} value={fromSem} onChange={e => { setFromSem(e.target.value); setEligibleStudents([]); setSelectedIds(new Set()); }}>
                                 <option value="" style={{ background: '#0f172a' }}>— Select Semester —</option>
-                                {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>Sem {s.number?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()}</option>)}
+                                {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>{s.number?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} Sem</option>)}
                             </select>
                         </div>
                         <div>
@@ -298,7 +298,7 @@ const StudentPromotions = () => {
                                 <label style={{ display: 'block', color: '#94a3b8', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Target Semester <span style={{ color: '#f87171' }}>*</span></label>
                                 <select style={{ boxSizing: 'border-box', width: '100%', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', fontSize: '0.9rem', outline: 'none' }} value={targetSem} onChange={e => setTargetSem(e.target.value)}>
                                     <option value="" style={{ background: '#0f172a' }}>— Select Target Semester —</option>
-                                    {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>Sem {s.number?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()}</option>)}
+                                    {semesters.map(s => <option key={s.id} value={s.number} style={{ background: '#0f172a' }}>{s.number?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} Sem</option>)}
                                 </select>
                             </div>
                             <div>
@@ -330,7 +330,7 @@ const StudentPromotions = () => {
                                 <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '12px', padding: '12px 16px', fontSize: '0.85rem', color: '#6ee7b7', lineHeight: 1.5, marginTop: '0.5rem', display: 'flex', gap: '10px' }}>
                                     <span style={{ fontSize: '1rem' }}>✅</span>
                                     <div>
-                                        Students move to <b>Sem {targetSem?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()}</b> and remain in their <b>current section & group</b>.
+                                        Students move to <b>{targetSem?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} Sem</b> and remain in their <b>current section & group</b>.
                                     </div>
                                 </div>
                             )}

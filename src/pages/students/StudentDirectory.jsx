@@ -441,7 +441,7 @@ function ProfileModal({ student, onClose }) {
                   <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, padding: '10px 14px' }}>
                     <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 700, marginBottom: 4 }}>{h.academicYear || h.year || `Entry ${i + 1}`}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                      {h.semester && <span style={{ fontSize: 12, color: '#94a3b8' }}>Sem {h.semester?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()}</span>}
+                      {h.semester && <span style={{ fontSize: 12, color: '#94a3b8' }}>{h.semester?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()} Sem</span>}
                       {h.section && <span style={{ fontSize: 12, color: '#94a3b8' }}>Batch {h.section}</span>}
                       {h.rollNo && <span style={{ fontSize: 12, color: '#94a3b8' }}>Roll {h.rollNo}</span>}
                     </div>
