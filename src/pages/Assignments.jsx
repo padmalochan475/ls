@@ -13,7 +13,6 @@ import {
     AlertTriangle, Keyboard, Settings, Clock, Search, Trash2, Edit2,
     User, Brain, List
 } from 'lucide-react';
-import { getSubjectShortCode, getFacultyShortCode } from '../utils/subjectUtils';
 import { formatSemester } from '../utils/sortUtils';
 import MasterData from './MasterData';
 import QuantumLoader from '../components/QuantumLoader';
