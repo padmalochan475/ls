@@ -1620,7 +1620,7 @@ const Scheduler = () => {
                                                                     {getFacultyShortCode(a.faculty)}{a.faculty2 ? `,${getFacultyShortCode(a.faculty2)}` : ''}
                                                                 </div>
                                                                 <div className="print-pill pill-sem">
-                                                                    {a.sem ? a.sem.replace(/Semester/i, '').replace(/Sem/i, '').trim() : ''}
+                                                                    {a.sem ? `${a.sem.replace(/Semester/i, '').replace(/Sem/i, '').trim()} Sem` : ''}
                                                                 </div>
                                                             </div>
                                                         </div>

@@ -350,7 +350,7 @@ function renderCompactCell(doc, items, x, y, w, h, unitHeight, baseFontSize) {
             // Future placeholder for lab-specific styling if needed
         }
 
-        // Sem: Use passed short code + Ordinal + " SEM"
+        // Sem: Use passed short code + Ordinal + " Sem"
         let semStr = '';
         if (item.sem) {
             let sVal = item.sem.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim();
