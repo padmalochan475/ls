@@ -143,11 +143,11 @@ export default async function handler(req, res) {
                 isLab = true;
             }
 
-            // Combine fields to create a clean 'batch' string like "CSE A 1"
+            // Combine fields to create a clean 'batch' string like "CSE-A-1"
             const deptStr = d.dept || '';
             const secStr = d.section && d.section !== 'All' ? d.section : '';
             const grpStr = d.group && d.group !== 'All' && d.group !== d.section ? d.group : '';
-            const batchStr = [deptStr, secStr, grpStr].filter(Boolean).join(' ');
+            const batchStr = [deptStr, secStr, grpStr].filter(Boolean).join('-');
 
             return {
                 // Public Fields ONLY

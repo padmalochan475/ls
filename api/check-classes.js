@@ -453,7 +453,7 @@ export default async function handler(req, res) {
                         (target.name && subData.substituteName && String(target.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase());
             }
             const time = cls.time ? cls.time.replace(/\s+/g, '') : "N/A";
-            const group = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join(' ');
+            const group = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-');
             const subject = cls.subject ? `${cls.subject.toUpperCase()}` : 'CLASS';
             
             let cofacStr = "";
@@ -797,7 +797,7 @@ export default async function handler(req, res) {
         for (const cls of upcomingClasses) {
             try {
                 const minutesLeft = Math.round((cls.startTime - nowIST) / 60000);
-                let groupStr = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join(' ').toUpperCase();
+                let groupStr = [cls.dept, cls.section || cls.grp, cls.group && cls.group !== 'All' ? cls.group : null].filter(Boolean).join('-').toUpperCase();
                 
                 // Get Full User Objects using CACHED data
                 const users = await getFacultyData([
