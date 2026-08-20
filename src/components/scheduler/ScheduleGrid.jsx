@@ -1,5 +1,6 @@
 import React from 'react';
 import { Layers, FlaskConical, Users, RefreshCw, ArrowRightLeft, BookOpen } from 'lucide-react';
+import { formatSemester } from '../../utils/sortUtils';
 
 const ScheduleGrid = ({
     viewMode,
@@ -138,7 +139,7 @@ const ScheduleGrid = ({
                                         fontWeight: 500,
                                         letterSpacing: '0.02em'
                                     }}>
-                                        {assignment.sem?.replace(/Semester/i, 'Sem')}
+                                        {formatSemester(assignment.sem)}
                                     </div>
 
                                     {isAdmin && (

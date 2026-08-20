@@ -13,6 +13,8 @@ import {
     AlertTriangle, Keyboard, Settings, Clock, Search, Trash2, Edit2,
     User, Brain, List
 } from 'lucide-react';
+import { getSubjectShortCode, getFacultyShortCode } from '../utils/subjectUtils';
+import { formatSemester } from '../utils/sortUtils';
 import MasterData from './MasterData';
 import QuantumLoader from '../components/QuantumLoader';
 import { normalizeStr, normalizeTime, parseTimeSlot } from '../utils/timeUtils';
@@ -787,7 +789,7 @@ const Assignments = () => {
                                     <div className="badge badge-blue detail-badge min-w-0"><User size={14} className="shrink-0" /> <span className="truncate">{assignment.faculty}</span></div>
                                     {assignment.faculty2 && <div className="badge badge-purple detail-badge min-w-0"><User size={14} className="shrink-0" /> <span className="truncate">{assignment.faculty2}</span></div>}
                                     <div className="badge badge-pink detail-badge shrink-0"><MapPin size={14} /> <span>{assignment.room}</span></div>
-                                    <div className="badge badge-orange detail-badge shrink-0"><Layers size={14} /> <span>{assignment.sem?.replace(/Semester/i, 'Sem')}</span></div>
+                                    <div className="badge badge-orange detail-badge shrink-0"><Layers size={14} /> <span>{formatSemester(assignment.sem)}</span></div>
                                     <div className="badge badge-green detail-badge shrink-0"><Users size={14} /> <span>{assignment.dept}-{assignment.section}{assignment.group ? `-${assignment.group}` : ''}</span></div>
                                 </div>
 
