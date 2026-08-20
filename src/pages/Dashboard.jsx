@@ -643,9 +643,11 @@ const Dashboard = () => {
                                 {item.group}
                             </span>
                         )}
-                        <span style={{ background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.75rem', borderRadius: '6px', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 500 }}>
-                            {item.sem}
-                        </span>
+                        {item.sem && (
+                            <span style={{ background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.75rem', borderRadius: '6px', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 500 }}>
+                                Sem {item.sem.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()}
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -864,7 +866,7 @@ const Dashboard = () => {
                             </div>
                             
                             <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                <div style={{ color: '#cbd5e1' }}>{item.dept} • {item.section}{item.group && item.group !== 'All' ? ` • ${item.group}` : ''} • Sem {item.sem}</div>
+                                <div style={{ color: '#cbd5e1' }}>{item.dept} • {item.section}{item.group && item.group !== 'All' ? ` • ${item.group}` : ''}{item.sem ? ` • Sem ${item.sem.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()}` : ''}</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                     <MapPin size={14} color="#f59e0b" />
                                     <span>Room <span style={{ color: '#f59e0b', fontWeight: 600 }}>{item.room}</span></span>

@@ -393,7 +393,7 @@ const GroupManager = () => {
                             setFilterGroup('1');
                         }}>
                             <option value="">-- Select Sem --</option>
-                            {semesters.map(s => <option key={s.id} value={s.number}>Sem {s.number}</option>)}
+                            {semesters.map(s => <option key={s.id} value={s.number}>Sem {s.number?.toString().replace(/Semester/ig, '').replace(/Sem/ig, '').trim()}</option>)}
                         </select>
                     </div>
                     {/* Section */}
