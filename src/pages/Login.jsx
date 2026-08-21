@@ -175,8 +175,8 @@ const Login = () => {
         if (currentUser && userProfile) {
             navigate('/');
         } else if (currentUser && profileMissing) {
-            setError('Your account profile is missing from the database. Please contact your Admin to restore it.');
-            logout().catch((e) => console.error('[Login] logout after profileMissing failed:', e));
+            // DO NOT auto-logout. Leave the user in the controlled state.
+            setError('Your account exists, but your application profile is missing or corrupted. Please contact an Administrator for identity repair.');
         } else if (currentUser && authError === 'ACCOUNT_DISABLED') {
             setError('Your account has been disabled or rejected. Please contact administration.');
         } else if (currentUser && authError === 'PERMISSION_DENIED') {
@@ -527,6 +527,27 @@ const Login = () => {
                             ← Back to Login
                         </button>
                     </form>
+                ) : currentUser && profileMissing ? (
+                    <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+                        <div style={{ color: '#fca5a5', marginBottom: '1rem' }}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        </div>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '1rem' }}>Identity Repair Required</h2>
+                        <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: 1.5, marginBottom: '2rem' }}>
+                            Your authentication account exists, but your application profile is missing or corrupted. 
+                            The system cannot securely determine your role or master data bindings.
+                            <br /><br />
+                            Please contact an Administrator to repair your identity record.
+                        </p>
+                        <button
+                            type="button"
+                            className="btn"
+                            onClick={() => logout()}
+                            style={{ background: 'rgba(255,255,255,0.1)', color: 'white', width: '100%' }}
+                        >
+                            Sign Out
+                        </button>
+                    </div>
                 ) : (
                     /* ── LOGIN / SIGNUP FORM ─────────────────────────────── */
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%' }}>
