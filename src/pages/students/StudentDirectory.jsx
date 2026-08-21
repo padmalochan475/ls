@@ -848,11 +848,11 @@ function ImportModal({ semesters, activeAcademicYear, onClose, onImported }) {
 
   const validCount = validRows.length;
 
-  const handleDataParsed = (hdrs, data, fileName) => {
+  const handleDataParsed = useCallback((hdrs, data, fileName) => {
     setHeaders(hdrs); setRows(data);
     autoMap(hdrs);
     setStep('map');
-  };
+  }, [autoMap]);
 
   const parseFile = useCallback(async (f) => {
     setFile(f);
@@ -902,7 +902,7 @@ function ImportModal({ semesters, activeAcademicYear, onClose, onImported }) {
       };
       reader.readAsArrayBuffer(f);
     }
-  }, []);
+  }, [handleDataParsed]);
 
   const handlePasteParse = () => {
     if (!pasteData.trim()) return toast.error('Please paste some data first');

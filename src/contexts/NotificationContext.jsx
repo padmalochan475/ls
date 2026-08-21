@@ -6,7 +6,12 @@ import { getToken, onMessage, deleteToken } from 'firebase/messaging';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
-const NotificationContext = createContext();
+const NotificationContext = createContext({
+    permission: 'default',
+    registerForPush: async () => {},
+    fcmToken: null,
+    initialized: false
+});
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useNotifications = () => useContext(NotificationContext);

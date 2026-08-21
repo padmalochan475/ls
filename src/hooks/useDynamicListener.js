@@ -75,6 +75,7 @@ export const useDynamicListener = (subscribeFn, dependencies = [], options = {})
                 document.removeEventListener('visibilitychange', handleVisibilityChange);
             }
         };
+        // SUPPRESSION REASON: This is a wrapper around useEffect. The `dependencies` array is intentionally passed dynamically from the caller to control lifecycle (exactly like useEffect). The lint rule only supports static array literals and cannot statically analyze dynamic spreads. This is architecturally required and safe provided callers construct their dependency arrays correctly.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...dependencies, enabled, suspendOnHidden, suspendDelayMs]);
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, or } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import { useDynamicListener } from '../hooks/useDynamicListener';
@@ -52,7 +52,31 @@ export const ScheduleProvider = ({ children }) => {
             searchYears = [...new Set(searchYears)];
 
             const scheduleRefDb = collection(db, 'schedule');
-            const q = query(scheduleRefDb, where('academicYear', 'in', searchYears));
+            let q;
+            
+            // TARGETED REALTIME QUERIES based on user role to optimize Spark Quota
+            if (userProfile?.role === 'admin' || userProfile?.role === 'principal' || userProfile?.role === 'coordinator') {
+                q = query(scheduleRefDb, where('academicYear', 'in', searchYears));
+            } else if (userProfile?.role === 'faculty' && userProfile?.empId) {
+                q = query(
+                    scheduleRefDb, 
+                    where('academicYear', 'in', searchYears),
+                    or(
+                        where('facultyEmpId', '==', String(userProfile.empId).trim()),
+                        where('faculty2EmpId', '==', String(userProfile.empId).trim())
+                    )
+                );
+            } else if (userProfile?.role === 'student' && userProfile?.section) {
+                // Students need to see their section's schedule
+                q = query(
+                    scheduleRefDb,
+                    where('academicYear', 'in', searchYears),
+                    where('section', '==', userProfile.section)
+                );
+            } else {
+                // Fallback for unassigned or generic roles (if any)
+                q = query(scheduleRefDb, where('academicYear', 'in', searchYears));
+            }
 
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 if (!isActiveRef.current) return;

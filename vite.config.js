@@ -64,6 +64,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api/whatsapp': {
+          // eslint-disable-next-line sonarjs/no-clear-text-protocols
           target: env.VITE_WHATSAPP_API_URL ? env.VITE_WHATSAPP_API_URL.replace(/\/api\/sendText$/, '') : 'http://129.225.114.212:2785',
           changeOrigin: true,
           secure: false,

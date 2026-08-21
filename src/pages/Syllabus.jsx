@@ -1,32 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BookOpen, ExternalLink, FileText, GraduationCap, Loader2 } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { useDynamicListener } from '../hooks/useDynamicListener';
+import { collection, getDocs } from 'firebase/firestore';
 
 const Syllabus = () => {
     const [activeTab, setActiveTab] = useState('');
     const [syllabusData, setSyllabusData] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useDynamicListener((isActiveRef) => {
-        return onSnapshot(collection(db, 'syllabi'), (snap) => {
-            if (!isActiveRef.current) return;
-            if (!snap.empty) {
-                const depts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.order - b.order);
-                setSyllabusData(depts);
-                if (depts.length > 0 && !activeTab) {
-                    setActiveTab(depts[0].id);
+    useEffect(() => {
+        let isMounted = true;
+        const fetchSyllabi = async () => {
+            try {
+                const snap = await getDocs(collection(db, 'syllabi'));
+                if (!isMounted) return;
+                
+                if (!snap.empty) {
+                    const depts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.order - b.order);
+                    setSyllabusData(depts);
+                    if (depts.length > 0) {
+                        setActiveTab(depts[0].id);
+                    }
+                } else {
+                    setSyllabusData([]);
                 }
-            } else {
-                setSyllabusData([]);
+            } catch (error) {
+                console.error("Error fetching syllabi:", error);
+            } finally {
+                if (isMounted) setLoading(false);
             }
-            setLoading(false);
-        }, (error) => {
-            if (!isActiveRef.current) return;
-            console.error("Error fetching syllabi:", error);
-            setLoading(false);
-        });
+        };
+        fetchSyllabi();
+        return () => { isMounted = false; };
     }, []);
 
     if (loading) {

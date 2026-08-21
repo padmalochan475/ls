@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Users, FileText, ArrowUpCircle, Layers, Upload, GraduationCap, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import StudentDirectory from './StudentDirectory';
@@ -271,11 +271,8 @@ export default function StudentsPage() {
   const [activeTab, setActiveTab] = useState('directory');
 
   const isAdmin = userProfile?.role === 'admin';
-  const visibleNav = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
-  
-  useEffect(() => {
-    if (!visibleNav.some(i => i.key === activeTab)) setActiveTab('directory');
-  }, [isAdmin]);
+  const visibleNav = useMemo(() => NAV_ITEMS.filter(item => !item.adminOnly || isAdmin), [isAdmin]);
+  const currentTab = visibleNav.some(i => i.key === activeTab) ? activeTab : 'directory';
 
   return (
     <div className="lams-print-page-wrapper" style={{ ...premiumStyles.page, flexDirection: 'column', padding: '1.5rem', overflow: 'hidden' }}>
@@ -305,7 +302,7 @@ export default function StudentsPage() {
         overflowX: 'auto', scrollbarWidth: 'none' 
       }}>
         {visibleNav.map(item => {
-          const active = activeTab === item.key;
+          const active = currentTab === item.key;
           const Icon = item.icon;
           return (
             <button
@@ -330,7 +327,7 @@ export default function StudentsPage() {
       </nav>
 
       <div className="lams-print-content-wrapper" style={{ ...premiumStyles.contentWrapper, flex: 1 }}>
-         <TabContent activeTab={activeTab} />
+         <TabContent activeTab={currentTab} />
       </div>
     </div>
   );

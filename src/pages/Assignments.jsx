@@ -623,7 +623,7 @@ const Assignments = () => {
             const tb = parseTimeSlot(b.time);
             return (ta?.start || 0) - (tb?.start || 0);
         });
-    }, [fullSchedule, searchTerm, filterDepts, filterSems, filterGroups, filterSubjects, filterFaculty, faculty, days]);
+    }, [fullSchedule, searchTerm, filterDepts, filterSems, filterGroups, filterSubjects, filterFaculty, faculty, days, getDayIndex, matchFaculty]);
 
     const availableSubGroups = React.useMemo(() => {
         const groupObj = rawGroups.find(g => g.name === selectedMainGroup);

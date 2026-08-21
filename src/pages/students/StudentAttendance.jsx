@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Printer, Download, Calendar, Type, Maximize2, FileText, SlidersHorizontal } from 'lucide-react';
@@ -121,7 +121,7 @@ const StudentAttendance = () => {
     const aiTimeoutRef = useRef(null);
     const aiIntervalRef = useRef(null);
 
-    const runAiOptimizer = () => {
+    const runAiOptimizer = useCallback(() => {
         if (sheetStudents.length === 0) return;
         
         if (aiTimeoutRef.current) clearTimeout(aiTimeoutRef.current);
@@ -177,14 +177,14 @@ const StudentAttendance = () => {
                 }, 100);
             }
         }, 50);
-    };
+    }, [sheetStudents.length, printSettings.paperSize, PAPER_SIZES]);
 
     // Auto-adjust the sliders to optimal values when the batch or paper size changes
     useEffect(() => {
         if (sheetStudents.length > 0) {
             runAiOptimizer();
         }
-    }, [config.group, sheetStudents.length, printSettings.paperSize]);
+    }, [config.group, sheetStudents.length, printSettings.paperSize, runAiOptimizer]);
 
     const handleExportExcel = () => {
         if (sheetStudents.length === 0) return;

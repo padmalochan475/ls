@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MultiSelectDropdown } from '../components/scheduler/SchedulerControls';
 import BookingModal from '../components/scheduler/BookingModal';
 import QuickAssignPanel from '../components/scheduler/QuickAssignPanel';
@@ -108,8 +108,10 @@ const Scheduler = () => {
 
     const loading = masterLoading || scheduleLoading;
 
-    // Helper: Strong Natural Sort (Manual implementation for 100% browsing consistency)
-    const naturalSort = (a, b) => {
+    // Helper: Natural Sort for Room names (R-1, R-2 ... R-10 instead of R-1, R-10, R-2)
+    const naturalSort = useCallback((a, b) => {
+        if (!a) a = '';
+        if (!b) b = '';
         const splitAlphaNum = (str) => {
             // eslint-disable-next-line sonarjs/slow-regex
             const match = String(str).match(/^(\D*)(\d+)(.*)$/);
@@ -130,100 +132,104 @@ const Scheduler = () => {
 
         // Compare suffixes (if any)
         return aSuf.localeCompare(bSuf);
-    };
+    }, []);
 
     // eslint-disable-next-line sonarjs/cognitive-complexity
     useEffect(() => {
         if (!rawRooms || !rawFaculty) return;
 
-        // Process Rooms
-        setRooms(rawRooms.map(d => d.name).sort(naturalSort));
+        // Wrap in setTimeout to avoid synchronous cascading renders during effect phase
+        setTimeout(() => {
+            // Process Rooms
+            setRooms(rawRooms.map(d => d.name).sort(naturalSort));
 
-        // Process Faculty
-        setFaculty(rawFaculty.map(d => ({ name: d.data?.name || d.name, shortCode: d.data?.shortCode || d.shortCode, empId: d.data?.empId || d.empId })).sort((a, b) => naturalSort(a.name, b.name)));
+            // Process Faculty
+            setFaculty(rawFaculty.map(d => ({ name: d.data?.name || d.name, shortCode: d.data?.shortCode || d.shortCode, empId: d.data?.empId || d.empId })).sort((a, b) => naturalSort(a.name, b.name)));
 
-        // Process Subjects
-        const subData = rawSubjects.map(d => ({ name: d.name, shortCode: d.shortCode, type: d.type })).sort((a, b) => a.name.localeCompare(b.name));
-        setSubjects(subData.map(d => d.name));
-        setSubjectDetails(subData);
+            // Process Subjects
+            const subData = rawSubjects.map(d => ({ name: d.name, shortCode: d.shortCode, type: d.type })).sort((a, b) => a.name.localeCompare(b.name));
+            setSubjects(subData.map(d => d.name));
+            setSubjectDetails(subData);
 
-        // Process Departments
-        const depts = [...new Set(rawDepartments.map(d => d.code || d.name))].sort();
-        setDepartments(depts);
+            // Process Departments
+            const depts = [...new Set(rawDepartments.map(d => d.code || d.name))].sort();
+            setDepartments(depts);
 
-        // Process Semesters
-        // Semesters might have same name but different ID? Usually name is unique ('1st Semester', etc)
-        // Let's filter unique names just in case
-        const uniqueSemesters = rawSemesters.filter((s, index, self) =>
-            index === self.findIndex((t) => (t.name === s.name))
-        );
-        setSemesters(uniqueSemesters);
+            // Process Semesters
+            const uniqueSemesters = rawSemesters.filter((s, index, self) =>
+                index === self.findIndex((t) => (t.name === s.name))
+            );
+            setSemesters(uniqueSemesters);
 
-        // Process Groups
-        setGroups(rawGroups); // Context doesn't sort by name by default? Context sorts by name if no sortFn.
+            // Process Groups
+            setGroups(rawGroups);
 
-        // Default to ALL departments and semesters for the view (Only once)
-        if (!defaultsSet.current) {
-            if (depts.length > 0) {
-                if (selectedDepts.length === 0) setSelectedDepts(depts);
-                setQuickAssignData(prev => ({ ...prev, dept: depts[0] }));
+            // Default to ALL departments and semesters for the view (Only once)
+            if (!defaultsSet.current) {
+                if (depts.length > 0) {
+                    if (selectedDepts.length === 0) setSelectedDepts(depts);
+                    setQuickAssignData(prev => ({ ...prev, dept: depts[0] }));
+                }
+
+                if (rawSemesters.length > 0) {
+                    const semNames = rawSemesters.map(s => s.name);
+                    if (selectedSems.length === 0) setSelectedSems(semNames);
+                    setQuickAssignData(prev => ({ ...prev, sem: rawSemesters[0].name }));
+                }
+
+                // Mark as set if we have data
+                if (depts.length > 0 && rawSemesters.length > 0) {
+                    defaultsSet.current = true;
+                }
             }
 
-            if (rawSemesters.length > 0) {
-                const semNames = rawSemesters.map(s => s.name);
-                if (selectedSems.length === 0) setSelectedSems(semNames);
-                setQuickAssignData(prev => ({ ...prev, sem: rawSemesters[0].name }));
+            // Process Days
+            const visibleDays = rawDays.filter(d => d.isVisible !== false).map(d => d.name);
+            setDays(visibleDays);
+            if (visibleDays.length > 0 && !formData.day) {
+                setFormData(prev => ({ ...prev, day: visibleDays[0] }));
             }
 
-            // Mark as set if we have data
-            if (depts.length > 0 && rawSemesters.length > 0) {
-                defaultsSet.current = true;
+            // Process Time Slots
+            const formatTime = (t) => {
+                if (!t) return '';
+                try {
+                    // Robust Regex Parser (Handles HH:MM, H.MM, AM/PM)
+                    const match = t.match(/(\d{1,2})[:.]?(\d{2})?\s*([ap]m)?/i);
+                    if (!match) return t;
+
+                    const hStr = match[1];
+                    const mStr = match[2];
+                    const marker = match[3];
+                    let h = parseInt(hStr, 10);
+                    const m = mStr ? parseInt(mStr, 10) : 0;
+
+                    if (marker && marker.toLowerCase() === 'pm' && h < 12) h += 12;
+                    if (marker && marker.toLowerCase() === 'am' && h === 12) h = 0;
+
+                    // Reconstruct to consistent format for Date object
+                    const val = `2000-01-01T${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+
+                    const d = new Date(val);
+                    if (isNaN(d.getTime())) return t; // Fallback
+
+                    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\u202F/g, ' ');
+                    // eslint-disable-next-line sonarjs/no-ignored-exceptions, no-unused-vars
+                } catch (e) { return t; }
+            };
+            const formattedSlots = rawTimeSlots.map(s => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`);
+            setTimeSlots(formattedSlots);
+
+            if (formattedSlots.length > 0 && !formData.time) {
+                setFormData(prev => ({ ...prev, time: formattedSlots[0] }));
             }
-        }
+        }, 0);
 
-        // Process Days
-        const visibleDays = rawDays.filter(d => d.isVisible !== false).map(d => d.name);
-        setDays(visibleDays);
-        if (visibleDays.length > 0 && !formData.day) {
-            setFormData(prev => ({ ...prev, day: visibleDays[0] }));
-        }
-
-        // Process Time Slots
-        const formatTime = (t) => {
-            if (!t) return '';
-            try {
-                // Robust Regex Parser (Handles HH:MM, H.MM, AM/PM)
-                const match = t.match(/(\d{1,2})[:.]?(\d{2})?\s*([ap]m)?/i);
-                if (!match) return t;
-
-                const hStr = match[1];
-                const mStr = match[2];
-                const marker = match[3];
-                let h = parseInt(hStr, 10);
-                const m = mStr ? parseInt(mStr, 10) : 0;
-
-                if (marker && marker.toLowerCase() === 'pm' && h < 12) h += 12;
-                if (marker && marker.toLowerCase() === 'am' && h === 12) h = 0;
-
-                // Reconstruct to consistent format for Date object
-                const val = `2000-01-01T${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-
-                const d = new Date(val);
-                if (isNaN(d.getTime())) return t; // Fallback
-
-                return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\u202F/g, ' ');
-                // eslint-disable-next-line sonarjs/no-ignored-exceptions, no-unused-vars
-            } catch (e) { return t; }
-        };
-        const formattedSlots = rawTimeSlots.map(s => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`);
-        setTimeSlots(formattedSlots);
-
-        if (formattedSlots.length > 0 && !formData.time) {
-            setFormData(prev => ({ ...prev, time: formattedSlots[0] }));
-        }
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rawRooms, rawFaculty, rawSubjects, rawDepartments, rawSemesters, rawGroups, rawDays, rawTimeSlots, formData.day, formData.time]);
+    }, [
+        rawRooms, rawFaculty, rawSubjects, rawDepartments, rawSemesters, rawGroups, rawDays, rawTimeSlots, 
+        formData.day, formData.time, 
+        naturalSort, selectedDepts.length, selectedSems.length
+    ]);
 
     // Schedule syncing handled by useScheduleData hook
 
@@ -333,7 +339,7 @@ const Scheduler = () => {
             return false;
         }).length;
 
-        setHiddenCount(count);
+        setTimeout(() => setHiddenCount(count), 0);
     }, [schedule, days, timeSlots, loading]);
 
 

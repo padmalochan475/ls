@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { db, auth } from '../lib/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
@@ -175,7 +175,7 @@ const AdminPanel = () => {
     const COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981'];
 
     // Fetches (Paginated/One-time) to preserve Firestore Quota
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         if (!userProfile || userProfile.role !== 'admin') return;
         setLoading(true);
         try {
@@ -191,9 +191,9 @@ const AdminPanel = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [userProfile]);
 
-    const fetchSuggestions = async () => {
+    const fetchSuggestions = useCallback(async () => {
         if (!userProfile || userProfile.role !== 'admin') return;
         setSuggestionsLoading(true);
         try {
@@ -209,7 +209,7 @@ const AdminPanel = () => {
         } finally {
             setSuggestionsLoading(false);
         }
-    };
+    }, [userProfile]);
 
     useEffect(() => {
         let isMounted = true;
@@ -218,7 +218,7 @@ const AdminPanel = () => {
             fetchSuggestions();
         }
         return () => { isMounted = false; };
-    }, [userProfile?.role]);
+    }, [userProfile?.role, fetchUsers, fetchSuggestions]);
 
     const handleRefreshData = () => {
         const toastId = toast.loading("Refreshing Admin Data...");
@@ -384,6 +384,11 @@ const AdminPanel = () => {
                 // 1. Transactional Reads
                 const userSnap = await transaction.get(userRef);
                 if (!userSnap.exists()) throw new Error("User no longer exists.");
+
+                const empLookupSnap = await transaction.get(empLookupRef);
+                if (empLookupSnap.exists()) {
+                    throw new Error(`EmpID ${String(pendingApprovalUser.empId).trim()} is already in use by another faculty record!`);
+                }
 
                 // 2. Create Faculty Master Record
                 transaction.set(newFacRef, {

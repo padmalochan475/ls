@@ -552,9 +552,9 @@ const SubstitutionManager = () => {
         if (!confirm(`Confirm ${action} this request?`)) return;
         setLoading(true);
         try {
+            const details = reqData.scheduleDetails || {};
             if (action === 'approve') {
                 // Safely extract details with fallbacks
-                const details = reqData.scheduleDetails || {};
                 const adjustmentId = `${reqData.date}_${reqData.originalScheduleId}`;
                 await setDoc(doc(db, 'adjustments', adjustmentId), {
                     academicYear: reqData.academicYear || activeAcademicYear,

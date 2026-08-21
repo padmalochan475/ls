@@ -92,6 +92,7 @@ export const AuthProvider = ({ children }) => {
 
     const [maxFacultyLoad, setMaxFacultyLoad] = useState(18);
     const [yearConfigs, setYearConfigs] = useState({});
+    const [masterDataVersion, setMasterDataVersion] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isSystemSyncing, setIsSystemSyncing] = useState(false); // Global Sync Shield
     const [isConfigLoaded, setIsConfigLoaded] = useState(false);
@@ -141,7 +142,11 @@ export const AuthProvider = ({ children }) => {
         return sendPasswordResetEmail(auth, normalizedEmail);
     };
 
-    const logout = () => {
+    const logout = async () => {
+        if (currentUser) {
+            localStorage.removeItem(`lams_master_cache_${currentUser.uid}`);
+            localStorage.removeItem(`lams_master_version_${currentUser.uid}`);
+        }
         return signOut(auth);
     };
 
@@ -170,6 +175,7 @@ export const AuthProvider = ({ children }) => {
                     const fetchedYears = cleanYears(data.academicYears || []);
                     const fetchedConfigs = data.yearConfigs || {};
                     const fetchedAllowChange = data.allowUserYearChange || false;
+                    const fetchedMasterDataVersion = data.masterDataVersion || 'v1';
 
                     // B. Source of Truth: Server Data + Active System Year.
                     const finalYears = cleanYears([...fetchedYears, fetchedSystemYear]);
@@ -179,6 +185,7 @@ export const AuthProvider = ({ children }) => {
                     setAcademicYears(finalYears);
                     setYearConfigs(fetchedConfigs);
                     setAllowUserYearChange(fetchedAllowChange);
+                    setMasterDataVersion(fetchedMasterDataVersion);
 
                     // D. Auto-Heal: If User Selection is now invalid (ghost), reset it
                     const currentSelection = localStorage.getItem(STORAGE_KEYS.SELECTED_YEAR);
@@ -510,6 +517,7 @@ export const AuthProvider = ({ children }) => {
         activeAcademicYear: selectedAcademicYear || systemAcademicYear, // Fallback to system if null
         systemAcademicYear, // Expose system default if needed
         academicYears,
+        masterDataVersion, // Expose for live invalidation
         maxFacultyLoad, // Expose the dynamic limit
         setSelectedAcademicYear: handleSetSelectedYear, // Allow changing view with persistence
         login,
@@ -526,13 +534,15 @@ export const AuthProvider = ({ children }) => {
         selectedAcademicYear,
         systemAcademicYear,
         academicYears,
+        masterDataVersion,
         maxFacultyLoad,
         loading,
         isConfigLoaded,
         isSystemSyncing,
         allowUserYearChange,
         profileMissing,
-        authError
+        authError,
+        logout
     ]);
 
     return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../lib/firebase';
 import { collection, getDocs, getDoc, addDoc, setDoc, deleteDoc, doc, updateDoc, query, where, writeBatch, onSnapshot, FieldPath } from 'firebase/firestore';
@@ -14,6 +14,17 @@ import { useWritePermission } from '../hooks/useWritePermission';
 import { normalizeStr, parseTimeToDate } from '../utils/timeUtils';
 import { FacultyCard, DepartmentCard, SubjectCard, RoomCard, GroupCard, DayCard, TimeSlotCard, SemesterCard, HolidayCard } from '../components/MasterDataCards';
 import { useDynamicListener } from '../hooks/useDynamicListener';
+
+const bumpMasterDataVersion = async () => {
+    try {
+        const configRef = doc(db, 'settings', 'config');
+        await updateDoc(configRef, {
+            masterDataVersion: `v-${Date.now()}`
+        });
+    } catch (e) {
+        console.error("Failed to bump masterDataVersion:", e);
+    }
+};
 
 const GroupFields = ({ formData, setFormData }) => {
     const handleAddSubGroup = () => {
@@ -109,7 +120,7 @@ const MasterData = ({ initialTab }) => {
     }, [initialTab]);
     const hasAutoSyncedRef = useRef(false);
 
-    const handleSyncFacultyPhones = async (isManual = false) => {
+    const handleSyncFacultyPhones = useCallback(async (isManual = false) => {
         if (!checkWritePermission()) return;
         if (hasAutoSyncedRef.current && !isManual) return;
         
@@ -183,13 +194,13 @@ const MasterData = ({ initialTab }) => {
         } catch (err) {
             console.warn("Silent Sync Background Error:", err);
         }
-    };
+    }, [checkWritePermission]);
 
     useEffect(() => {
         if (activeTab === 'faculty' && userProfile?.role === 'admin') {
             handleSyncFacultyPhones();
         }
-    }, [activeTab]);
+    }, [activeTab, userProfile?.role, handleSyncFacultyPhones]);
 
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -623,6 +634,11 @@ const MasterData = ({ initialTab }) => {
             // Standard Delete for other items
             await deleteDoc(doc(db, activeCollection, id));
         }
+
+        // BUMP VERSION to invalidate cache globally
+        if (activeTab !== 'settings') {
+            await bumpMasterDataVersion();
+        }
     };
 
     const executeDelete = async () => {
@@ -1048,7 +1064,8 @@ const MasterData = ({ initialTab }) => {
             }
         } catch (err) {
             console.error("Cascade Update Failed:", err);
-            toast.error("Warning: Some related records might not have synced.");
+            toast.error("Warning: Some related records might not have synced. Please try again.");
+            throw err;
         }
     };
 
@@ -1138,17 +1155,14 @@ const MasterData = ({ initialTab }) => {
                     console.warn("Failed to fetch old doc for cascade/cleanup:", e);
                 }
 
-                await updateDoc(doc(db, activeCollection, editingId), formData);
-                
                 // 🔥 DYNAMIC CASCADE AI: Safely update all related schedules when names/IDs change!
                 if (oldData) {
-                    try {
-                        const activeYear = data[0]?.activeAcademicYear;
-                        await handleCascadeUpdate(activeCollection, oldData, formData, activeYear);
-                    } catch (cascadeErr) {
-                        console.error("Cascade update failed:", cascadeErr);
-                    }
+                    const activeYear = data[0]?.activeAcademicYear;
+                    await handleCascadeUpdate(activeCollection, oldData, formData, activeYear);
                 }
+
+                // IMPORTANT: Update the Master Data record ONLY AFTER cascade succeeds to preserve idempotency
+                await updateDoc(doc(db, activeCollection, editingId), formData);
 
                 // Security syncs (emp_lookups, user upgrades/downgrades) are now 
                 // fully handled by handleCascadeUpdate -> handleFacultyCascade.
@@ -1210,6 +1224,12 @@ const MasterData = ({ initialTab }) => {
                     }
                 }
             }
+            
+            // BUMP VERSION to invalidate cache globally
+            if (activeTab !== 'settings') {
+                await bumpMasterDataVersion();
+            }
+
             setIsModalOpen(false);
             setFormData({});
             setEditingId(null);

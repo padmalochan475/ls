@@ -111,9 +111,12 @@ const Certificates = () => {
                 setCompanies(res.data.companies || []);
                 setBackendSettings(res.data.settings || {});
                 setSheetUrl(res.data.sheetUrl || '');
-                if (res.data.settings?.active_year && !selectedYear) {
-                    setSelectedYear(res.data.settings.active_year);
-                }
+                setSelectedYear(prev => {
+                    if (!prev && res.data.settings?.active_year) {
+                        return res.data.settings.active_year;
+                    }
+                    return prev;
+                });
                 if (res.data.fromCache) toast.success("Using System Cache (Fast Mode)", { icon: '⚡' });
             } else {
                 toast.error(res.error || "Failed to load dashboard");
@@ -123,7 +126,7 @@ const Certificates = () => {
         } finally { 
             setLoading(false); 
         }
-    }, [liveMode, selectedYear]);
+    }, [liveMode]);
 
     const loadExplorer = useCallback(async (sheet) => {
         setExplorerLoading(true);
@@ -144,8 +147,7 @@ const Certificates = () => {
         else if (activeTab === 'branches') loadExplorer(CONSTANTS.BRANCHES);
         else if (activeTab === 'companies') loadExplorer(CONSTANTS.COMPANIES);
         else if (activeTab === 'audit') loadExplorer(CONSTANTS.AUDIT);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, loadExplorer]); // Intentionally omitting fetchData to prevent duplicate initial fetches
+    }, [activeTab, loadExplorer, fetchData]);
 
     // Data Filtering & Stats
     const filteredRequests = useMemo(() => {

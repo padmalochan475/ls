@@ -2,6 +2,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 
 try {
+  // eslint-disable-next-line sonarjs/no-os-command-from-path
   const output = execSync('npx eslint "src/**/*.js" "src/**/*.jsx" -f json', { encoding: 'utf-8' });
   processEslint(output);
 } catch (e) {

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, where } from 'firebase/firestore';
 
 import { useAuth } from './AuthContext';
 import { parseTimeToDate } from '../utils/timeUtils';
@@ -12,10 +12,8 @@ export const useMasterData = () => {
     return useContext(MasterDataContext);
 };
 
-const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
-
 export const MasterDataProvider = ({ children }) => {
-    const { currentUser, loading: authLoading } = useAuth();
+    const { currentUser, loading: authLoading, masterDataVersion: liveMasterDataVersion } = useAuth();
     const [departments, setDepartments] = useState([]);
     const [semesters, setSemesters] = useState([]);
     const [subjects, setSubjects] = useState([]);
@@ -42,7 +40,7 @@ export const MasterDataProvider = ({ children }) => {
         return aSuf.localeCompare(bSuf);
     };
 
-    const sortItems = (items, statusKey) => {
+    const sortItems = useCallback((items, statusKey) => {
         if (statusKey === 'days') {
             items.sort((a, b) => (a.order || 0) - (b.order || 0));
         } else if (statusKey === 'timeslots') {
@@ -61,7 +59,7 @@ export const MasterDataProvider = ({ children }) => {
             items.sort((a, b) => naturalSort(a.name || '', b.name || ''));
         }
         return items;
-    };
+    }, []);
 
     useEffect(() => {
         if (!currentUser || authLoading) {
@@ -76,36 +74,40 @@ export const MasterDataProvider = ({ children }) => {
         const loadMasterData = async () => {
             setLoading(true);
             const cacheKey = `lams_master_cache_${currentUser.uid}`;
+            const versionKey = `lams_master_version_${currentUser.uid}`;
             
-            // Check cache
-            if (refreshTrigger === 0) {
-                try {
-                    const cachedStr = localStorage.getItem(cacheKey);
-                    if (cachedStr) {
-                        const parsed = JSON.parse(cachedStr);
-                        if (parsed.timestamp && (Date.now() - parsed.timestamp < CACHE_TTL_MS)) {
-                            // Valid cache
-                            setDepartments(parsed.departments || []);
-                            setSemesters(parsed.semesters || []);
-                            setSubjects(parsed.subjects || []);
-                            setFaculty(parsed.faculty || []);
-                            setRooms(parsed.rooms || []);
-                            setDays(parsed.days || []);
-                            setTimeSlots(parsed.timeSlots || []);
-                            setGroups(parsed.groups || []);
-                            setHolidays(parsed.holidays || []);
-                            setLoading(false);
-                            return; // Skip fetch
-                        }
-                    }
-                } catch (e) {
-                    console.warn("MasterData Cache load failed", e);
-                }
-            }
-
             try {
-                // Fetch all sequentially to avoid completely blowing up concurrent limits, 
-                // but Promise.all is faster. We will use Promise.all for speed.
+                // 1. Fetch the authoritative version
+                const configDoc = await getDoc(doc(db, 'settings', 'config'));
+                const serverVersion = configDoc.exists() ? (configDoc.data().masterDataVersion || 'v1') : 'v1';
+                
+                // 2. Check cache
+                if (refreshTrigger === 0) {
+                    const cachedVersion = localStorage.getItem(versionKey);
+                    const cachedStr = localStorage.getItem(cacheKey);
+                    
+                    // Force refresh if the LIVE version (from AuthContext) doesn't match the cache.
+                    // If liveMasterDataVersion is null (loading), fall back to serverVersion from the getDoc
+                    const effectiveLiveVersion = liveMasterDataVersion || serverVersion;
+                    
+                    if (cachedStr && cachedVersion === String(effectiveLiveVersion)) {
+                        const parsed = JSON.parse(cachedStr);
+                        // Valid cache
+                        setDepartments(parsed.departments || []);
+                        setSemesters(parsed.semesters || []);
+                        setSubjects(parsed.subjects || []);
+                        setFaculty(parsed.faculty || []);
+                        setRooms(parsed.rooms || []);
+                        setDays(parsed.days || []);
+                        setTimeSlots(parsed.timeSlots || []);
+                        setGroups(parsed.groups || []);
+                        setHolidays(parsed.holidays || []);
+                        setLoading(false);
+                        return; // Skip fetch
+                    }
+                }
+
+                // 3. Fetch Master Data (Cache Miss or Force Refresh)
                 const queries = [
                     { key: 'departments', q: query(collection(db, 'departments')) },
                     { key: 'semesters', q: query(collection(db, 'semesters')) },
@@ -139,10 +141,8 @@ export const MasterDataProvider = ({ children }) => {
                 setHolidays(newData.holidays);
 
                 // Update cache
-                localStorage.setItem(cacheKey, JSON.stringify({
-                    timestamp: Date.now(),
-                    ...newData
-                }));
+                localStorage.setItem(cacheKey, JSON.stringify(newData));
+                localStorage.setItem(versionKey, String(serverVersion));
 
             } catch (error) {
                 console.error("[MasterData] Fetch failed:", error);
@@ -154,7 +154,7 @@ export const MasterDataProvider = ({ children }) => {
         loadMasterData();
 
         return () => { isMounted = false; };
-    }, [currentUser, authLoading, refreshTrigger]);
+    }, [currentUser, authLoading, refreshTrigger, liveMasterDataVersion, sortItems]);
 
     // Force a re-fetch of all master data
     const refreshMasterData = useCallback(async () => {

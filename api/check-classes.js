@@ -176,13 +176,13 @@ let cachedSessionId = null;
 
 async function sendWhatsApp(phoneNumber, message) {
     if (!phoneNumber || !message) return false;
-    try {
-        let formattedNumber = String(phoneNumber).replace(/[^0-9]/g, '');
-        if (formattedNumber.length === 10) formattedNumber = '91' + formattedNumber;
-        else if (formattedNumber.length < 10) return false;
-        
-        const chatId = formattedNumber + '@c.us';
+    let formattedNumber = String(phoneNumber).replace(/[^0-9]/g, '');
+    if (formattedNumber.length === 10) formattedNumber = '91' + formattedNumber;
+    else if (formattedNumber.length < 10) return false;
+    
+    const chatId = formattedNumber + '@c.us';
 
+    try {
         if (!cachedSessionId) {
             const sessionsRes = await axios.get(`${WHATSAPP_API_BASE}/api/sessions`, {
                 headers: { 'x-api-key': WHATSAPP_API_KEY }

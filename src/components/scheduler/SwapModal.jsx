@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { RefreshCw, X, ArrowRightLeft, AlertTriangle, BookOpen, Users, CheckCircle2 } from 'lucide-react';
 
@@ -82,7 +82,7 @@ const SwapFacultyModal = ({
     }, [targetFaculty, schedule, sourceAssignment]);
 
     // Check availability
-    const checkSwapValidity = (targetItem) => {
+    const checkSwapValidity = useCallback((targetItem) => {
         const sourceFac = sourceMemberToSwap; // Use SELECTED member
         // Robust Normalizer: Handles dots, spaces, case
         const normalizeTime = (t) => t ? t.toString().toLowerCase().replace(/\s+/g, '').replace(/[ap]m/g, '').replace(/\./g, ':').replace(/\b0(\d):/g, '$1:') : '';
@@ -112,7 +112,7 @@ const SwapFacultyModal = ({
         }
 
         return { possible: true };
-    };
+    }, [sourceMemberToSwap, schedule, sourceAssignment, targetFaculty]);
 
     // Filtered Display List
     const displaySchedule = useMemo(() => {
@@ -127,7 +127,7 @@ const SwapFacultyModal = ({
         }
 
         return items;
-    }, [targetSchedule, hideConflicts, activeDayFilter, sourceMemberToSwap]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [targetSchedule, hideConflicts, activeDayFilter, checkSwapValidity]); 
 
     // Helper for Day Chips
     const uniqueDays = useMemo(() => ['ALL', ...new Set(targetSchedule.map(i => i.day))].sort((a, b) => {
