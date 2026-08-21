@@ -3,6 +3,87 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import crypto from 'crypto';
 
+// --- Microsoft Graph API Email Service ---
+let cachedToken = null;
+let tokenExpiresAt = null;
+
+async function getMicrosoftGraphToken() {
+    const { MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET } = process.env;
+    if (!MS_TENANT_ID || !MS_CLIENT_ID || !MS_CLIENT_SECRET) {
+        throw new Error('OAuth2_Config_Missing');
+    }
+
+    if (cachedToken && tokenExpiresAt && Date.now() < tokenExpiresAt) {
+        return cachedToken;
+    }
+
+    const url = `https://login.microsoftonline.com/${MS_TENANT_ID}/oauth2/v2.0/token`;
+    const params = new URLSearchParams({
+        client_id: MS_CLIENT_ID,
+        client_secret: MS_CLIENT_SECRET,
+        scope: 'https://graph.microsoft.com/.default',
+        grant_type: 'client_credentials'
+    });
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    });
+
+    if (!response.ok) {
+        let errDetails = '';
+        try { errDetails = await response.text(); } catch(e) {}
+        throw new Error(`Token_Fetch_Failed|HTTP_${response.status}`);
+    }
+
+    const data = await response.json();
+    cachedToken = data.access_token;
+    // Expire 5 minutes early for safety
+    tokenExpiresAt = Date.now() + (data.expires_in - 300) * 1000; 
+
+    return cachedToken;
+}
+
+async function sendEmail({ to, subject, html }) {
+    const { MS_SENDER_EMAIL } = process.env;
+    if (!MS_SENDER_EMAIL) {
+        throw new Error('Sender_Config_Missing');
+    }
+
+    const token = await getMicrosoftGraphToken();
+    const url = `https://graph.microsoft.com/v1.0/users/${MS_SENDER_EMAIL}/sendMail`;
+
+    const messagePayload = {
+        message: {
+            subject: subject,
+            body: {
+                contentType: 'HTML',
+                content: html
+            },
+            toRecipients: [{ emailAddress: { address: to } }]
+        },
+        saveToSentItems: 'false'
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(messagePayload)
+    });
+
+    if (!response.ok) {
+        let errDetails = '';
+        try { errDetails = await response.text(); } catch(e) {}
+        throw new Error(`Graph_API_Failed|HTTP_${response.status}`);
+    }
+    return true;
+}
+// -----------------------------------------
+
 // Singleton Initialization
 if (!getApps().length) {
     try {
@@ -75,7 +156,7 @@ export default async function handler(req, res) {
         const db = getDb();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         
-        // Rate limiting logic: Check existing OTP requests
+        // Rate limiting logic: Check existing OTP requests (Per-Email)
         const otpRef = db.collection('otps').doc(email);
         const existingOtp = await otpRef.get();
         if (existingOtp.exists) {
@@ -86,6 +167,26 @@ export default async function handler(req, res) {
             }
         }
 
+        // Rate limiting logic: Global/IP abuse protection
+        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown_ip';
+        const ipRef = db.collection('rate_limits').doc(`ip_${clientIp.replace(/\./g, '_')}`);
+        const ipData = await ipRef.get();
+        let requestCount = 1;
+        if (ipData.exists) {
+            const data = ipData.data();
+            if (data.windowStart && Date.now() - data.windowStart.toMillis() < 15 * 60 * 1000) { // 15 min window
+                if (data.count >= 10) {
+                    console.warn(JSON.stringify({ event: "RateLimit_Exceeded", ip: clientIp, email }));
+                    return res.status(429).json({ error: 'Too many requests from this IP. Please try again later.' });
+                }
+                requestCount = data.count + 1;
+            }
+        }
+        await ipRef.set({
+            count: requestCount,
+            windowStart: requestCount === 1 ? FieldValue.serverTimestamp() : (ipData.exists ? ipData.data().windowStart : FieldValue.serverTimestamp())
+        });
+
         await otpRef.set({
             otpHash,
             createdAt: FieldValue.serverTimestamp(),
@@ -94,32 +195,7 @@ export default async function handler(req, res) {
             actionType: actionType || 'signup'
         });
 
-        // 4. Send Email via Nodemailer
-        const { SMTP_USER, SMTP_PASSWORD } = process.env;
-        
-        if (!SMTP_USER || !SMTP_PASSWORD) {
-            throw new Error("Missing SMTP_USER or SMTP_PASSWORD environment variables.");
-        }
-
-        // We use nodemailer to connect to Gmail, Outlook, Office365 etc.
-        const nodemailer = require('nodemailer');
-        
-        // Dynamically determine host if not specified, default to office365 if microsoft, else gmail
-        let smtpHost = 'smtp.gmail.com';
-        if (SMTP_USER.includes('@outlook') || SMTP_USER.includes('@hotmail') || SMTP_USER.includes('@live') || SMTP_USER.includes('@office365') || process.env.SMTP_HOST === 'smtp.office365.com') {
-            smtpHost = 'smtp.office365.com';
-        }
-
-        const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || smtpHost,
-            port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587,
-            secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASSWORD
-            }
-        });
-
+        // 4. Send Email via Microsoft Graph API Service
         let subject = "LAMS Registration - Email Verification";
         let messageText = "Please verify your email to complete registration.";
         
@@ -144,19 +220,31 @@ export default async function handler(req, res) {
         </div>
         `;
 
-        const senderEmail = process.env.SMTP_FROM || SMTP_USER;
-        await transporter.sendMail({
-            from: `"LAMS Security" <${senderEmail}>`,
+        await sendEmail({
             to: email,
             subject: subject,
-            text: `${messageText} Your OTP is: ${otp}`,
             html: htmlContent
         });
 
-        return res.status(200).json({ success: true, message: 'OTP sent securely via SMTP.' });
+        // Structured success logging (Sanitized)
+        console.log(JSON.stringify({
+            event: "OTP_Sent_Successfully",
+            actionType,
+            recipientDomain: email.split('@')[1],
+            timestamp: new Date().toISOString()
+        }));
+
+        return res.status(200).json({ success: true, message: 'OTP sent securely.' });
 
     } catch (error) {
-        console.error('Send OTP Error:', error.message || error);
+        // Structured error logging (Sanitized - no credentials, no OTPs, no raw MS errors)
+        console.error(JSON.stringify({
+            event: "OTP_Delivery_Failed",
+            actionType: req.body?.actionType || 'signup',
+            errorCategory: error.message || 'Unknown',
+            timestamp: new Date().toISOString()
+        }));
+
         return res.status(500).json({
             error: 'Unable to send verification code. Please try again.'
         });

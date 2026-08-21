@@ -37,3 +37,15 @@ __backups/
 .env.vercel.downloaded
 .env.production  
  
+.env*.local
+
+# Temporary / Forensic / Audit scripts and results
+audit_results.json
+phase3-cleanup-report.json
+phase3-verification.json
+check-*.mjs
+phase3-*.mjs
+audit-*.mjs
+prod-otp-test.mjs
+cleanup-*.mjs
+test-graph.cjs
