@@ -145,6 +145,7 @@ const Login = () => {
     // ── UI mode ──────────────────────────────────────────────────────────────
     const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
     const [signupStep, setSignupStep] = useState(1); // 1 = details, 2 = OTP
+    const [forgotStep, setForgotStep] = useState(1); // 1 = details, 2 = OTP
 
     // ── Form data ─────────────────────────────────────────────────────────────
     const [formData, setFormData] = useState({
@@ -154,6 +155,9 @@ const Login = () => {
     const [signupOtp, setSignupOtp]               = useState('');
     const [generatedOtp, setGeneratedOtp]         = useState(null);
     const [resetInput, setResetInput]             = useState('');
+    const [forgotEmail, setForgotEmail]           = useState('');
+    const [forgotOtp, setForgotOtp]               = useState('');
+    const [forgotNewPassword, setForgotNewPassword] = useState('');
 
     // ── Feedback ─────────────────────────────────────────────────────────────
     const [error, setError]               = useState('');
@@ -171,8 +175,6 @@ const Login = () => {
         if (currentUser && userProfile) {
             navigate('/');
         } else if (currentUser && profileMissing) {
-            // Set the error BEFORE logout so the message persists after
-            // currentUser / profileMissing are cleared from AuthContext.
             setError('Your account profile is missing from the database. Please contact your Admin to restore it.');
             logout().catch((e) => console.error('[Login] logout after profileMissing failed:', e));
         }
@@ -185,7 +187,12 @@ const Login = () => {
     const switchMode = (next) => {
         clearFeedback();
         setSignupStep(1);
+        setForgotStep(1);
         setFormData({ empId: '', password: '', confirmPassword: '', name: '', recoveryEmail: '', mobileNumber: '' });
+        setResetInput('');
+        setForgotEmail('');
+        setForgotOtp('');
+        setForgotNewPassword('');
         setMode(next);
     };
 
@@ -233,7 +240,6 @@ const Login = () => {
 
         setIsLoading(true);
 
-        // Pre-check: is EmpID already taken?
         try {
             const lookupSnap = await getDoc(doc(db, 'emp_lookups', cleanEmpId));
             if (lookupSnap.exists() && lookupSnap.data().uid) {
@@ -245,7 +251,6 @@ const Login = () => {
             console.warn('[Login] pre-check failed, continuing:', err);
         }
 
-        // Generate & send OTP securely via Backend
         const normalizedEmail = formData.recoveryEmail.trim().toLowerCase();
         const result = await sendOtpEmailSecure(normalizedEmail, formData.name.trim());
         if (result.success) {
@@ -282,7 +287,6 @@ const Login = () => {
                 throw new Error(data.error || 'Failed to register. Please try again.');
             }
 
-            // Successfully registered via backend. Now log them in.
             await login(formData.empId.trim(), formData.password);
         } catch (err) {
             console.error('[Login] backend registration failed:', err);
@@ -292,26 +296,65 @@ const Login = () => {
     };
 
     // ── Forgot password ───────────────────────────────────────────────────────
-    const handleForgotPassword = async (e) => {
-        e.preventDefault();
+    const handleForgotPasswordStep1 = async (e) => {
+        if (e) e.preventDefault();
         clearFeedback();
         setIsLoading(true);
 
         try {
             const { email, displayEmail } = await resolveResetEmail(resetInput.trim());
-            await resetPassword(email);
-            setStatusMessage(
-                `Reset link sent to ${displayEmail}. Check your inbox and spam folder. ` +
-                `Note: the link goes to the email you used when you first registered.`
-            );
-            setResetInput('');
-        } catch (err) {
-            console.error('[Login] forgot password error:', err);
-            if (err.code) {
-                setError(mapAuthError(err));
+            setForgotEmail(email);
+            
+            const result = await sendOtpEmailSecure(email, 'User', 'password_reset');
+            if (result.success) {
+                setStatusMessage(`OTP sent to ${displayEmail}. Please check your inbox and spam folder.`);
+                setForgotStep(2);
             } else {
-                setError(err.message);
+                setError(`Failed to send OTP: ${result.error?.message || 'Unknown error'}`);
             }
+        } catch (err) {
+            console.error('[Login] forgot password step 1 error:', err);
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleForgotPasswordStep2 = async (e) => {
+        if (e) e.preventDefault();
+        clearFeedback();
+        
+        if (forgotNewPassword.length < 6) {
+            setError('Password must be at least 6 characters.');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: forgotEmail,
+                    otp: forgotOtp,
+                    newPassword: forgotNewPassword
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to reset password.');
+            }
+
+            setStatusMessage('Password updated successfully! You can now sign in.');
+            setForgotStep(1);
+            setResetInput('');
+            setForgotOtp('');
+            setForgotNewPassword('');
+            setMode('login');
+        } catch (err) {
+            console.error('[Login] forgot password step 2 error:', err);
+            setError(err.message || 'Reset failed.');
         } finally {
             setIsLoading(false);
         }
@@ -324,10 +367,14 @@ const Login = () => {
 
         if (mode === 'login') {
             await handleLogin();
-        } else if (signupStep === 1) {
+        } else if (mode === 'signup' && signupStep === 1) {
             await handleSignupStep1();
-        } else {
+        } else if (mode === 'signup' && signupStep === 2) {
             await handleSignupStep2();
+        } else if (mode === 'forgot' && forgotStep === 1) {
+            await handleForgotPasswordStep1();
+        } else if (mode === 'forgot' && forgotStep === 2) {
+            await handleForgotPasswordStep2();
         }
     };
 
@@ -335,7 +382,8 @@ const Login = () => {
     const submitLabel = () => {
         if (isLoading) return 'Processing…';
         if (mode === 'login') return 'Sign In';
-        return signupStep === 1 ? 'Send OTP' : 'Verify & Sign Up';
+        if (mode === 'signup') return signupStep === 1 ? 'Send OTP' : 'Verify & Sign Up';
+        return forgotStep === 1 ? 'Send Reset OTP' : 'Reset Password';
     };
 
     // =========================================================================
@@ -350,10 +398,8 @@ const Login = () => {
             position: 'relative', overflow: 'hidden',
             color: '#f8fafc',
         }}>
-            {/* Single keyframe injection — no duplicates */}
             <style>{KEYFRAMES}</style>
 
-            {/* Ambient background orbs */}
             <div style={{
                 position: 'absolute', top: '-20%', left: '-10%',
                 width: '600px', height: '600px',
@@ -367,7 +413,6 @@ const Login = () => {
                 filter: 'blur(80px)', animation: 'float 15s infinite alternate-reverse',
             }} />
 
-            {/* ── Card ─────────────────────────────────────────────────────── */}
             <div style={{
                 padding: '3rem', width: '90%', maxWidth: '450px', textAlign: 'center',
                 background: 'rgba(15,23,42,0.4)',
@@ -380,7 +425,6 @@ const Login = () => {
                 animation: 'crystallize 0.8s cubic-bezier(0.16,1,0.3,1) forwards',
             }}>
 
-                {/* Logo */}
                 <div style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'center' }}>
                     <div style={{
                         padding: '12px', borderRadius: '20px',
@@ -391,7 +435,6 @@ const Login = () => {
                     </div>
                 </div>
 
-                {/* Title */}
                 <h1 style={{
                     marginBottom: '0.4rem', fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.02em',
                     background: 'linear-gradient(to bottom right, #ffffff, #94a3b8)',
@@ -404,32 +447,73 @@ const Login = () => {
                     Lab Assignment Management System
                 </p>
 
-                {/* Feedback banners */}
                 {statusMessage && <div style={SUCCESS_ALERT}>{statusMessage}</div>}
                 {error         && <div style={ERROR_ALERT}>{error}</div>}
 
                 {/* ── FORGOT PASSWORD FORM ──────────────────────────────── */}
                 {mode === 'forgot' ? (
-                    <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <input
-                            id="reset-input"
-                            type="text"
-                            placeholder="Employee ID or registered Email"
-                            className="glass-input"
-                            aria-label="Employee ID or Email for password reset"
-                            style={INPUT_STYLE}
-                            value={resetInput}
-                            onChange={(e) => setResetInput(e.target.value)}
-                            required
-                        />
-                        <button
-                            type="submit"
-                            className="btn"
-                            disabled={isLoading}
-                            style={{ background: 'var(--color-accent)', color: 'white', opacity: isLoading ? 0.7 : 1 }}
-                        >
-                            {isLoading ? 'Sending…' : 'Send Reset Link'}
-                        </button>
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {forgotStep === 1 ? (
+                            <>
+                                <input
+                                    id="reset-input"
+                                    type="text"
+                                    placeholder="Employee ID or registered Email"
+                                    className="glass-input"
+                                    aria-label="Employee ID or Email for password reset"
+                                    style={INPUT_STYLE}
+                                    value={resetInput}
+                                    onChange={(e) => setResetInput(e.target.value)}
+                                    required
+                                />
+                                <button
+                                    type="submit"
+                                    className="btn"
+                                    disabled={isLoading}
+                                    style={{ background: 'var(--color-accent)', color: 'white', opacity: isLoading ? 0.7 : 1 }}
+                                >
+                                    {isLoading ? 'Sending...' : 'Send Reset OTP'}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <input
+                                    id="forgot-otp"
+                                    type="text"
+                                    placeholder="Enter 6-digit OTP"
+                                    className="glass-input text-center text-xl tracking-widest"
+                                    style={{ ...INPUT_STYLE, letterSpacing: '0.25em' }}
+                                    value={forgotOtp}
+                                    onChange={(e) => setForgotOtp(e.target.value)}
+                                    maxLength={6}
+                                    required
+                                />
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        id="forgot-new-password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        placeholder="New Password"
+                                        className="glass-input"
+                                        style={PASSWORD_INPUT_STYLE}
+                                        value={forgotNewPassword}
+                                        onChange={(e) => setForgotNewPassword(e.target.value)}
+                                        required
+                                        minLength={6}
+                                    />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={EYE_BTN_STYLE}>
+                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </button>
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="btn"
+                                    disabled={isLoading}
+                                    style={{ background: 'var(--color-accent)', color: 'white', opacity: isLoading ? 0.7 : 1 }}
+                                >
+                                    {isLoading ? 'Resetting...' : 'Reset Password'}
+                                </button>
+                            </>
+                        )}
                         <button
                             type="button"
                             onClick={() => switchMode('login')}

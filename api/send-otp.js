@@ -94,44 +94,66 @@ export default async function handler(req, res) {
             actionType: actionType || 'signup'
         });
 
-        // 4. Send Email via EmailJS REST API
-        const serviceId = process.env.EMAILJS_SERVICE_ID;
-        const targetTemplateId = templateId || process.env.EMAILJS_TEMPLATE_ID;
-        const publicKey = process.env.EMAILJS_PUBLIC_KEY;
-
-        if (!serviceId || !targetTemplateId || !publicKey) {
-            throw new Error("Missing EmailJS environment variables on the server.");
+        // 4. Send Email via Nodemailer
+        const { SMTP_USER, SMTP_PASSWORD } = process.env;
+        
+        if (!SMTP_USER || !SMTP_PASSWORD) {
+            throw new Error("Missing SMTP_USER or SMTP_PASSWORD environment variables.");
         }
 
-        const emailJsResponse = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                service_id: serviceId,
-                template_id: targetTemplateId,
-                user_id: publicKey,
-                template_params: {
-                    to_name: name,
-                    to_email: email,
-                    email: email, // some templates use 'email'
-                    passcode: otp,
-                    time: new Date().toLocaleString(),
-                    message: actionType === 'admin_auth' 
-                        ? "Action Required: Granting Administrator Privileges. Please verify your identity."
-                        : "Please verify your email to complete registration."
-                }
-            })
+        // We use nodemailer to connect to Gmail, Outlook, Office365 etc.
+        const nodemailer = require('nodemailer');
+        
+        // Dynamically determine host if not specified, default to office365 if microsoft, else gmail
+        let smtpHost = 'smtp.gmail.com';
+        if (SMTP_USER.includes('@outlook') || SMTP_USER.includes('@hotmail') || SMTP_USER.includes('@live') || SMTP_USER.includes('@office365') || process.env.SMTP_HOST === 'smtp.office365.com') {
+            smtpHost = 'smtp.office365.com';
+        }
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || smtpHost,
+            port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587,
+            secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+            auth: {
+                user: SMTP_USER,
+                pass: SMTP_PASSWORD
+            }
         });
 
-        if (!emailJsResponse.ok) {
-            const errorText = await emailJsResponse.text();
-            throw new Error(`EmailJS Error: ${errorText}`);
+        let subject = "LAMS Registration - Email Verification";
+        let messageText = "Please verify your email to complete registration.";
+        
+        if (actionType === 'admin_auth') {
+            subject = "LAMS Admin Security Alert";
+            messageText = "Action Required: Granting Administrator Privileges. Please verify your identity.";
+        } else if (actionType === 'password_reset') {
+            subject = "LAMS Password Reset";
+            messageText = "Action Required: Password Reset. Please use this OTP to securely reset your LAMS password.";
         }
 
-        return res.status(200).json({ success: true, message: 'OTP sent securely.' });
+        const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px;">
+            <h2 style="color: #333; text-align: center;">LAMS Authentication</h2>
+            <p style="color: #555; font-size: 16px;">Hello ${name},</p>
+            <p style="color: #555; font-size: 16px;">${messageText}</p>
+            <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #000;">${otp}</span>
+            </div>
+            <p style="color: #888; font-size: 12px; text-align: center;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+            <p style="color: #888; font-size: 12px; text-align: center;">Time of request: ${new Date().toLocaleString()}</p>
+        </div>
+        `;
+
+        const senderEmail = process.env.SMTP_FROM || SMTP_USER;
+        await transporter.sendMail({
+            from: `"LAMS Security" <${senderEmail}>`,
+            to: email,
+            subject: subject,
+            text: `${messageText} Your OTP is: ${otp}`,
+            html: htmlContent
+        });
+
+        return res.status(200).json({ success: true, message: 'OTP sent securely via SMTP.' });
 
     } catch (error) {
         console.error('Send OTP Error:', error.message || error);
