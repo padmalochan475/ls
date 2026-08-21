@@ -174,44 +174,60 @@ const AdminPanel = () => {
 
     const COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981'];
 
-    // Real-Time Users Listener
-    useDynamicListener((isActiveRef) => {
+    // Fetches (Paginated/One-time) to preserve Firestore Quota
+    const fetchUsers = async () => {
         if (!userProfile || userProfile.role !== 'admin') return;
         setLoading(true);
-        return onSnapshot(collection(db, 'users'), (snapshot) => {
-            if (!isActiveRef.current) return; // Guard: prevent update on unmounted component
+        try {
+            const snapshot = await getDocs(collection(db, 'users'));
             const usersList = [];
             snapshot.forEach((doc) => {
                 usersList.push({ id: doc.id, ...doc.data() });
             });
             setUsers(usersList);
-            setLoading(false);
-        }, (error) => {
-            if (!isActiveRef.current) return;
+        } catch (error) {
             console.error("Error fetching users:", error);
+            toast.error("Failed to load users");
+        } finally {
             setLoading(false);
-        });
-    }, [userProfile?.role], { suspendOnHidden: true, suspendDelayMs: 30000 });
+        }
+    };
 
-    // Suggestions Listener (Always Active for Instant Switching)
-    useDynamicListener((isActiveRef) => {
+    const fetchSuggestions = async () => {
         if (!userProfile || userProfile.role !== 'admin') return;
         setSuggestionsLoading(true);
-        const q = collection(db, 'suggestions');
-        return onSnapshot(q, (snapshot) => {
-            if (!isActiveRef.current) return; // Guard: prevent update on unmounted component
+        try {
+            const snapshot = await getDocs(collection(db, 'suggestions'));
             const list = [];
             snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
             // Sort by date desc
             list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setSuggestions(list);
-            setSuggestionsLoading(false);
-        }, (err) => {
-            if (!isActiveRef.current) return;
+        } catch (err) {
             console.error("Suggestions Sync Error:", err);
+            toast.error("Failed to load suggestions");
+        } finally {
             setSuggestionsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        let isMounted = true;
+        if (userProfile?.role === 'admin') {
+            fetchUsers();
+            fetchSuggestions();
+        }
+        return () => { isMounted = false; };
+    }, [userProfile?.role]);
+
+    const handleRefreshData = () => {
+        const toastId = toast.loading("Refreshing Admin Data...");
+        Promise.all([fetchUsers(), fetchSuggestions()]).then(() => {
+            toast.success("Data Refreshed", { id: toastId });
+        }).catch(() => {
+            toast.error("Failed to refresh", { id: toastId });
         });
-    }, [userProfile?.role], { suspendOnHidden: true, suspendDelayMs: 30000 });
+    };
 
     const updateSuggestionStatus = async (id, status) => {
         // STRICT PERMISSION CHECK
@@ -265,7 +281,11 @@ const AdminPanel = () => {
                 if (!facSnap.empty) {
                     facDocRef = doc(db, 'faculty', facSnap.docs[0].id);
                 } else {
-                    toast(`User approved, but no Faculty Master record found for EmpID ${targetUser.empId}.`, { icon: '⚠️' });
+                    // CASE B: Missing Master Data -> Trigger Creation Modal
+                    setPendingApprovalUser(targetUser);
+                    setShowCreateFacultyModal(true);
+                    setProcessingAction(false);
+                    return;
                 }
             }
 
@@ -339,6 +359,83 @@ const AdminPanel = () => {
     // ... (inside component)
     const [otpModal, setOtpModal] = useState({ isOpen: false, otp: '', userId: '', newRole: '' });
     const [isVerifying, setIsVerifying] = useState(false);
+    
+    // Create Faculty Modal State (For Case B Approval)
+    const [showCreateFacultyModal, setShowCreateFacultyModal] = useState(false);
+    const [pendingApprovalUser, setPendingApprovalUser] = useState(null);
+    const [newFacultyForm, setNewFacultyForm] = useState({ department: '', designation: '', type: 'Teaching' });
+
+    const handleCreateFacultyAndApprove = async () => {
+        if (!checkWritePermission()) return;
+        if (!newFacultyForm.department || !newFacultyForm.designation) {
+            toast.error("Please fill in Department and Designation.");
+            return;
+        }
+
+        setProcessingAction(true);
+        const toastId = toast.loading("Creating Master Data & Approving...");
+        
+        try {
+            const userRef = doc(db, 'users', pendingApprovalUser.id);
+            const newFacRef = doc(collection(db, 'faculty')); // Auto-generate ID
+            const empLookupRef = doc(db, 'emp_lookups', String(pendingApprovalUser.empId).trim());
+
+            await runTransaction(db, async (transaction) => {
+                // 1. Transactional Reads
+                const userSnap = await transaction.get(userRef);
+                if (!userSnap.exists()) throw new Error("User no longer exists.");
+
+                // 2. Create Faculty Master Record
+                transaction.set(newFacRef, {
+                    name: pendingApprovalUser.name || 'Unknown',
+                    empId: String(pendingApprovalUser.empId).trim(),
+                    email: pendingApprovalUser.email || '',
+                    department: newFacultyForm.department,
+                    designation: newFacultyForm.designation,
+                    type: newFacultyForm.type,
+                    uid: pendingApprovalUser.id,
+                    isRegistered: true,
+                    handshakeAt: new Date().toISOString(),
+                    whatsappEnabled: pendingApprovalUser.whatsappEnabled !== false,
+                    createdAt: new Date().toISOString()
+                });
+
+                // 3. Update Emp Lookup
+                transaction.set(empLookupRef, {
+                    uid: pendingApprovalUser.id,
+                    email: pendingApprovalUser.email,
+                    syncedAt: new Date().toISOString(),
+                    source: 'admin-approval-creation'
+                });
+
+                // 4. Update User Status
+                transaction.update(userRef, {
+                    status: 'approved',
+                    approvalStatus: 'approved',
+                    accountStatus: 'active',
+                    masterDataLinked: true
+                });
+            });
+
+            await sendNotification({
+                userIds: [pendingApprovalUser.id],
+                title: 'Account Approved',
+                body: `Your LAMS account has been verified and approved by the Administrator.`,
+                type: 'account_approved',
+                data: { name: pendingApprovalUser.name }
+            });
+
+            toast.success("Master Data Created & Account Approved!", { id: toastId });
+            setShowCreateFacultyModal(false);
+            setPendingApprovalUser(null);
+            setNewFacultyForm({ department: '', designation: '', type: 'Teaching' });
+        } catch (error) {
+            console.error("Error creating faculty/approving: ", error);
+            toast.error(error.message || "Failed to process approval.", { id: toastId });
+        } finally {
+            setProcessingAction(false);
+        }
+    };
 
     const sendEmailOtpSecure = async (email, name) => {
         try {
@@ -566,126 +663,138 @@ const AdminPanel = () => {
         if (!checkWritePermission()) return;
 
         if (!editingUser) return;
-        try {
-            // 1. Update User Doc
-            await updateDoc(doc(db, 'users', editingUser.id), {
-                name: editForm.name,
-                empId: editForm.empId,
-                dob: editForm.dob,
-                joiningDate: editForm.joiningDate,
-                whatsappEnabled: editForm.whatsappEnabled
-            });
+        setProcessingAction(true);
+        const toastId = toast.loading("Updating User...");
 
-            // 2. Sync to Faculty Record
-            const q = query(collection(db, 'faculty'), where('uid', '==', editingUser.id));
-            const facSnap = await getDocs(q);
-            if (!facSnap.empty) {
-                const batch = writeBatch(db);
-                facSnap.forEach((d) => {
-                    batch.update(d.ref, { 
-                        name: editForm.name,
-                        empId: editForm.empId,
-                        whatsappEnabled: editForm.whatsappEnabled
-                    });
+        try {
+            const userRef = doc(db, 'users', editingUser.id);
+            const newEmpId = editForm.empId ? String(editForm.empId).trim() : '';
+            const oldEmpId = editingUser.empId ? String(editingUser.empId).trim() : '';
+            const isEmpIdChanged = oldEmpId !== newEmpId;
+
+            // 1. Transactional Update for Identity Safety
+            await runTransaction(db, async (transaction) => {
+                const userSnap = await transaction.get(userRef);
+                if (!userSnap.exists()) throw new Error("User no longer exists.");
+
+                if (isEmpIdChanged && newEmpId) {
+                    const lookupRef = doc(db, 'emp_lookups', newEmpId);
+                    const lookupSnap = await transaction.get(lookupRef);
+                    if (lookupSnap.exists() && lookupSnap.data().uid !== editingUser.id) {
+                        throw new Error(`EmpID ${newEmpId} is already in use by another account!`);
+                    }
+                }
+
+                // Update User Doc
+                transaction.update(userRef, {
+                    name: editForm.name,
+                    empId: newEmpId,
+                    dob: editForm.dob,
+                    joiningDate: editForm.joiningDate,
+                    whatsappEnabled: editForm.whatsappEnabled
                 });
-                
-                // 3. Sync Security (If EmpID Changed)
-                if (editingUser.empId !== editForm.empId) {
-                    // Update Secure Lookup
-                    if (editForm.empId) {
-                        batch.set(doc(db, 'emp_lookups', editForm.empId), {
+
+                if (isEmpIdChanged) {
+                    if (newEmpId) {
+                        const newLookupRef = doc(db, 'emp_lookups', newEmpId);
+                        transaction.set(newLookupRef, {
                             uid: editingUser.id,
                             email: editingUser.email,
                             syncedAt: new Date().toISOString(),
                             source: 'admin-panel-edit'
                         });
                     }
-                    // Remove old lookup if it existed
-                    if (editingUser.empId) {
-                        batch.delete(doc(db, 'emp_lookups', editingUser.empId));
+                    if (oldEmpId) {
+                        const oldLookupRef = doc(db, 'emp_lookups', oldEmpId);
+                        transaction.delete(oldLookupRef);
                     }
+                }
+            });
+
+            // 2. Sync to Faculty Record (Batch - Non-Identity Critical but requires updates)
+            const q = query(collection(db, 'faculty'), where('uid', '==', editingUser.id));
+            const facSnap = await getDocs(q);
+            const batch = writeBatch(db);
+            
+            if (!facSnap.empty) {
+                facSnap.forEach((d) => {
+                    batch.update(d.ref, { 
+                        name: editForm.name,
+                        empId: newEmpId,
+                        whatsappEnabled: editForm.whatsappEnabled
+                    });
+                });
+            }
+                
+            // 3. Cascade to Schedule (If Name or EmpID Changed)
+            if (editingUser.name !== editForm.name || isEmpIdChanged) {
+                let q1, q2;
+                if (oldEmpId) {
+                    q1 = query(collection(db, 'schedule'), where('facultyEmpId', '==', oldEmpId));
+                    q2 = query(collection(db, 'schedule'), where('faculty2EmpId', '==', oldEmpId));
+                } else {
+                    q1 = query(collection(db, 'schedule'), where('faculty', '==', editingUser.name));
+                    q2 = query(collection(db, 'schedule'), where('faculty2', '==', editingUser.name));
                 }
                 
-                // 4. Cascade to Schedule (If Name or EmpID Changed)
-                if (editingUser.name !== editForm.name || editingUser.empId !== editForm.empId) {
-                    let q1, q2;
-                    if (editingUser.empId) {
-                        q1 = query(collection(db, 'schedule'), where('facultyEmpId', '==', editingUser.empId));
-                        q2 = query(collection(db, 'schedule'), where('faculty2EmpId', '==', editingUser.empId));
+                const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+                const scheduleUpdates = new Map();
+                
+                snap1.docs.forEach(doc => {
+                    scheduleUpdates.set(doc.id, { ref: doc.ref, data: { faculty: editForm.name, facultyEmpId: newEmpId || null } });
+                });
+                
+                snap2.docs.forEach(doc => {
+                    const existing = scheduleUpdates.get(doc.id);
+                    const updateData = { faculty2: editForm.name, faculty2EmpId: newEmpId || null };
+                    if (existing) {
+                        existing.data = { ...existing.data, ...updateData };
                     } else {
-                        q1 = query(collection(db, 'schedule'), where('faculty', '==', editingUser.name));
-                        q2 = query(collection(db, 'schedule'), where('faculty2', '==', editingUser.name));
+                        scheduleUpdates.set(doc.id, { ref: doc.ref, data: updateData });
                     }
+                });
+                
+                for (const update of scheduleUpdates.values()) {
+                    batch.update(update.ref, update.data);
+                }
+                
+                // 4. Cascade to Substitution Requests
+                if (oldEmpId) {
+                    const subQ1 = query(collection(db, 'substitution_requests'), where('requesterId', '==', oldEmpId));
+                    const subQ2 = query(collection(db, 'substitution_requests'), where('targetFacultyId', '==', oldEmpId));
+                    const [subSnap1, subSnap2] = await Promise.all([getDocs(subQ1), getDocs(subQ2)]);
                     
-                    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-                    const scheduleUpdates = new Map();
-                    
-                    snap1.docs.forEach(doc => {
-                        scheduleUpdates.set(doc.id, { ref: doc.ref, data: { faculty: editForm.name, facultyEmpId: editForm.empId || null } });
+                    subSnap1.docs.forEach(doc => {
+                        batch.update(doc.ref, { requesterName: editForm.name, requesterId: newEmpId || null });
+                    });
+                    subSnap2.docs.forEach(doc => {
+                        batch.update(doc.ref, { targetFacultyName: editForm.name, targetFacultyId: newEmpId || null });
                     });
                     
-                    snap2.docs.forEach(doc => {
-                        const existing = scheduleUpdates.get(doc.id);
-                        const updateData = { faculty2: editForm.name, faculty2EmpId: editForm.empId || null };
-                        if (existing) {
-                            existing.data = { ...existing.data, ...updateData };
-                        } else {
-                            scheduleUpdates.set(doc.id, { ref: doc.ref, data: updateData });
-                        }
+                    // 5. Cascade to Adjustments
+                    const adjQ1 = query(collection(db, 'adjustments'), where('originalFacultyEmpId', '==', oldEmpId));
+                    const adjQ2 = query(collection(db, 'adjustments'), where('substituteEmpId', '==', oldEmpId));
+                    const [adjSnap1, adjSnap2] = await Promise.all([getDocs(adjQ1), getDocs(adjQ2)]);
+                    
+                    adjSnap1.docs.forEach(doc => {
+                        batch.update(doc.ref, { originalFaculty: editForm.name, originalFacultyEmpId: newEmpId || null });
                     });
-                    
-                    for (const update of scheduleUpdates.values()) {
-                        batch.update(update.ref, update.data);
-                    }
-                    
-                    // 5. Cascade to Substitution Requests
-                    if (editingUser.empId) {
-                        const subQ1 = query(collection(db, 'substitution_requests'), where('requesterId', '==', editingUser.empId));
-                        const subQ2 = query(collection(db, 'substitution_requests'), where('targetFacultyId', '==', editingUser.empId));
-                        const [subSnap1, subSnap2] = await Promise.all([getDocs(subQ1), getDocs(subQ2)]);
-                        
-                        subSnap1.docs.forEach(doc => {
-                            batch.update(doc.ref, { requesterName: editForm.name, requesterId: editForm.empId || null });
-                        });
-                        subSnap2.docs.forEach(doc => {
-                            batch.update(doc.ref, { targetFacultyName: editForm.name, targetFacultyId: editForm.empId || null });
-                        });
-                        
-                        // 6. Cascade to Adjustments
-                        const adjQ1 = query(collection(db, 'adjustments'), where('originalFacultyEmpId', '==', editingUser.empId));
-                        const adjQ2 = query(collection(db, 'adjustments'), where('substituteEmpId', '==', editingUser.empId));
-                        const [adjSnap1, adjSnap2] = await Promise.all([getDocs(adjQ1), getDocs(adjQ2)]);
-                        
-                        adjSnap1.docs.forEach(doc => {
-                            batch.update(doc.ref, { originalFaculty: editForm.name, originalFacultyEmpId: editForm.empId || null });
-                        });
-                        adjSnap2.docs.forEach(doc => {
-                            batch.update(doc.ref, { substituteName: editForm.name, substituteEmpId: editForm.empId || null });
-                        });
-                    }
-                }
-                await batch.commit();
-            } else if (editingUser.empId !== editForm.empId) {
-                // If no faculty record yet, but ID changed, still update lookups
-                const batch = writeBatch(db);
-                if (editForm.empId) {
-                    batch.set(doc(db, 'emp_lookups', editForm.empId), {
-                        uid: editingUser.id,
-                        email: editingUser.email,
-                        syncedAt: new Date().toISOString(),
-                        source: 'admin-panel-edit'
+                    adjSnap2.docs.forEach(doc => {
+                        batch.update(doc.ref, { substituteName: editForm.name, substituteEmpId: newEmpId || null });
                     });
                 }
-                if (editingUser.empId) {
-                    batch.delete(doc(db, 'emp_lookups', editingUser.empId));
-                }
-                await batch.commit();
             }
-            toast.success("User updated successfully!");
+            await batch.commit();
+            toast.success("User updated successfully!", { id: toastId });
             setEditingUser(null);
+            
+            // Auto-refresh dash
+            fetchUsers();
         } catch (error) {
             console.error("Error updating user:", error);
-            toast.error("Failed to update user.");
+            toast.error(error.message || "Failed to update user.", { id: toastId });
+        } finally {
+            setProcessingAction(false);
         }
     };
 
@@ -695,6 +804,82 @@ const AdminPanel = () => {
 
     return (
         <div style={{ paddingBottom: '4rem', maxWidth: '1600px', margin: '0 auto' }}>
+            {/* Create Faculty Modal (For Case B Approvals) */}
+            {showCreateFacultyModal && pendingApprovalUser && createPortal(
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
+                    <div className="glass-panel" style={{ width: '100%', maxWidth: '500px', padding: '2.5rem', position: 'relative', animation: 'scaleIn 0.3s ease' }}>
+                        <h2 style={{ margin: '0 0 1.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <UserPlus size={24} color="#f59e0b" />
+                            Create Faculty Master Record
+                        </h2>
+                        
+                        <div style={{ padding: '1rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '8px', borderLeft: '4px solid #f59e0b', marginBottom: '1.5rem', color: '#fcd34d', fontSize: '0.9rem' }}>
+                            No existing Faculty Master Data was found for EmpID <strong>{pendingApprovalUser.empId}</strong>. You must create one now to complete the approval handshake.
+                        </div>
+
+                        <div style={{ display: 'grid', gap: '1.25rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Name (Read-only)</label>
+                                <input type="text" value={pendingApprovalUser.name || ''} disabled className="glass-input" style={{ opacity: 0.7 }} />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Emp ID (Read-only)</label>
+                                <input type="text" value={pendingApprovalUser.empId || ''} disabled className="glass-input" style={{ opacity: 0.7 }} />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Email (Read-only)</label>
+                                <input type="text" value={pendingApprovalUser.email || ''} disabled className="glass-input" style={{ opacity: 0.7 }} />
+                            </div>
+                            
+                            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '0.5rem 0' }} />
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Department *</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., Computer Science"
+                                    value={newFacultyForm.department}
+                                    onChange={(e) => setNewFacultyForm({ ...newFacultyForm, department: e.target.value })}
+                                    className="glass-input"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Designation *</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., Assistant Professor"
+                                    value={newFacultyForm.designation}
+                                    onChange={(e) => setNewFacultyForm({ ...newFacultyForm, designation: e.target.value })}
+                                    className="glass-input"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Type</label>
+                                <select
+                                    value={newFacultyForm.type}
+                                    onChange={(e) => setNewFacultyForm({ ...newFacultyForm, type: e.target.value })}
+                                    className="glass-input"
+                                >
+                                    <option value="Teaching" style={{ background: '#0f172a' }}>Teaching</option>
+                                    <option value="Non-Teaching" style={{ background: '#0f172a' }}>Non-Teaching</option>
+                                    <option value="Guest" style={{ background: '#0f172a' }}>Guest</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
+                            <button onClick={() => { setShowCreateFacultyModal(false); setPendingApprovalUser(null); }} className="btn" style={{ background: 'rgba(255,255,255,0.1)', color: 'white' }} disabled={processingAction}>Cancel</button>
+                            <button onClick={handleCreateFacultyAndApprove} className="btn" style={{ background: '#f59e0b', color: '#fff' }} disabled={processingAction}>
+                                {processingAction ? 'Processing...' : 'Create & Approve'}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
             <AdminOtpModal
                 isOpen={otpModal.isOpen}
                 onClose={() => setOtpModal({ ...otpModal, isOpen: false })}
@@ -840,22 +1025,32 @@ const AdminPanel = () => {
 
             {/* Header Area */}
             <div className="admin-header">
-                <div>
-                    <h2 style={{
-                        fontSize: '2.2rem', fontWeight: '800', margin: 0,
-                        background: 'linear-gradient(to right, #ffffff, #94a3b8)',
-                        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                        letterSpacing: '-1px'
-                    }}>
-                        Admin Control Center
-                        <div style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '12px', verticalAlign: 'middle' }}>
-                            <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', boxShadow: '0 0 10px #10b981', animation: 'pulse 2s infinite' }}></div>
-                        </div>
-                    </h2>
-                    <p style={{ color: 'var(--color-text-muted)', fontSize: '1.1rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '4px', letterSpacing: '1px' }}>SYSTEM LIVE</span> 
-                        Manage users, permissions, and system health
-                    </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                        <h2 style={{
+                            fontSize: '2.2rem', fontWeight: '800', margin: 0,
+                            background: 'linear-gradient(to right, #ffffff, #94a3b8)',
+                            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                            letterSpacing: '-1px'
+                        }}>
+                            Admin Control Center
+                            <div style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '12px', verticalAlign: 'middle' }}>
+                                <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', boxShadow: '0 0 10px #10b981', animation: 'pulse 2s infinite' }}></div>
+                            </div>
+                        </h2>
+                        <p style={{ color: 'var(--color-text-muted)', fontSize: '1.1rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '4px', letterSpacing: '1px' }}>SYSTEM LIVE</span> 
+                            Manage users, permissions, and system health
+                        </p>
+                    </div>
+                    <button 
+                        onClick={handleRefreshData} 
+                        className="btn" 
+                        style={{ background: 'rgba(255,255,255,0.05)', color: 'white', display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
+                        disabled={loading || suggestionsLoading}
+                    >
+                        <Activity size={16} /> {loading || suggestionsLoading ? 'Refreshing...' : 'Refresh Data'}
+                    </button>
                 </div>
 
                 {/* Tab Navigation */}
