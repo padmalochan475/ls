@@ -30,7 +30,6 @@
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.555.0",
     "multer": "^2.0.2",
-    "nodemailer": "^9.0.5",
     "papaparse": "^5.5.3",
     "qrcode": "^1.5.4",
     "react": "^19.2.3",
