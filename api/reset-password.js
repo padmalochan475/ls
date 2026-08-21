@@ -2,6 +2,7 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import crypto from 'crypto';
+import { getAuth } from 'firebase-admin/auth';
 
 // Singleton Initialization
 if (!getApps().length) {
@@ -110,7 +111,6 @@ export default async function handler(req, res) {
 
         if (otpValid) {
             // Update password using Admin SDK
-            const { getAuth } = await import('firebase-admin/auth');
             const auth = getAuth();
             
             try {
