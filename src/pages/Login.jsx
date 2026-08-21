@@ -139,7 +139,7 @@ const KEYFRAMES = `
 // Login Page Component
 // ===========================================================================
 const Login = () => {
-    const { login, resetPassword, currentUser, userProfile, loading, logout, profileMissing } = useAuth();
+    const { login, resetPassword, currentUser, userProfile, loading, logout, profileMissing, authError } = useAuth();
     const navigate = useNavigate();
 
     // ── UI mode ──────────────────────────────────────────────────────────────
@@ -177,8 +177,13 @@ const Login = () => {
         } else if (currentUser && profileMissing) {
             setError('Your account profile is missing from the database. Please contact your Admin to restore it.');
             logout().catch((e) => console.error('[Login] logout after profileMissing failed:', e));
+        } else if (currentUser && authError === 'ACCOUNT_DISABLED') {
+            setError('Your account has been disabled or rejected. Please contact administration.');
+        } else if (currentUser && authError === 'PERMISSION_DENIED') {
+            setError('Access Denied. You do not have permission to view this profile.');
+            logout().catch((e) => console.error('[Login] logout after permission denied:', e));
         }
-    }, [currentUser, userProfile, profileMissing, loading, navigate, logout]);
+    }, [currentUser, userProfile, profileMissing, authError, loading, navigate, logout]);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const clearFeedback  = () => { setError(''); setStatusMessage(''); };

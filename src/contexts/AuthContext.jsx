@@ -393,12 +393,18 @@ export const AuthProvider = ({ children }) => {
                     const newData = docSnap.data();
 
                     if (newData.status === 'disabled' || newData.status === 'rejected') {
-                        console.warn('[Auth] Account disabled or rejected. Forcing logout.');
-                        signOut(auth).catch(console.error);
-                        setUserProfile(null);
-                        setProfileMissing(true);
-                        setAuthError('ACCOUNT_DISABLED');
-                        return;
+                        if (docSnap.metadata.fromCache) {
+                            console.warn(`[Auth] Cache says account is ${newData.status}. Waiting for server confirmation to avoid lock-out.`);
+                            // Don't force logout yet. Let the server snapshot arrive.
+                        } else {
+                            console.warn(`[Auth] Server confirmed account ${newData.status}. Forcing logout.`);
+                            signOut(auth).catch(console.error);
+                            setUserProfile(null);
+                            // We set profileMissing to false, and rely on authError for disabled accounts
+                            setProfileMissing(false);
+                            setAuthError('ACCOUNT_DISABLED');
+                            return;
+                        }
                     }
 
                     setUserProfile(prev => {
