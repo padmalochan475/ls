@@ -519,6 +519,11 @@ export default async function handler(req, res) {
 
             if (forceWeekly || !alreadySentWeekly.exists) {
                 try {
+                    // SET LOCK IMMEDIATELY TO PREVENT CONCURRENT CRON DUPLICATION
+                    if (!forceWeekly) {
+                        await db.collection('sent_notifications').doc(weeklySentId).set({ sentAt: new Date(), type: 'weekly_preview', status: 'processing' });
+                    }
+
                     const fullScheduleSnap = await db.collection('schedule')
                         .where('academicYear', '==', activeAcademicYear)
                         .get();
@@ -636,6 +641,11 @@ export default async function handler(req, res) {
 
             if (forceMorning || !alreadySentSummary.exists) {
                 try {
+                    // SET LOCK IMMEDIATELY TO PREVENT CONCURRENT CRON DUPLICATION
+                    if (!forceMorning) {
+                        await db.collection('sent_notifications').doc(summarySentId).set({ sentAt: new Date(), type: 'morning_summary', status: 'processing' });
+                    }
+
         
                     // 1. Fetch Today's Master Schedule for today
                     const dayScheduleSnap = await db.collection('schedule')
@@ -841,6 +851,9 @@ export default async function handler(req, res) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_first`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
+                        // SET LOCK IMMEDIATELY
+                        await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning', status: 'processing' });
+                        
                         for (const u of finalUsers) {
                             // Calculate correct co-faculty for this specific user
                             let otherFac = cls.faculty2;
@@ -866,9 +879,11 @@ export default async function handler(req, res) {
                             if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
                                 otherFac = '';
                             }
+                            
+                            const semStr = (cls.semester || cls.sem) ? ` (Sem ${cls.semester || cls.sem})` : '';
                             const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
                             const uCofacStr = otherFac ? `\n🤝 *Co-Faculty:* ${otherFac}` : '';
-                            const uVars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
+                            const uVars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr, semStr: semStr };
 
                             // SEND TAILORED PUSH NOTIFICATION
                             const pushTitle = formatMsg('warn1_push_title', defaultTemplates.warn1_push_title, uVars);
@@ -883,7 +898,8 @@ export default async function handler(req, res) {
                             }
                         }
                         
-                        await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning' });
+                        // Finalize lock
+                        await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'first_warning', status: 'completed' });
                         sentCount++;
                     }
                 }
@@ -893,6 +909,9 @@ export default async function handler(req, res) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_second`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
+                        // SET LOCK IMMEDIATELY
+                        await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning', status: 'processing' });
+                        
                         for (const u of finalUsers) {
                             // Calculate correct co-faculty for this specific user
                             let otherFac = cls.faculty2;
@@ -918,9 +937,11 @@ export default async function handler(req, res) {
                             if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
                                 otherFac = '';
                             }
+                            
+                            const semStr = (cls.semester || cls.sem) ? ` (Sem ${cls.semester || cls.sem})` : '';
                             const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
                             const uCofacStr = otherFac ? `\n🤝 *Co-Faculty:* ${otherFac}` : '';
-                            const uVars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
+                            const uVars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr, semStr: semStr };
 
                             // SEND TAILORED PUSH NOTIFICATION
                             const pushTitle = formatMsg('warn2_push_title', defaultTemplates.warn2_push_title, uVars);
@@ -935,7 +956,8 @@ export default async function handler(req, res) {
                             }
                         }
                         
-                        await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning' });
+                        // Finalize lock
+                        await getDb().collection('sent_notifications').doc(notifId).set({ sentAt: new Date(), type: 'second_warning', status: 'completed' });
                         sentCount++;
                     }
                 }

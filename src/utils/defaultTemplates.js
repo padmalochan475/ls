@@ -8,12 +8,12 @@ export const defaultTemplates = {
     holiday_wa: "🏖️ *HOLIDAY ALERT* 🏖️\n\nDear Faculty & Staff,\n\nPlease be informed that today is *{holiday_name}*.\n\n━━━━━━━━━━━━━━\n🚫 Regular classes and academic activities are *suspended* for the day.\n━━━━━━━━━━━━━━\n\nHave a great day off! ✨\n-- College Administration",
     
     warn1_push_title: "⏳ Upcoming Class",
-    warn1_push_body: "Reminder: {subject} ({group}){cofacInline} begins in {mins} mins at Room {room}.",
-    warn1_wa: "⚠️ *CLASS REMINDER [ Starts in {mins} mins ]* ⚠️\n\nDear *{name}*,\nYour next class is approaching rapidly.\n\n*SESSION DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}\n👥 *Group:* {group}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n🏃 Please proceed to your designated classroom.\n-- LAMS System",
+    warn1_push_body: "Reminder: {subject} ({group}){semStr}{cofacInline} begins in {mins} mins at Room {room}.",
+    warn1_wa: "⚠️ *CLASS REMINDER [ Starts in {mins} mins ]* ⚠️\n\nDear *{name}*,\nYour next class is approaching rapidly.\n\n*SESSION DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}\n👥 *Group:* {group}{semStr}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n🏃 Please proceed to your designated classroom.\n-- LAMS System",
     
     warn2_push_title: "🚨 Class Starting",
-    warn2_push_body: "Action Required: {subject} ({group}){cofacInline} is starting now at Room {room}.",
-    warn2_wa: "🚨 *CLASS STARTING NOW* 🚨\n\nDear *{name}*,\nYour scheduled class is beginning *immediately*.\n\n*SESSION DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}\n👥 *Group:* {group}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n⚡ Please ensure you are in the classroom.\n-- LAMS System",
+    warn2_push_body: "Action Required: {subject} ({group}){semStr}{cofacInline} is starting now at Room {room}.",
+    warn2_wa: "🚨 *CLASS STARTING NOW* 🚨\n\nDear *{name}*,\nYour scheduled class is beginning *immediately*.\n\n*SESSION DETAILS:*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n📚 *Subject:* {subject}\n👥 *Group:* {group}{semStr}\n📍 *Room:* {room}{cofacStr}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n\n⚡ Please ensure you are in the classroom.\n-- LAMS System",
     
     weekly_header: "📅 *LAMS WEEKLY ITINERARY* 📅\n\nHello *{name}*,\n\nHere is your official schedule for the upcoming week. \nYou have a total of *{total_sessions}* assigned sessions.\n\n━━━━━━━━━━━━━━\n",
     weekly_class_line: "🔹 *Session {idx}*\n   ⏰ {time} | 📍 Room: {room}\n   📚 {subject}\n   👥 {group}{semStr}{cofacStr}{subStr}\n",
