@@ -42,6 +42,7 @@ const AdminPanel = () => {
 
     const getUserStatus = (u) => {
         if (u.status) return normalizeStr(u.status);
+        if (u.approvalStatus) return normalizeStr(u.approvalStatus);
         if (u.role === 'admin') return 'approved';
         return 'pending';
     };
@@ -1472,10 +1473,10 @@ const AdminPanel = () => {
                                 <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>CONTACT</label>
                                 <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>{selectedUser.mobile || 'N/A'}</div>
                             </div>
-                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', borderLeft: selectedUser.status === 'approved' ? '3px solid #10b981' : '3px solid #fbbf24' }}>
+                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', borderLeft: getUserStatus(selectedUser) === 'approved' ? '3px solid #10b981' : '3px solid #fbbf24' }}>
                                 <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>ACCOUNT STATUS</label>
-                                <div style={{ fontSize: '1.1rem', color: selectedUser.status === 'approved' ? '#6ee7b7' : '#fcd34d', fontWeight: 600 }}>
-                                    {selectedUser.status.toUpperCase()}
+                                <div style={{ fontSize: '1.1rem', color: getUserStatus(selectedUser) === 'approved' ? '#6ee7b7' : '#fcd34d', fontWeight: 600 }}>
+                                    {getUserStatus(selectedUser).toUpperCase()}
                                 </div>
                             </div>
                             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', borderLeft: (selectedUser.whatsappEnabled !== false) ? '3px solid #10b981' : '3px solid #ef4444' }}>
