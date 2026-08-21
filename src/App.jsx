@@ -49,7 +49,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   }
 
   // Check for pending status
-  if (userProfile.status?.toLowerCase() === 'pending') {
+  if (userProfile.approvalStatus?.toLowerCase() === 'pending') {
     return (
       <div className="glass-panel" style={{ margin: '2rem', padding: '2rem', textAlign: 'center', color: 'white' }}>
         <h1>Account Pending</h1>
