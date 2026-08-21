@@ -49,13 +49,13 @@ const ERROR_ALERT   = { ...ALERT_BASE, background: 'rgba(239,68,68,0.2)',  color
 // ---------------------------------------------------------------------------
 // Helper: send OTP email via Secure Vercel API
 // ---------------------------------------------------------------------------
-async function sendOtpEmailSecure(email, name) {
+async function sendOtpEmailSecure(email, name, actionType = 'signup') {
     try {
         const apiUrl = import.meta.env.VITE_API_URL || '';
         const res = await fetch(`${apiUrl}/api/send-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, name, actionType: 'signup' })
+            body: JSON.stringify({ email, name, actionType })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
