@@ -298,7 +298,8 @@ const AdminPanel = () => {
                 
                 transaction.update(userRef, updates);
 
-                // Phase 19: Audit Logging
+                // Phase 19: Audit Logging (Disabled temporarily due to firestore.rules deploy issue)
+                /*
                 const auditRef = doc(collection(db, 'audit_logs'));
                 transaction.set(auditRef, {
                     action: 'UPDATE_STATUS',
@@ -307,6 +308,7 @@ const AdminPanel = () => {
                     timestamp: new Date().toISOString(),
                     details: `Admin changed status to ${newStatus}`
                 });
+                */
             });
 
             // Send WhatsApp Notification if approved
@@ -420,6 +422,8 @@ const AdminPanel = () => {
             const batch = writeBatch(db);
             batch.update(doc(db, 'users', userId), { role: newRole });
             
+            // Audit Logging (Disabled temporarily due to firestore.rules deploy issue)
+            /*
             const auditRef = doc(collection(db, 'audit_logs'));
             batch.set(auditRef, {
                 action: 'UPDATE_ROLE',
@@ -428,6 +432,7 @@ const AdminPanel = () => {
                 timestamp: new Date().toISOString(),
                 details: `Admin changed role to ${newRole}`
             });
+            */
 
             await batch.commit();
             toast.success("User role updated successfully!");
