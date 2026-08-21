@@ -39,6 +39,7 @@ const AdminPanel = () => {
     
     // Popup state for stat cards
     const [statPopup, setStatPopup] = useState(null);
+    const [processingAction, setProcessingAction] = useState(false);
 
     const getUserStatus = (u) => {
         if (u.status) return normalizeStr(u.status);
@@ -241,6 +242,8 @@ const AdminPanel = () => {
     const handleStatusChange = async (userId, newStatus) => {
         // STRICT PERMISSION CHECK
         if (!checkWritePermission()) return;
+        
+        if (processingAction) return;
 
         // Prevent modifying yourself
         if (userId === auth.currentUser?.uid) {
@@ -249,8 +252,9 @@ const AdminPanel = () => {
         }
 
         const targetUser = users.find(u => u.id === userId);
-        if (!targetUser) return;
+        if (!targetUser || getUserStatus(targetUser) === newStatus) return;
 
+        setProcessingAction(true);
         try {
             let facDocRef = null;
             
@@ -327,6 +331,8 @@ const AdminPanel = () => {
         } catch (error) {
             console.error("Error updating status: ", error);
             toast.error(error.message || "Failed to update status");
+        } finally {
+            setProcessingAction(false);
         }
     };
 
@@ -1352,8 +1358,9 @@ const AdminPanel = () => {
                                                     {getUserStatus(user) === 'pending' && (
                                                         <button
                                                             onClick={() => handleStatusChange(user.id, 'approved')}
+                                                            disabled={processingAction}
                                                             className="action-btn"
-                                                            style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}
+                                                            style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', opacity: processingAction ? 0.5 : 1, cursor: processingAction ? 'not-allowed' : 'pointer' }}
                                                             title="Approve User"
                                                         >
                                                             <CheckCircle size={16} />
