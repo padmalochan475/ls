@@ -261,7 +261,7 @@ const AdminPanel = () => {
                 if (!facSnap.empty) {
                     facDocRef = doc(db, 'faculty', facSnap.docs[0].id);
                 } else {
-                    toast.warn(`User approved, but no Faculty Master record found for EmpID ${targetUser.empId}.`);
+                    toast(`User approved, but no Faculty Master record found for EmpID ${targetUser.empId}.`, { icon: '⚠️' });
                 }
             }
 
