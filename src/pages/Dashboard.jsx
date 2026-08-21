@@ -37,8 +37,8 @@ const StatCard = ({ title, value, icon, trend, gradient }) => (
 const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
     // 1. Robust Check: Match by EmpID
     if (isPersonalView && userProfile?.empId) {
-        if (item.facultyEmpId && String(item.facultyEmpId) === String(userProfile.empId)) return true;
-        if (item.faculty2EmpId && String(item.faculty2EmpId) === String(userProfile.empId)) return true;
+        if (item.facultyEmpId && String(item.facultyEmpId).trim() === String(userProfile.empId).trim()) return true;
+        if (item.faculty2EmpId && String(item.faculty2EmpId).trim() === String(userProfile.empId).trim()) return true;
         
         // If the item HAS an empId assigned to BOTH slots, and neither matched, it's definitely NOT theirs
         if (item.facultyEmpId && (!item.faculty2 || item.faculty2EmpId)) {
@@ -51,12 +51,12 @@ const isMyAssignment = (item, targetName, userProfile, isPersonalView) => {
     const targetNorm = normalizeStr(targetName);
     
     if (normalizeStr(item.faculty) === targetNorm) {
-        if (isPersonalView && item.facultyEmpId && item.facultyEmpId !== userProfile?.empId) return false;
+        if (isPersonalView && item.facultyEmpId && String(item.facultyEmpId).trim() !== String(userProfile?.empId).trim()) return false;
         return true;
     }
     
     if (normalizeStr(item.faculty2) === targetNorm) {
-        if (isPersonalView && item.faculty2EmpId && item.faculty2EmpId !== userProfile?.empId) return false;
+        if (isPersonalView && item.faculty2EmpId && String(item.faculty2EmpId).trim() !== String(userProfile?.empId).trim()) return false;
         return true;
     }
     
@@ -159,7 +159,7 @@ const calculateDerivedSchedules = ({
     // Robust Matching for Absences/Substitutions
     const matchesTarget = (nameVal, empIdVal) => {
         if (isPersonalView && userProfile?.empId && empIdVal) {
-            return empIdVal === userProfile.empId;
+            return String(empIdVal).trim() === String(userProfile.empId).trim();
         }
         if (!nameVal || !selectedFaculty) return false;
         return normalizeStr(nameVal) === normalizeStr(selectedFaculty);

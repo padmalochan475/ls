@@ -7,7 +7,7 @@ import {
     onAuthStateChanged,
     sendPasswordResetEmail
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 import { useDynamicListener } from '../hooks/useDynamicListener';
@@ -64,6 +64,7 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
     const [profileMissing, setProfileMissing] = useState(false);
+    const [authError, setAuthError] = useState(null);
 
     // 3. State: Academic Years List (STRICT SERVER MODE)
     // IMPROVED: Try to hydrate from cache first to avoid content flashing, fall back to prediction.
@@ -97,6 +98,12 @@ export const AuthProvider = ({ children }) => {
 
     const selectedAcademicYearRef = useRef(null);
     const previousSystemYear = useRef(null);
+    // Registration guard: prevents the profile-missing detector from firing
+    // during the window between account creation and Firestore profile write.
+    const isRegisteringRef = useRef(false);
+    // Track whether we currently have a profile, without creating a stale closure
+    // inside the useDynamicListener callback (which only re-runs when currentUser changes).
+    const hasProfileRef = useRef(false);
 
     // Initialize Ref from storage on mount (handling page reloads)
     useEffect(() => {
@@ -109,12 +116,13 @@ export const AuthProvider = ({ children }) => {
     }, [selectedAcademicYear]);
 
     const login = async (identifier, password) => {
-        let email = identifier;
-        if (!identifier.includes('@')) {
+        const cleanIdentifier = String(identifier).trim().toLowerCase();
+        let email = cleanIdentifier;
+        if (!cleanIdentifier.includes('@')) {
             try {
-                const lookupDoc = await getDoc(doc(db, 'emp_lookups', identifier));
+                const lookupDoc = await getDoc(doc(db, 'emp_lookups', String(identifier).trim())); // EmpID keeps casing/numbers but is trimmed
                 if (lookupDoc.exists()) {
-                    email = lookupDoc.data().email;
+                    email = lookupDoc.data().email.toLowerCase();
                 } else {
                     console.warn(`EmpID ${identifier} not found in secure lookup.`);
                     throw new Error("Employee ID not linked. Please ask Admin to link your profile.");
@@ -128,145 +136,9 @@ export const AuthProvider = ({ children }) => {
         return signInWithEmailAndPassword(auth, email, password);
     };
 
-    const signup = async (empId, password, name, recoveryEmail, mobileNumber) => {
-        let finalEmpId = empId; // We will use this to auto-correct typos if matched by email
-
-        // Pre-flight check: ensure EmpID is not already taken
-        try {
-            const lookupDoc = await getDoc(doc(db, 'emp_lookups', finalEmpId));
-            if (lookupDoc.exists()) {
-                throw new Error("This Employee ID is already registered. Please login or contact Admin.");
-            }
-        } catch (err) {
-            if (err.message.includes("registered")) throw err;
-            // Ignore permission/network errors here, let the actual signup fail if necessary
-        }
-
-        let linkedDept = null;
-        let isFaculty = false;
-        let syncedPhotoURL = null;
-        let syncedDesignation = null;
-        let syncedShortCode = null;
-        let syncedMobile = mobileNumber;
-        let syncedName = name; // Default to user-provided name
-        let facDocIdToUpdate = null;
-
-        // PRE-FLIGHT FACULTY SECURITY CHECK: Ensure they are allowed to claim this Faculty ID
-        try {
-            let facultySnap = await getDocs(query(collection(db, 'faculty'), where('empId', '==', empId)));
-            if (facultySnap.empty && recoveryEmail) {
-                facultySnap = await getDocs(query(collection(db, 'faculty'), where('email', '==', recoveryEmail)));
-            }
-            if (!facultySnap.empty) {
-                const facDoc = facultySnap.docs[0];
-                const facData = facDoc.data();
-                
-                // STRICT SECURITY: If Admin has NOT set an email, block the hijack attempt!
-                if (!facData.email) {
-                    throw new Error(`This Faculty profile is locked because no official email is assigned. Please ask Admin to update your email in Master Data before you can register.`);
-                }
-                
-                // STRICT SECURITY: If Admin has set an email, the signup email MUST match!
-                if (facData.email.toLowerCase() !== recoveryEmail.toLowerCase()) {
-                    throw new Error(`This Employee ID is securely linked to a different official email. Please use the correct email or contact Admin.`);
-                }
-                
-                facDocIdToUpdate = facDoc.id;
-                linkedDept = facData.department || facData.dept;
-                isFaculty = true;
-                
-                // MASTER DATA AUTO-CORRECT: If they made a typo in EmpID but email matched, fix it!
-                if (facData.empId) finalEmpId = facData.empId;
-                
-                // MASTER DATA SYNC: Sync attributes directly from Admin's Master Data
-                if (facData.name) syncedName = facData.name; 
-                if (facData.photoURL) syncedPhotoURL = facData.photoURL;
-                if (facData.designation) syncedDesignation = facData.designation;
-                if (facData.shortCode) syncedShortCode = facData.shortCode;
-                if (facData.phone || facData.mobile) syncedMobile = facData.mobile || facData.phone;
-            }
-        } catch (facErr) {
-            if (facErr.message.includes("securely linked")) throw facErr;
-            console.warn("Faculty lookup/link failed during signup:", facErr);
-        }
-
-        // CREATE AUTHENTICATION ACCOUNT (Only happens if security checks passed)
-        const { user } = await createUserWithEmailAndPassword(auth, recoveryEmail, password);
-
-        // POST-CREATION: Link Faculty Document to new UID
-        if (facDocIdToUpdate) {
-            try {
-                await updateDoc(doc(db, 'faculty', facDocIdToUpdate), {
-                    uid: user.uid,
-                    isRegistered: true
-                    // We DO NOT overwrite email or empId in Master Data anymore. Master Data is the Source of Truth!
-                });
-            } catch (err) {
-                console.warn("Failed to link faculty document:", err);
-            }
-        }
-
-        let isFirstUser = false;
-        try {
-            const usersSnapshot = await getDocs(collection(db, 'users'));
-            isFirstUser = usersSnapshot.empty;
-        } catch (e) {
-            console.warn("First-user check failed, defaulting to pending user:", e);
-        }
-
-        const userProfileData = {
-            empId: finalEmpId,
-            name: syncedName,
-            email: recoveryEmail,
-            mobile: syncedMobile,
-            role: isFirstUser ? 'admin' : 'user',
-            status: isFirstUser ? 'approved' : 'pending',
-            dept: linkedDept,
-            isFaculty: isFaculty,
-            whatsappEnabled: true,
-            createdAt: new Date().toISOString()
-        };
-        if (syncedPhotoURL) userProfileData.photoURL = syncedPhotoURL;
-        if (syncedDesignation) userProfileData.designation = syncedDesignation;
-        if (syncedShortCode) userProfileData.shortCode = syncedShortCode;
-
-        // Always create user profile document in Firestore
-        try {
-            await setDoc(doc(db, 'users', user.uid), userProfileData);
-        } catch (err) {
-            console.error("Critical error creating Firestore profile:", err);
-            // Rollback Auth User to prevent zombie accounts
-            try {
-                await user.delete();
-            } catch (rollbackErr) {
-                console.error("Failed to rollback auth user:", rollbackErr);
-            }
-            throw new Error("Failed to create user profile in database. Please try again.");
-        }
-
-        if (finalEmpId) {
-            try {
-                await setDoc(doc(db, 'emp_lookups', finalEmpId), { email: recoveryEmail, uid: user.uid });
-            } catch (lookupErr) {
-                console.warn("Emp lookup write failed:", lookupErr);
-            }
-        }
-
-        // WhatsApp Notification on Signup
-        if (mobileNumber) {
-            try {
-                const welcomeMsg = `🤖 *Welcome to LAMS* 🤖\n\nHi ${name},\nYour account has been successfully created and is pending approval.\n\n_You will receive updates directly on this number._`;
-                sendWhatsAppNotification(mobileNumber, welcomeMsg);
-            } catch (waErr) {
-                console.warn("WhatsApp notification failed:", waErr);
-            }
-        }
-
-        return user;
-    };
-
     const resetPassword = (email) => {
-        return sendPasswordResetEmail(auth, email);
+        const normalizedEmail = String(email).trim().toLowerCase();
+        return sendPasswordResetEmail(auth, normalizedEmail);
     };
 
     const logout = () => {
@@ -408,20 +280,35 @@ export const AuthProvider = ({ children }) => {
     }, [selectedAcademicYear, systemAcademicYear, yearConfigs]);
 
     useEffect(() => {
+        let isResolved = false;
+        
+        // SAFETY: If onAuthStateChanged never fires (Firebase SDK init failure, network),
+        // force loading:false after 10s so the user sees the login page instead of
+        // an infinite black screen. 10s is chosen to be > the profile listener's 8s
+        // serverTimeout, so the profile has a full chance to load before we give up.
+        const safetyTimer = setTimeout(() => {
+            if (!isResolved) {
+                console.warn('[Auth] onAuthStateChanged timed out. Forcing degraded mode.');
+                setIsConfigLoaded(true);
+                setLoading(false);
+            }
+        }, 10000);
+
         const unsubscribe = onAuthStateChanged(auth, (user) => {
+            isResolved = true;
+            clearTimeout(safetyTimer);
             setCurrentUser(user);
 
             if (!user) {
+                // Logged out: clear all user state immediately
+                setUserProfile(null);
+                setProfileMissing(false);
+                hasProfileRef.current = false;
                 setLoading(false);
             }
+            // If user exists: loading stays true until the profile listener resolves it.
+            // Do NOT call setLoading(false) here — that's the profile listener's job.
         });
-
-        // SAFETY: If Auth hangs (Limit Exhausted), force load after 7s to try offline mode
-        const safetyTimer = setTimeout(() => {
-            console.warn("Auth initialization timed out (Likely Firestore Limit). Forcing degraded mode.");
-            setIsConfigLoaded(true);
-            setLoading(false);
-        }, 7000);
 
         return () => {
             unsubscribe();
@@ -429,90 +316,187 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
+    // --- PROFILE LISTENER ---
+    // Uses includeMetadataChanges: true so we receive TWO snapshots when Firestore
+    // loads from its persistent local cache:
+    //
+    //   Snapshot 1 — fromCache: true  → came from IndexedDB / local cache
+    //   Snapshot 2 — fromCache: false → came from the Firestore server
+    //
+    // This is the ONLY architecturally correct way to distinguish between:
+    //   a) "Cache doesn't have this doc yet"  (wait — don't declare missing)
+    //   b) "Server confirmed doc doesn't exist" (act — declare missing or guard)
+    //
+    // All previous timer/flag approaches were working around the symptom of not
+    // making this distinction. This is the fix, not a patch.
     useDynamicListener((isActiveRef) => {
-        let profileSafetyTimer = null;
-
-        if (currentUser) {
-            // Using onSnapshot for Real-Time Role/Profile Updates
-            // This allows Admins to Ban/Promote users instantly.
-            if (!userProfile) {
-                setLoading(true);
-                setProfileMissing(false);
-                profileSafetyTimer = setTimeout(() => {
-                    if (isActiveRef.current) {
-                        setLoading(prev => {
-                            if (prev) console.warn("Profile fetch timed out (Quota limit). Continuing offline.");
-                            return false;
-                        });
-                    }
-                }, 8000);
-            }
-            const docRef = doc(db, 'users', currentUser.uid);
-
-            const unsubscribeProfile = onSnapshot(docRef,
-                (docSnap) => {
-                    if (!isActiveRef.current) return;
-                    if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
-                    if (docSnap.exists()) {
-                        setProfileMissing(false);
-                        const newData = docSnap.data();
-                        setUserProfile(prev => {
-                            if (!prev) return newData;
-                            
-                            // Prevent re-renders from background 'lastSeen' updates (Heartbeat)
-                            const ignoreKeys = ['lastSeen', 'sessions', 'isOnline', 'fcmTokens', 'fcmDeviceTokens', 'webPushActive'];
-                            const keys1 = Object.keys(prev).filter(k => !ignoreKeys.includes(k));
-                            const keys2 = Object.keys(newData).filter(k => !ignoreKeys.includes(k));
-                            
-                            let isMeaningfulChange = keys1.length !== keys2.length;
-                            if (!isMeaningfulChange) {
-                                for (let key of keys1) {
-                                    if (JSON.stringify(prev[key]) !== JSON.stringify(newData[key])) {
-                                        isMeaningfulChange = true;
-                                        break;
-                                    }
-                                }
-                            }
-                                
-                            return isMeaningfulChange ? newData : prev;
-                        });
-                    } else {
-                        const creationTime = currentUser.metadata?.creationTime;
-                        const isNewlyCreated = creationTime && (Date.now() - Date.parse(creationTime) < 15000);
-                        
-                        if (isNewlyCreated) {
-                            console.log("Account just created, waiting for profile generation...");
-                            return; // Do not call setLoading(false) yet, wait for the profile creation setDoc to trigger a re-render
-                        }
-                        
-                        console.warn("User Profile Missing!");
-                        setUserProfile(null);
-                        setProfileMissing(true);
-                    }
-                    setLoading(false);
-                },
-                (err) => {
-                    if (!isActiveRef.current) return;
-                    console.error("Profile Sync Error:", err);
-                    if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
-                    setLoading(false);
-                }
-            );
-
-            return () => {
-                unsubscribeProfile();
-                if (profileSafetyTimer) clearTimeout(profileSafetyTimer);
-            };
-        } else {
+        if (!currentUser) {
             setUserProfile(null);
             setProfileMissing(false);
             return () => {};
         }
+
+        // Do NOT set loading:true here. Loading is managed by onAuthStateChanged (set to true
+        // implicitly when currentUser exists but profile hasn't arrived yet) and cleared
+        // by the profile listener below. Setting it here would cause a flash on tab-refocus.
+        // The only exception: profileMissing may be stale from a previous session.
+        setProfileMissing(false);
+        setAuthError(null);
+
+        // Timeout: if the server hasn't responded in 8s (quota/offline), attempt
+        // a direct getDocFromServer call. This is the last-resort recovery — not
+        // the primary mechanism. If this also fails, we show a graceful degraded
+        // state rather than kicking the user out.
+        let serverTimeout = setTimeout(async () => {
+            if (!isActiveRef.current) return;
+            console.warn('[Auth] Server has not confirmed profile in 8s. Attempting direct server fetch...');
+            try {
+                // getDoc with persistent cache enabled will try cache first, then server.
+                // We explicitly want server data here to break out of any cache stall.
+                const { getDocFromServer } = await import('firebase/firestore');
+                const snap = await getDocFromServer(doc(db, 'users', currentUser.uid));
+                if (!isActiveRef.current) return;
+                if (snap.exists()) {
+                    console.log('[Auth] Direct server fetch succeeded.');
+                    setUserProfile(snap.data());
+                    setProfileMissing(false);
+                } else if (!isRegisteringRef.current) {
+                    setUserProfile(null);
+                    setProfileMissing(true);
+                }
+            } catch (e) {
+                // Firestore is genuinely unreachable (quota exhausted, offline).
+                // Do NOT declare profile missing — the user is still authenticated.
+                // They'll be in a degraded state until connectivity returns.
+                console.error('[Auth] Direct server fetch failed (quota/offline):', e.code);
+            } finally {
+                if (isActiveRef.current) setLoading(false);
+            }
+        }, 8000);
+
+        const docRef = doc(db, 'users', currentUser.uid);
+
+        const unsubscribeProfile = onSnapshot(
+            docRef,
+            { includeMetadataChanges: true }, // ← The key architectural decision
+            (docSnap) => {
+                if (!isActiveRef.current) return;
+
+                if (docSnap.exists()) {
+                    // ✅ Profile found — whether from cache or server, accept it.
+                    // The server snapshot (fromCache: false) will follow if data differs,
+                    // and the change-detection below will update state only if meaningful.
+                    clearTimeout(serverTimeout);
+                    setProfileMissing(false);
+                    setAuthError(null);
+
+                    const newData = docSnap.data();
+
+                    if (newData.status === 'disabled' || newData.status === 'rejected') {
+                        console.warn('[Auth] Account disabled or rejected. Forcing logout.');
+                        signOut(auth).catch(console.error);
+                        setUserProfile(null);
+                        setProfileMissing(true);
+                        setAuthError('ACCOUNT_DISABLED');
+                        return;
+                    }
+
+                    setUserProfile(prev => {
+                        if (!prev) {
+                            hasProfileRef.current = true;
+                            return newData;
+                        }
+
+                        // Suppress re-renders caused by heartbeat-only writes
+                        // (lastSeen, session tokens, FCM tokens, etc.)
+                        const HEARTBEAT_KEYS = new Set([
+                            'lastSeen', 'sessions', 'isOnline',
+                            'fcmTokens', 'fcmDeviceTokens', 'webPushActive'
+                        ]);
+                        const isMeaningful = Object.keys({ ...prev, ...newData }).some(k => {
+                            if (HEARTBEAT_KEYS.has(k)) return false;
+                            return JSON.stringify(prev[k]) !== JSON.stringify(newData[k]);
+                        });
+                        if (isMeaningful) hasProfileRef.current = true;
+                        return isMeaningful ? newData : prev;
+                    });
+
+                    setLoading(false);
+
+                } else if (docSnap.metadata.fromCache) {
+                    // ⏳ Cache miss — the local cache has no record of this document.
+                    // This is completely normal and expected for:
+                    //   • New registrations (doc hasn't been written yet)
+                    //   • First login on a new browser/device (cold cache)
+                    //   • Tab reopen after cache was cleared
+                    //
+                    // IMPORTANT: Do NOT declare profile missing here.
+                    // Keep loading: true and wait for the server snapshot to arrive.
+                    // The serverTimeout above handles the case where server never responds.
+                    console.log('[Auth] Cache miss for profile — waiting for server confirmation...');
+
+                } else {
+                    // ❌ fromCache: false → the Firestore SERVER confirmed the document
+                    // does not exist. This is authoritative.
+                    clearTimeout(serverTimeout);
+
+                    // Guard: active registration. The signup function sets isRegisteringRef
+                    // before calling createUserWithEmailAndPassword and clears it after setDoc.
+                    // If it's set, the setDoc write is still in flight — do not declare missing.
+                    if (isRegisteringRef.current) {
+                        console.log('[Auth] Server confirmed no doc, but registration write is in flight. Holding...');
+                        return; // Spinner stays up — setDoc snapshot will resolve this
+                    }
+
+                    // Guard: extremely fresh account. Belt-and-suspenders check.
+                    // If creationTime is within 30s, give the write a final chance.
+                    const creationTime = currentUser.metadata?.creationTime;
+                    if (creationTime) {
+                        const age = Date.now() - Date.parse(creationTime);
+                        if (age < 30000 && age > -10000) {
+                            console.log('[Auth] Account is < 30s old. Holding for write to complete...');
+                            return;
+                        }
+                    }
+
+                    // All guards passed. The profile genuinely does not exist on the server.
+                    console.warn('[Auth] Server-confirmed profile missing. uid:', currentUser.uid);
+                    setUserProfile(null);
+                    setProfileMissing(true);
+                    setLoading(false);
+                }
+            },
+            (err) => {
+                if (!isActiveRef.current) return;
+                console.error('[Auth] Profile listener error:', err.code);
+
+                if (err.code === 'permission-denied') {
+                    // Security rules rejected the read. This won't self-heal.
+                    clearTimeout(serverTimeout);
+                    setAuthError('PERMISSION_DENIED');
+                    setLoading(false);
+                } else {
+                    setAuthError('NETWORK_ERROR');
+                }
+                // quota-resource-exhausted, unavailable, network errors:
+                // Let the serverTimeout handle the recovery attempt above.
+            }
+        );
+
+        return () => {
+            clearTimeout(serverTimeout);
+            unsubscribeProfile();
+        };
     }, [currentUser], {
         enabled: true,
         suspendOnHidden: true,
         suspendDelayMs: 30000
     });
+
+    // Keep hasProfileRef in sync when profile is cleared (logout)
+    useEffect(() => {
+        hasProfileRef.current = !!userProfile;
+    }, [userProfile]);
 
     const value = useMemo(() => ({
         currentUser,
@@ -523,13 +507,13 @@ export const AuthProvider = ({ children }) => {
         maxFacultyLoad, // Expose the dynamic limit
         setSelectedAcademicYear: handleSetSelectedYear, // Allow changing view with persistence
         login,
-        signup,
         resetPassword,
         logout,
         loading: loading || (currentUser && !isConfigLoaded),
         isSystemSyncing,
         allowUserYearChange,
-        profileMissing
+        profileMissing,
+        authError
     }), [
         currentUser,
         userProfile,
@@ -540,7 +524,9 @@ export const AuthProvider = ({ children }) => {
         loading,
         isConfigLoaded,
         isSystemSyncing,
-        allowUserYearChange
+        allowUserYearChange,
+        profileMissing,
+        authError
     ]);
 
     return (

@@ -384,8 +384,10 @@ const Assignments = () => {
                 subject: selectedSubject ? selectedSubject.trim() : '',
                 faculty: facultyObj ? facultyObj.name : '',
                 facultyEmpId: facultyObj?.empId || null,
+                facultyUid: facultyObj?.uid || null,
                 faculty2: faculty2Obj ? faculty2Obj.name : null,
                 faculty2EmpId: faculty2Obj?.empId || null,
+                faculty2Uid: faculty2Obj?.uid || null,
                 room: selectedRoom ? selectedRoom.trim() : '',
                 group: selectedSubGroup,
                 section: selectedMainGroup,
@@ -562,6 +564,9 @@ const Assignments = () => {
         if (f1.includes(search) || f2.includes(search)) return true;
 
         const facObj = faculty.find(f => normalizeStr(f.name) === search);
+        if (facObj?.uid) {
+            if (s.facultyUid && String(s.facultyUid) === String(facObj.uid) || s.faculty2Uid && String(s.faculty2Uid) === String(facObj.uid)) return true;
+        }
         if (facObj?.empId) {
             if (s.facultyEmpId && String(s.facultyEmpId) === String(facObj.empId) || s.faculty2EmpId && String(s.faculty2EmpId) === String(facObj.empId)) return true;
         }

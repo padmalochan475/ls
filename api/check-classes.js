@@ -836,50 +836,48 @@ export default async function handler(req, res) {
                 const targetPayload = finalUsers.map(u => u.uid).filter(Boolean);
                 const hasMobileTargets = finalUsers.some(u => u.mobile && u.whatsappEnabled !== false);
                 if (targetPayload.length === 0 && !hasMobileTargets) continue;
-
                 // 1st Warning Window: 6 mins left to 25 mins left (Very wide window to guarantee it fires)
                 if (minutesLeft > warn2Min && minutesLeft <= (warn1Min + 10)) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_first`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
-                        const cofacInline = cls.faculty2 ? ` (w/ ${cls.faculty2})` : '';
-                        const cofacStr = cls.faculty2 ? `\n🔹 *Cofaculty:* ${cls.faculty2}` : '';
-                        const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft, cofacInline, cofacStr };
-                        const pushTitle = formatMsg('warn1_push_title', defaultTemplates.warn1_push_title, vars);
-                        const pushBody = formatMsg('warn1_push_body', defaultTemplates.warn1_push_body, vars);
-
-                        await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
-                        
                         for (const u of finalUsers) {
-                            if (u.mobile && u.whatsappEnabled !== false) {
-                                let otherFac = cls.faculty2;
-                                if (cls.faculty && cls.faculty2) {
-                                    let isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
-                                                        (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
-                                    // If this user is a substitute, determine who they are replacing
-                                    if (subData && (String(u.empId) === String(subData.substituteEmpId) || String(u.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase())) {
-                                        isSecondary = (subData.originalFacultyEmpId && cls.faculty2EmpId && String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId)) || 
-                                                      (subData.originalFacultyName && cls.faculty2 && String(subData.originalFacultyName).trim().toLowerCase() === String(cls.faculty2).trim().toLowerCase());
-                                    }
-                                    if (isSecondary) otherFac = cls.faculty;
-                                }
+                            // Calculate correct co-faculty for this specific user
+                            let otherFac = cls.faculty2;
+                            if (cls.faculty && cls.faculty2) {
+                                let isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
+                                                  (u.name && String(u.name).trim().toLowerCase() === String(cls.faculty2).trim().toLowerCase());
                                 
-                                if (subData) {
-                                    const origName = (subData.originalFacultyName || (String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId) ? cls.faculty2 : cls.faculty) || '').trim().toLowerCase();
-                                    if (otherFac && origName && String(otherFac).trim().toLowerCase() === origName) {
-                                        otherFac = subData.substituteName;
-                                    }
+                                if (subData && (String(u.empId) === String(subData.substituteEmpId) || String(u.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase())) {
+                                    isSecondary = (subData.originalFacultyEmpId && cls.faculty2EmpId && String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId)) || 
+                                                  (subData.originalFacultyName && cls.faculty2 && String(subData.originalFacultyName).trim().toLowerCase() === String(cls.faculty2).trim().toLowerCase());
                                 }
+                                if (isSecondary) otherFac = cls.faculty;
+                            }
+                            
+                            if (subData) {
+                                const origName = (subData.originalFacultyName || (String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId) ? cls.faculty2 : cls.faculty) || '').trim().toLowerCase();
+                                if (otherFac && origName && String(otherFac).trim().toLowerCase() === origName) {
+                                    otherFac = subData.substituteName;
+                                }
+                            }
 
-                                // Ensure it doesn't print self name
-                                if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
-                                    otherFac = '';
-                                }
-                                const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
-                                const uCofacStr = otherFac ? `\n🤝 *Co-Faculty:* ${otherFac}` : '';
-                                const uVars = { ...vars, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
+                            // Ensure it doesn't print self name
+                            if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
+                                otherFac = '';
+                            }
+                            const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
+                            const uCofacStr = otherFac ? `\n🤝 *Co-Faculty:* ${otherFac}` : '';
+                            const uVars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
+
+                            // SEND TAILORED PUSH NOTIFICATION
+                            const pushTitle = formatMsg('warn1_push_title', defaultTemplates.warn1_push_title, uVars);
+                            const pushBody = formatMsg('warn1_push_body', defaultTemplates.warn1_push_body, uVars);
+                            await sendFCM([String(u.empId)], pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
+                            
+                            // SEND TAILORED WHATSAPP
+                            if (u.mobile && u.whatsappEnabled !== false) {
                                 const waMsg = formatMsg('warn1_wa', defaultTemplates.warn1_wa, uVars);
-                                
                                 await sendWhatsApp(u.mobile, waMsg);
                                 await new Promise(r => setTimeout(r, 300));
                             }
@@ -895,44 +893,43 @@ export default async function handler(req, res) {
                     const notifId = `notif_${cls.id}_${notifDateKey}_warn_second`;
                     const alreadySent = (await db.collection('sent_notifications').doc(notifId).get()).exists;
                     if (!alreadySent) {
-                        const cofacInline = cls.faculty2 ? ` (w/ ${cls.faculty2})` : '';
-                        const cofacStr = cls.faculty2 ? `\n🔹 *Cofaculty:* ${cls.faculty2}` : '';
-                        const vars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft, cofacInline, cofacStr };
-                        const pushTitle = formatMsg('warn2_push_title', defaultTemplates.warn2_push_title, vars);
-                        const pushBody = formatMsg('warn2_push_body', defaultTemplates.warn2_push_body, vars);
-
-                        await sendFCM(targetPayload, pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
-                        
                         for (const u of finalUsers) {
-                            if (u.mobile && u.whatsappEnabled !== false) {
-                                let otherFac = cls.faculty2;
-                                if (cls.faculty && cls.faculty2) {
-                                    let isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
-                                                        (cls.faculty2 && u.name && cls.faculty2.trim().toLowerCase() === (u.name || "").trim().toLowerCase());
-                                    // If this user is a substitute, determine who they are replacing
-                                    if (subData && (String(u.empId) === String(subData.substituteEmpId) || String(u.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase())) {
-                                        isSecondary = (subData.originalFacultyEmpId && cls.faculty2EmpId && String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId)) || 
-                                                      (subData.originalFacultyName && cls.faculty2 && String(subData.originalFacultyName).trim().toLowerCase() === String(cls.faculty2).trim().toLowerCase());
-                                    }
-                                    if (isSecondary) otherFac = cls.faculty;
-                                }
+                            // Calculate correct co-faculty for this specific user
+                            let otherFac = cls.faculty2;
+                            if (cls.faculty && cls.faculty2) {
+                                let isSecondary = (u.empId && cls.faculty2EmpId && String(u.empId) === String(cls.faculty2EmpId)) || 
+                                                  (u.name && String(u.name).trim().toLowerCase() === String(cls.faculty2).trim().toLowerCase());
                                 
-                                if (subData) {
-                                    const origName = (subData.originalFacultyName || (String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId) ? cls.faculty2 : cls.faculty) || '').trim().toLowerCase();
-                                    if (otherFac && origName && String(otherFac).trim().toLowerCase() === origName) {
-                                        otherFac = subData.substituteName;
-                                    }
+                                if (subData && (String(u.empId) === String(subData.substituteEmpId) || String(u.name).trim().toLowerCase() === String(subData.substituteName).trim().toLowerCase())) {
+                                    isSecondary = (subData.originalFacultyEmpId && cls.faculty2EmpId && String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId)) || 
+                                                  (subData.originalFacultyName && cls.faculty2 && String(subData.originalFacultyName).trim().toLowerCase() === String(cls.faculty2).trim().toLowerCase());
                                 }
+                                if (isSecondary) otherFac = cls.faculty;
+                            }
+                            
+                            if (subData) {
+                                const origName = (subData.originalFacultyName || (String(subData.originalFacultyEmpId) === String(cls.faculty2EmpId) ? cls.faculty2 : cls.faculty) || '').trim().toLowerCase();
+                                if (otherFac && origName && String(otherFac).trim().toLowerCase() === origName) {
+                                    otherFac = subData.substituteName;
+                                }
+                            }
 
-                                // Ensure it doesn't print self name
-                                if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
-                                    otherFac = '';
-                                }
-                                const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
-                                const uCofacStr = otherFac ? `\n🤝 *Co-Faculty:* ${otherFac}` : '';
-                                const uVars = { ...vars, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
+                            // Ensure it doesn't print self name
+                            if (otherFac && u.name && String(otherFac).trim().toLowerCase() === String(u.name).trim().toLowerCase()) {
+                                otherFac = '';
+                            }
+                            const uCofacInline = otherFac ? ` (w/ ${otherFac})` : '';
+                            const uCofacStr = otherFac ? `\n🤝 *Co-Faculty:* ${otherFac}` : '';
+                            const uVars = { subject: cls.subject, group: groupStr, room: cls.room, mins: minutesLeft < 0 ? 0 : minutesLeft, name: u.name || 'Faculty', cofacInline: uCofacInline, cofacStr: uCofacStr };
+
+                            // SEND TAILORED PUSH NOTIFICATION
+                            const pushTitle = formatMsg('warn2_push_title', defaultTemplates.warn2_push_title, uVars);
+                            const pushBody = formatMsg('warn2_push_body', defaultTemplates.warn2_push_body, uVars);
+                            await sendFCM([String(u.empId)], pushTitle, pushBody, { type: 'class_reminder', id: cls.id }, 'external_id');
+                            
+                            // SEND TAILORED WHATSAPP
+                            if (u.mobile && u.whatsappEnabled !== false) {
                                 const waMsg = formatMsg('warn2_wa', defaultTemplates.warn2_wa, uVars);
-                                
                                 await sendWhatsApp(u.mobile, waMsg);
                                 await new Promise(r => setTimeout(r, 300));
                             }

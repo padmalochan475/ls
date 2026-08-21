@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db, auth } from '../lib/firebase';
-import { collection, doc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { collection, doc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where, getDocs, writeBatch, runTransaction } from 'firebase/firestore';
 // EmailAuthProvider removed (unused)
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
-import { Users, UserPlus, ShieldAlert, Activity, Search, Trash2, CheckCircle, Shield, GraduationCap, Settings, MessageSquare, User, BookOpen } from 'lucide-react';
+import { Users, UserPlus, ShieldAlert, Activity, Search, Trash2, CheckCircle, Shield, GraduationCap, Settings, MessageSquare, User, BookOpen, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
-import emailjs from '@emailjs/browser';
 import { ResponsiveContainer, AreaChart, Tooltip, Area, PieChart, Pie, Cell, Legend, BarChart, Bar, XAxis, CartesianGrid, YAxis, LineChart, Line } from 'recharts';
 import '../styles/design-system.css';
 import { normalizeStr } from '../utils/timeUtils';
@@ -17,6 +17,7 @@ import CelebrationManager from '../components/admin/CelebrationManager';
 import SubstitutionManager from '../components/SubstitutionManager';
 import AdminOtpModal from '../components/admin/AdminOtpModal';
 import SyllabusManager from '../components/admin/SyllabusManager';
+import SystemHealth from '../components/admin/SystemHealth';
 import { sendWhatsAppNotification } from '../utils/whatsappUtils';
 import { sendNotification } from '../utils/notificationUtils';
 import { useDynamicListener } from '../hooks/useDynamicListener';
@@ -246,28 +247,83 @@ const AdminPanel = () => {
             return;
         }
 
+        const targetUser = users.find(u => u.id === userId);
+        if (!targetUser) return;
+
         try {
-            await updateDoc(doc(db, 'users', userId), { status: newStatus });
+            let facDocRef = null;
             
+            // Query for Faculty Master Data outside transaction
+            if (newStatus === 'approved' && targetUser.empId) {
+                const facQuery = query(collection(db, 'faculty'), where('empId', '==', String(targetUser.empId).trim()));
+                const facSnap = await getDocs(facQuery);
+                if (!facSnap.empty) {
+                    facDocRef = doc(db, 'faculty', facSnap.docs[0].id);
+                } else {
+                    toast.warn(`User approved, but no Faculty Master record found for EmpID ${targetUser.empId}.`);
+                }
+            }
+
+            await runTransaction(db, async (transaction) => {
+                const userRef = doc(db, 'users', userId);
+                
+                // Phase 3: Separate fields for robust architecture, while keeping 'status' for legacy compatibility
+                const updates = { 
+                    status: newStatus,
+                    approvalStatus: newStatus === 'approved' ? 'approved' : 'pending',
+                    accountStatus: newStatus === 'suspended' ? 'suspended' : 'active'
+                };
+                
+                // 1. Transactional Reads
+                if (facDocRef) {
+                    const facDocSnap = await transaction.get(facDocRef);
+                    if (facDocSnap.exists()) {
+                        const currentFacData = facDocSnap.data();
+                        
+                        // Strict transactional security check
+                        if (currentFacData.uid && currentFacData.uid !== userId) {
+                            throw new Error(`Master Data Conflict: EmpID ${targetUser.empId} is already linked to another user!`);
+                        }
+                        
+                        // 2. Transactional Writes
+                        transaction.update(facDocRef, {
+                            uid: userId,
+                            isRegistered: true,
+                            handshakeAt: new Date().toISOString()
+                        });
+                        updates.masterDataLinked = true;
+                    }
+                }
+                
+                transaction.update(userRef, updates);
+
+                // Phase 19: Audit Logging
+                const auditRef = doc(collection(db, 'audit_logs'));
+                transaction.set(auditRef, {
+                    action: 'UPDATE_STATUS',
+                    targetUid: userId,
+                    adminUid: auth.currentUser.uid,
+                    timestamp: new Date().toISOString(),
+                    details: `Admin changed status to ${newStatus}`
+                });
+            });
+
             // Send WhatsApp Notification if approved
             if (newStatus === 'approved') {
-                const targetUser = users.find(u => u.id === userId);
-                if (targetUser) {
-                    await sendNotification({
-                        userIds: [userId],
-                        title: 'Account Approved',
-                        body: `Your LAMS account has been verified and approved by the Administrator.`,
-                        type: 'account_approved',
-                        data: { name: targetUser.name }
-                    });
-                }
-                toast.success("Account approved.");
+                await sendNotification({
+                    userIds: [userId],
+                    title: 'Account Approved',
+                    body: `Your LAMS account has been verified and approved by the Administrator.`,
+                    type: 'account_approved',
+                    data: { name: targetUser.name }
+                });
+                toast.success("Account approved and Handshake complete.");
             } else {
                 toast.success(`Account status updated to ${newStatus}.`);
             }
         } catch (error) {
             console.error("Error updating status: ", error);
-            toast.error("Failed to update status.");
+            toast.error(error.message || "Failed to update status");
         }
     };
 
@@ -275,32 +331,20 @@ const AdminPanel = () => {
     const [otpModal, setOtpModal] = useState({ isOpen: false, otp: '', userId: '', newRole: '' });
     const [isVerifying, setIsVerifying] = useState(false);
 
-    // EmailJS Configuration
-    const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-    const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-    const EMAILJS_ADMIN_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_ADMIN_TEMPLATE_ID || EMAILJS_TEMPLATE_ID; // Fallback to default if not set
-    const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-
-    const sendEmailOtp = async (email, name, otpCode, templateId = EMAILJS_TEMPLATE_ID) => {
-        if (!EMAILJS_SERVICE_ID || !EMAILJS_PUBLIC_KEY || !templateId) {
-            console.error("EmailJS Configuration Missing");
-            return { success: false, error: { text: "Missing API Keys in .env" } };
-        }
-
-        const templateParams = {
-            to_name: name,
-            passcode: otpCode,
-            time: new Date().toLocaleString(),
-            to_email: email,
-            email: email,
-            message: "Action Required: Granting Administrator Privileges. Please verify your identity."
-        };
+    const sendEmailOtpSecure = async (email, name) => {
         try {
-            await emailjs.send(EMAILJS_SERVICE_ID, templateId, templateParams, EMAILJS_PUBLIC_KEY);
+            const apiUrl = import.meta.env.VITE_API_URL || '';
+            const res = await fetch(`${apiUrl}/api/send-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, name, actionType: 'admin_auth' })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
             return { success: true };
-        } catch (error) {
-            console.error("EmailJS Error:", error);
-            return { success: false, error };
+        } catch (err) {
+            console.error("Secure OTP Error:", err);
+            return { success: false, error: err };
         }
     };
 
@@ -324,42 +368,67 @@ const AdminPanel = () => {
                 return;
             }
 
-            const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString(); // eslint-disable-line sonarjs/pseudo-random
             const toastId = toast.loading("Sending Verification Code...");
 
-            // Use the specific ADMIN TEMPLATE ID here
-            const result = await sendEmailOtp(adminEmail, adminName, generatedOtp, EMAILJS_ADMIN_TEMPLATE_ID);
+            // Use Secure Backend OTP API
+            const result = await sendEmailOtpSecure(adminEmail, adminName);
             toast.dismiss(toastId);
 
             if (!result.success) {
-                toast.error(`Failed to send Verification Email: ${result.error?.text || "Unknown Error"}`);
+                toast.error(`Failed to send Verification Email: ${result.error?.message || "Unknown Error"}`);
                 return;
             }
 
             toast.success(`Verification Code sent!`);
-            setOtpModal({ isOpen: true, otp: generatedOtp, userId, newRole });
+            setOtpModal({ isOpen: true, otp: '', userId, newRole, adminEmail });
         } else {
             // Normal role downgrade/change doesn't need OTP (optional choice, easier UX)
             updateUserRole(userId, newRole);
         }
     };
 
-    const handleVerifyOtp = (inputCode) => {
-        if (inputCode === otpModal.otp) {
-            setIsVerifying(true);
-            setTimeout(() => {
-                updateUserRole(otpModal.userId, otpModal.newRole);
+    const handleVerifyOtp = async (inputCode) => {
+        setIsVerifying(true);
+        try {
+            const apiUrl = import.meta.env.VITE_API_URL || '';
+            const res = await fetch(`${apiUrl}/api/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: otpModal.adminEmail, otp: inputCode, actionType: 'admin_auth' })
+            });
+            const data = await res.json();
+            
+            if (!res.ok) {
+                toast.error(data.error || "Invalid Code. Please try again.");
                 setIsVerifying(false);
-                setOtpModal({ isOpen: false, otp: '', userId: '', newRole: '' });
-            }, 1000); // Fake delay for UX "Verifying..."
-        } else {
-            toast.error("Invalid Code. Please try again.");
+                return;
+            }
+            
+            updateUserRole(otpModal.userId, otpModal.newRole);
+            setOtpModal({ isOpen: false, otp: '', userId: '', newRole: '', adminEmail: '' });
+        } catch (err) {
+            console.error("OTP Verification Error:", err);
+            toast.error("Network error during verification.");
+        } finally {
+            setIsVerifying(false);
         }
     };
 
     const updateUserRole = async (userId, newRole) => {
         try {
-            await updateDoc(doc(db, 'users', userId), { role: newRole });
+            const batch = writeBatch(db);
+            batch.update(doc(db, 'users', userId), { role: newRole });
+            
+            const auditRef = doc(collection(db, 'audit_logs'));
+            batch.set(auditRef, {
+                action: 'UPDATE_ROLE',
+                targetUid: userId,
+                adminUid: auth.currentUser.uid,
+                timestamp: new Date().toISOString(),
+                details: `Admin changed role to ${newRole}`
+            });
+
+            await batch.commit();
             toast.success("User role updated successfully!");
         } catch (error) {
             console.error("Error updating role: ", error);
@@ -388,40 +457,7 @@ const AdminPanel = () => {
         setConfirmModal({ isOpen: false, id: null });
 
         try {
-            // 1. Get User Data first to find links
-            const userDoc = await getDoc(doc(db, 'users', userId));
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-
-                // 2. Remove Secure Lookup
-                if (userData.empId) {
-                    await deleteDoc(doc(db, 'emp_lookups', userData.empId));
-                }
-
-                // 3. Unlink Faculty Record
-                // If this user was a faculty member, we must free up the faculty entry
-                if (userData.empId) {
-                    const q = query(collection(db, 'faculty'), where('uid', '==', userId));
-                    const facSnap = await getDocs(q);
-                    if (!facSnap.empty) {
-                        const batch = writeBatch(db);
-                        facSnap.forEach((d) => {
-                            batch.update(d.ref, {
-                                uid: null,
-                                isRegistered: false,
-                                // We keep the email in master data as it might be their official contact
-                                // but we strip the linkage
-                            });
-                        });
-                        await batch.commit();
-                    }
-                }
-            }
-
-            // 4. Delete User from Firestore
-            await deleteDoc(doc(db, 'users', userId));
-            
-            // 5. Securely Delete User from Firebase Auth via Vercel Backend
+            // Securely Delete User from Firebase Auth and Firestore via Vercel Backend
             try {
                 const idToken = await auth.currentUser?.getIdToken();
                 const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -449,6 +485,43 @@ const AdminPanel = () => {
         } catch (error) {
             console.error("Error deleting user: ", error);
             alert("Failed to delete user.");
+        }
+    };
+
+    // --- ADMIN PASSWORD RESET ---
+    // Sends a Firebase password reset email on behalf of a user.
+    // This is the correct way to handle "password not arriving" — the admin
+    // can trigger it directly from their session, which also confirms the
+    // exact email address stored in Firestore for that account.
+    const handleAdminPasswordReset = async (user) => {
+        if (!checkWritePermission()) return;
+
+        const email = user.email;
+        if (!email) {
+            toast.error(`No email address found for ${user.name}. Cannot send reset link.`);
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Send a password reset link to:\n\n${email}\n\nThis is the email stored in Firestore for "${user.name}". Proceed?`
+        );
+        if (!confirmed) return;
+
+        const toastId = toast.loading(`Sending reset link to ${email}...`);
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toast.dismiss(toastId);
+            toast.success(`✅ Reset link sent to ${email}. Tell the user to check their inbox AND spam folder.`);
+        } catch (err) {
+            toast.dismiss(toastId);
+            console.error('[Admin] sendPasswordResetEmail failed:', err);
+            if (err.code === 'auth/user-not-found') {
+                toast.error(`No Firebase Auth account found for ${email}. The Firestore profile may be orphaned.`);
+            } else if (err.code === 'auth/too-many-requests') {
+                toast.error('Too many reset requests for this email. Wait a few minutes.');
+            } else {
+                toast.error(`Failed: ${err.message}`);
+            }
         }
     };
 
@@ -824,6 +897,13 @@ const AdminPanel = () => {
                     >
                         <Settings size={18} /> Settings
                     </button>
+                    <button
+                        onClick={() => setActiveTab('health')}
+                        className={activeTab === 'health' ? 'active' : ''}
+                        style={{ background: 'transparent', color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                        <Activity size={18} /> System Health
+                    </button>
                 </div>
             </div>
 
@@ -859,6 +939,14 @@ const AdminPanel = () => {
                         </div>
                         <div className="glass-panel" style={{ padding: '1.5rem' }}>
                             <SyllabusManager />
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'health' && (
+                    <div className="admin-section-divider">
+                        <div className="glass-panel" style={{ padding: '2rem' }}>
+                            <SystemHealth />
                         </div>
                     </div>
                 )}
@@ -1281,14 +1369,22 @@ const AdminPanel = () => {
                                                     >
                                                         <Settings size={16} />
                                                     </button>
-                                                    <button
-                                                        onClick={() => setSelectedUser(user)}
-                                                        className="action-btn"
-                                                        style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}
-                                                        title="View Details"
-                                                    >
-                                                        <Search size={16} />
-                                                    </button>
+                                                        <button
+                                                            onClick={() => handleAdminPasswordReset(user)}
+                                                            className="action-btn"
+                                                            style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}
+                                                            title={`Send Password Reset to ${user.email}`}
+                                                        >
+                                                            <KeyRound size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setSelectedUser(user)}
+                                                            className="action-btn"
+                                                            style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}
+                                                            title="View Details"
+                                                        >
+                                                            <Search size={16} />
+                                                        </button>
                                                 </div>
                                             </td>
                                         </tr>

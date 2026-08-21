@@ -58,15 +58,16 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuth();
       
-      // Security Fix: Block users from creating an 'admin' role directly. 
-      allow create: if isAuth() && request.auth.uid == userId && 
-                    (!('role' in request.resource.data) || request.resource.data.role == 'user' || request.resource.data.role == 'pending');
+      // SECURED: User creation is strictly handled by the Backend Admin SDK.
+      allow create: if false;
       
       // Allow admin to update anything. 
-      // Allow users to update their own profile, BUT block changes to 'role' and 'status'.
+      // Allow users to update their own profile, BUT block changes to sensitive fields.
       allow update: if isAdmin() || (
           isAuth() && request.auth.uid == userId 
-          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'role', 'accountStatus', 'approvalStatus', 'masterDataLinked', 'empId', 'isAdmin', 'permissions'
+          ]))
       );
       
       // Only admins can delete users.
@@ -83,12 +84,29 @@ service cloud.firestore {
       }
     }
 
+    // Secure OTPs and Audit Logs (Backend only)
+    match /otps/{id} {
+      allow read, write: if false;
+    }
+    match /audit_logs/{id} {
+      allow read, write: if false;
+    }
+
     // 5. Secure Login Lookup
     match /emp_lookups/{empId} {
       allow get: if true;
       allow list: if false;
-      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
+      // Registration is handled strictly by the backend Admin SDK.
+      allow create: if false;
+      // Allow update if:
+      //   a) Admin updating anything
+      //   b) The user who owns this lookup (uid matches)
+      //   c) An authenticated user claiming a pre-created (uid=null) lookup by linking their own uid
+      allow update: if isAdmin() 
+                    || (isAuth() && resource.data.uid == request.auth.uid)
+                    || (isAuth() && (resource.data.uid == null || !("uid" in resource.data)) 
+                        && request.resource.data.uid == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
     // 6. Config/Settings

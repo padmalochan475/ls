@@ -271,9 +271,12 @@ const Scheduler = () => {
                     // 1. Match by inclusion (best for names with trailing spaces)
                     if (f1.includes(search) || f2.includes(search)) return true;
 
-                    // 2. Match by EmpID
+                    // 2. Match by EmpID or UID
                     // eslint-disable-next-line sonarjs/no-nested-functions
                     const facObj = faculty.find(f => f.name === facName);
+                    if (facObj?.uid) {
+                        if (item.facultyUid && String(item.facultyUid) === String(facObj.uid) || item.faculty2Uid && String(item.faculty2Uid) === String(facObj.uid)) return true;
+                    }
                     if (facObj?.empId) {
                         if (item.facultyEmpId && String(item.facultyEmpId) === String(facObj.empId) || item.faculty2EmpId && String(item.faculty2EmpId) === String(facObj.empId)) return true;
                     }
@@ -428,7 +431,9 @@ const Scheduler = () => {
             faculty: clean(dataToSave.faculty),
             faculty2: clean(dataToSave.faculty2),
             facultyEmpId: (faculty1Obj && faculty1Obj.empId) || null,
+            facultyUid: (faculty1Obj && faculty1Obj.uid) || null,
             faculty2EmpId: (faculty2Obj && faculty2Obj.empId) || null,
+            faculty2Uid: (faculty2Obj && faculty2Obj.uid) || null,
             academicYear: activeAcademicYear
         };
 
@@ -692,8 +697,13 @@ const Scheduler = () => {
             else sourceUpdate.faculty2 = targetFacultyName;
 
             const targetFacObj = faculty.find(f => f.name === targetFacultyName);
-            if (sourceIsFac1) sourceUpdate.facultyEmpId = targetFacObj?.empId || null;
-            else sourceUpdate.faculty2EmpId = targetFacObj?.empId || null;
+            if (sourceIsFac1) {
+                sourceUpdate.facultyEmpId = targetFacObj?.empId || null;
+                sourceUpdate.facultyUid = targetFacObj?.uid || null;
+            } else {
+                sourceUpdate.faculty2EmpId = targetFacObj?.empId || null;
+                sourceUpdate.faculty2Uid = targetFacObj?.uid || null;
+            }
 
             sourceUpdate.updatedAt = timestamp;
             sourceUpdate.updatedBy = userId;
@@ -706,8 +716,13 @@ const Scheduler = () => {
             else targetUpdate.faculty2 = sourceFacName;
 
             const sourceFacObj = faculty.find(f => f.name === sourceFacName);
-            if (targetIsFac1) targetUpdate.facultyEmpId = sourceFacObj?.empId || null;
-            else targetUpdate.faculty2EmpId = sourceFacObj?.empId || null;
+            if (targetIsFac1) {
+                targetUpdate.facultyEmpId = sourceFacObj?.empId || null;
+                targetUpdate.facultyUid = sourceFacObj?.uid || null;
+            } else {
+                targetUpdate.faculty2EmpId = sourceFacObj?.empId || null;
+                targetUpdate.faculty2Uid = sourceFacObj?.uid || null;
+            }
 
             targetUpdate.updatedAt = timestamp;
             targetUpdate.updatedBy = userId;

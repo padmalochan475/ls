@@ -699,8 +699,11 @@ const MasterData = ({ initialTab }) => {
     const handleTimeSlotCascade = async (oldData, newData, db, addToBatch, formatTimeForSchedule) => {
         // Helper to generate format variants (e.g. "9:00 AM" and "09:00 AM")
         const getFormatVariants = (tStr) => {
+            if (!tStr) return [];
             const t = formatTimeForSchedule(tStr); // "9:00 AM"
+            if (!t) return [];
             const parts = t.split(' '); // ["9:00", "AM"]
+            if (parts.length < 2) return [t];
             const [h, m] = parts[0].split(':');
 
             const variant1 = `${parseInt(h)}:${m} ${parts[1]}`; // "9:00 AM"
@@ -743,9 +746,9 @@ const MasterData = ({ initialTab }) => {
         // AUTOMATIC SECURITY SYNC: Handle emp_lookups updates immediately
 
         // 1. Update/Create New Lookup (Priority)
-        if (newData.uid && newData.email && newData.empId) {
+        if (newData.email && newData.empId) {
             await addToBatch(doc(db, 'emp_lookups', newData.empId), {
-                uid: newData.uid,
+                uid: newData.uid || null,
                 email: newData.email,
                 syncedAt: new Date().toISOString(),
                 source: 'auto-sync'
@@ -758,25 +761,30 @@ const MasterData = ({ initialTab }) => {
             if (oldData.empId !== newData.empId) {
                 await addToBatch(doc(db, 'emp_lookups', oldData.empId), null, 'delete');
             }
-            // Case B: User Unlinked (UID removed) -> Delete Old ID (even if ID string is same)
-            // eslint-disable-next-line sonarjs/no-duplicated-branches
-            else if (oldData.uid && !newData.uid) {
-                await addToBatch(doc(db, 'emp_lookups', oldData.empId), null, 'delete');
-            }
         }
     };
 
     // eslint-disable-next-line sonarjs/cognitive-complexity
-    const handleFacultyCascade = async (oldData, newData, db, addToBatch) => {
+    const handleFacultyCascade = async (oldData, newData, db, addToBatch, activeAcademicYear) => {
         if (oldData.name !== newData.name || oldData.empId !== newData.empId) {
             // Update: Prioritize ID search to find old records
             let q1, q2;
-            if (oldData.empId) {
-                q1 = query(collection(db, 'schedule'), where('facultyEmpId', '==', oldData.empId));
-                q2 = query(collection(db, 'schedule'), where('faculty2EmpId', '==', oldData.empId));
+            if (activeAcademicYear) {
+                if (oldData.empId) {
+                    q1 = query(collection(db, 'schedule'), where('facultyEmpId', '==', oldData.empId), where('academicYear', '==', activeAcademicYear));
+                    q2 = query(collection(db, 'schedule'), where('faculty2EmpId', '==', oldData.empId), where('academicYear', '==', activeAcademicYear));
+                } else {
+                    q1 = query(collection(db, 'schedule'), where('faculty', '==', oldData.name), where('academicYear', '==', activeAcademicYear));
+                    q2 = query(collection(db, 'schedule'), where('faculty2', '==', oldData.name), where('academicYear', '==', activeAcademicYear));
+                }
             } else {
-                q1 = query(collection(db, 'schedule'), where('faculty', '==', oldData.name));
-                q2 = query(collection(db, 'schedule'), where('faculty2', '==', oldData.name));
+                if (oldData.empId) {
+                    q1 = query(collection(db, 'schedule'), where('facultyEmpId', '==', oldData.empId));
+                    q2 = query(collection(db, 'schedule'), where('faculty2EmpId', '==', oldData.empId));
+                } else {
+                    q1 = query(collection(db, 'schedule'), where('faculty', '==', oldData.name));
+                    q2 = query(collection(db, 'schedule'), where('faculty2', '==', oldData.name));
+                }
             }
 
             // Update faculty 1 & 2 (Smart Merge to prevent batch collision)
@@ -885,12 +893,19 @@ const MasterData = ({ initialTab }) => {
                 // Safety Check: Verify User exists (should exist as selected from list, but good practice)
                 const newUserSnap = await getDoc(newUserRef);
                 if (newUserSnap.exists()) {
-                    await addToBatch(newUserRef, {
-                        empId: newData.empId,
-                        name: newData.name,
+                    const userUpdates = {
+                        empId: newData.empId || null,
+                        name: newData.name || newUserSnap.data().name,
                         isFaculty: true,
-                        dept: newData.department || newData.dept
-                    }, 'update');
+                        dept: newData.department || newData.dept || null,
+                        mobile: newData.phone || null,
+                        whatsappEnabled: newData.whatsappEnabled !== false
+                    };
+                    if (newData.designation) userUpdates.designation = newData.designation;
+                    if (newData.shortCode) userUpdates.shortCode = newData.shortCode;
+                    if (newData.photoURL) userUpdates.photoURL = newData.photoURL;
+                    
+                    await addToBatch(newUserRef, userUpdates, 'update');
                 }
             }
         }
@@ -899,11 +914,16 @@ const MasterData = ({ initialTab }) => {
     };
 
     // eslint-disable-next-line sonarjs/cognitive-complexity
-    const handleStandardCascade = async (collectionName, oldData, newData, db, addToBatch) => {
+    const handleStandardCascade = async (collectionName, oldData, newData, db, addToBatch, activeAcademicYear) => {
         // Helper for Cascade Updates
         const updateScheduleRef = async (field, oldVal, newVal) => {
             if (oldVal !== newVal) {
-                const q = query(collection(db, 'schedule'), where(field, '==', oldVal));
+                let q;
+                if (activeAcademicYear) {
+                    q = query(collection(db, 'schedule'), where(field, '==', oldVal), where('academicYear', '==', activeAcademicYear));
+                } else {
+                    q = query(collection(db, 'schedule'), where(field, '==', oldVal));
+                }
                 const snap = await getDocs(q);
                 for (const d of snap.docs) {
                     await addToBatch(d.ref, { [field]: newVal });
@@ -922,7 +942,12 @@ const MasterData = ({ initialTab }) => {
 
             if (oldData.name !== newData.name) {
                 // Update Schedule
-                const q = query(collection(db, 'schedule'), where('dept', '==', oldData.name));
+                let q;
+                if (activeAcademicYear) {
+                    q = query(collection(db, 'schedule'), where('dept', '==', oldData.name), where('academicYear', '==', activeAcademicYear));
+                } else {
+                    q = query(collection(db, 'schedule'), where('dept', '==', oldData.name));
+                }
                 const snap = await getDocs(q);
                 for (const d of snap.docs) {
                     await addToBatch(d.ref, { dept: newData.name });
@@ -948,7 +973,12 @@ const MasterData = ({ initialTab }) => {
             // CASCADE CODE CHANGE
             if (oldData.code && newData.code && oldData.code !== newData.code) {
                 // Update Schedule (Skip if already processed)
-                const q = query(collection(db, 'schedule'), where('dept', '==', oldData.code));
+                let q;
+                if (activeAcademicYear) {
+                    q = query(collection(db, 'schedule'), where('dept', '==', oldData.code), where('academicYear', '==', activeAcademicYear));
+                } else {
+                    q = query(collection(db, 'schedule'), where('dept', '==', oldData.code));
+                }
                 const snap = await getDocs(q);
                 for (const d of snap.docs) {
                     if (!processedScheduleIds.has(d.id)) {
@@ -974,7 +1004,7 @@ const MasterData = ({ initialTab }) => {
             await updateScheduleRef('day', oldData.name, newData.name);
         }
     };
-    const handleCascadeUpdate = async (collectionName, oldData, newData) => {
+    const handleCascadeUpdate = async (collectionName, oldData, newData, activeAcademicYear) => {
         let batch = writeBatch(db);
         let updateCount = 0;
         let batchOpCount = 0;
@@ -1005,9 +1035,9 @@ const MasterData = ({ initialTab }) => {
             if (collectionName === 'timeslots') {
                 await handleTimeSlotCascade(oldData, newData, db, addToBatch, formatTimeForSchedule);
             } else if (collectionName === 'faculty') {
-                await handleFacultyCascade(oldData, newData, db, addToBatch);
+                await handleFacultyCascade(oldData, newData, db, addToBatch, activeAcademicYear);
             } else {
-                await handleStandardCascade(collectionName, oldData, newData, db, addToBatch);
+                await handleStandardCascade(collectionName, oldData, newData, db, addToBatch, activeAcademicYear);
             }
 
             // Final commit if anything is pending
@@ -1089,12 +1119,6 @@ const MasterData = ({ initialTab }) => {
 
         try {
             if (editingId) {
-                // Perform cascade update if needed
-                const originalItem = data.find(i => i.id === editingId);
-                if (originalItem) {
-                    await handleCascadeUpdate(activeCollection, originalItem, formData);
-                }
-
                 if (activeCollection === 'faculty' && formData.phone) {
                     const cleanPhone = formData.phone.replace(/[^0-9]/g, '').slice(-10);
                     formData.phone = cleanPhone;
@@ -1119,56 +1143,15 @@ const MasterData = ({ initialTab }) => {
                 // 🔥 DYNAMIC CASCADE AI: Safely update all related schedules when names/IDs change!
                 if (oldData) {
                     try {
-                        await handleCascadeUpdate(activeCollection, oldData, formData);
+                        const activeYear = data[0]?.activeAcademicYear;
+                        await handleCascadeUpdate(activeCollection, oldData, formData, activeYear);
                     } catch (cascadeErr) {
                         console.error("Cascade update failed:", cascadeErr);
                     }
                 }
 
-                // FORCE SYNC: Ensure User Profile is always up to date when editing Faculty
-                if (activeCollection === 'faculty' && formData.uid) {
-                    try {
-                        const userRef = doc(db, 'users', formData.uid);
-                        // Passive update: Check if exists first
-                        const userSnap = await getDoc(userRef);
-                        if (userSnap.exists()) {
-                            const userUpdates = {
-                                name: formData.name || userSnap.data().name,
-                                empId: formData.empId || null,
-                                isFaculty: true,
-                                dept: formData.department || formData.dept || null,
-                                mobile: formData.phone || null,
-                                whatsappEnabled: formData.whatsappEnabled !== false
-                            };
-                            if (formData.designation) userUpdates.designation = formData.designation;
-                            if (formData.shortCode) userUpdates.shortCode = formData.shortCode;
-                            if (formData.photoURL) userUpdates.photoURL = formData.photoURL;
-                            await updateDoc(userRef, userUpdates);
-                        }
-                        
-                        // SYNC EMP_LOOKUPS (If EmpId or Email changed)
-                        if (formData.empId && formData.email) {
-                            // CLEANUP: If the Admin changed the EmpId, delete the old one from lookups to prevent stranded profiles!
-                            if (oldEmpId && oldEmpId !== formData.empId) {
-                                try {
-                                    await deleteDoc(doc(db, 'emp_lookups', oldEmpId));
-                                } catch (cleanupErr) {
-                                    console.warn("Failed to cleanup old emp_lookup:", cleanupErr);
-                                }
-                            }
-                            await setDoc(doc(db, 'emp_lookups', formData.empId), {
-                                uid: formData.uid,
-                                email: formData.email,
-                                syncedAt: new Date().toISOString(),
-                                source: 'auto-sync-edit'
-                            });
-                        }
-                    } catch (uErr) {
-                        console.warn("User Profile Sync Skipped:", uErr);
-                        // Do not fail the faculty save, just warn
-                        toast.error("Warning: Linked User Profile could not be updated.");
-                    }
-                }
+                // Security syncs (emp_lookups, user upgrades/downgrades) are now 
+                // fully handled by handleCascadeUpdate -> handleFacultyCascade.
             } else {
                 let dataToSave = { ...formData };
                 if (activeTab === 'holidays') {
@@ -1185,41 +1168,45 @@ const MasterData = ({ initialTab }) => {
                 await addDoc(collection(db, activeCollection), dataToSave);
 
                 // AUTOMATIC SECURITY SYNC: Handle New Faculty
-                if (activeCollection === 'faculty' && formData.uid) {
-                    try {
-                        const batch = writeBatch(db);
-
-                        // 1. Upgrade User Profile (Must happen if UID is linked)
-                        const userRef = doc(db, 'users', formData.uid);
-                        const userSnap = await getDoc(userRef);
-                        if (userSnap.exists()) {
-                            const userUpdates = {
-                                isFaculty: true,
-                                empId: formData.empId || null,
-                                dept: formData.department || formData.dept || null,
-                                mobile: formData.phone || null,
-                                whatsappEnabled: formData.whatsappEnabled !== false
-                            };
-                            if (formData.designation) userUpdates.designation = formData.designation;
-                            if (formData.shortCode) userUpdates.shortCode = formData.shortCode;
-                            if (formData.photoURL) userUpdates.photoURL = formData.photoURL;
-                            batch.update(userRef, userUpdates);
+                if (activeCollection === 'faculty') {
+                    // 1. Upgrade User Profile (Must happen if UID is linked)
+                    if (formData.uid) {
+                        try {
+                            const batch = writeBatch(db);
+                            const userRef = doc(db, 'users', formData.uid);
+                            const userSnap = await getDoc(userRef);
+                            if (userSnap.exists()) {
+                                const userUpdates = {
+                                    isFaculty: true,
+                                    empId: formData.empId || null,
+                                    dept: formData.department || formData.dept || null,
+                                    mobile: formData.phone || null,
+                                    whatsappEnabled: formData.whatsappEnabled !== false
+                                };
+                                if (formData.designation) userUpdates.designation = formData.designation;
+                                if (formData.shortCode) userUpdates.shortCode = formData.shortCode;
+                                if (formData.photoURL) userUpdates.photoURL = formData.photoURL;
+                                batch.update(userRef, userUpdates);
+                            }
+                            await batch.commit();
+                        } catch (syncErr) {
+                            console.error("Auto-sync failed:", syncErr);
+                            toast.error("Warning: Linked User Profile sync failed.");
                         }
+                    }
 
-                        // 2. Secure Lookup (Only if we have all data)
-                        if (formData.empId && formData.email) {
-                            batch.set(doc(db, 'emp_lookups', formData.empId), {
-                                uid: formData.uid,
+                    // 2. ALWAYS SYNC EMP_LOOKUPS (Even if user hasn't signed up yet)
+                    if (formData.empId && formData.email) {
+                        try {
+                            await setDoc(doc(db, 'emp_lookups', formData.empId), {
+                                uid: formData.uid || null,
                                 email: formData.email,
                                 syncedAt: new Date().toISOString(),
                                 source: 'auto-sync-create'
                             });
+                        } catch (lookupErr) {
+                            console.warn("Failed to sync emp_lookups:", lookupErr);
                         }
-
-                        await batch.commit();
-                    } catch (syncErr) {
-                        console.error("Auto-sync failed:", syncErr);
-                        toast.error("Warning: Linked User Profile sync failed.");
                     }
                 }
             }
