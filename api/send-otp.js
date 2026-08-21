@@ -207,18 +207,182 @@ export default async function handler(req, res) {
             messageText = "Action Required: Password Reset. Please use this OTP to securely reset your LAMS password.";
         }
 
-        const htmlContent = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px;">
-            <h2 style="color: #333; text-align: center;">LAMS Authentication</h2>
-            <p style="color: #555; font-size: 16px;">Hello ${name},</p>
-            <p style="color: #555; font-size: 16px;">${messageText}</p>
-            <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
-                <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #000;">${otp}</span>
-            </div>
-            <p style="color: #888; font-size: 12px; text-align: center;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
-            <p style="color: #888; font-size: 12px; text-align: center;">Time of request: ${new Date().toLocaleString()}</p>
+        let htmlContent = "";
+
+        if (actionType === 'password_reset') {
+            htmlContent = `
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>LAMS Password Reset</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Segoe UI', Inter, Arial, sans-serif; }
+        .main-card { background-color: #ffffff; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); overflow: hidden; }
+        .header-bg {
+            background: linear-gradient(135deg, #1f2937, #111827);
+            padding: 40px 20px; text-align: center;
+        }
+        .pulse-icon {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .otp-container {
+            margin: 35px auto;
+            background: #fff7ed;
+            border: 2px dashed #f97316;
+            border-radius: 12px;
+            padding: 24px;
+            width: 80%;
+            max-width: 320px;
+        }
+        .otp-code {
+            font-size: 42px;
+            font-weight: 800;
+            color: #ea580c;
+            letter-spacing: 8px;
+            display: block;
+            text-align: center;
+        }
+    </style>
+</head>
+<body style="margin:0;padding:0;">
+    <center style="width: 100%; background-color: #f3f4f6; padding: 40px 0;">
+        <table align="center" width="600" border="0" cellpadding="0" cellspacing="0" style="width:600px; margin:0 auto;" class="main-card">
+            <tr>
+                <td class="header-bg">
+                    <div class="pulse-icon" style="font-size: 40px; margin-bottom: 15px;">🔒</div>
+                    <h1 style="color:#ffffff; margin:0; font-size:24px; letter-spacing:1px;">PASSWORD RESET</h1>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding:45px 50px; text-align:center;">
+                    <h2 style="color:#111827; font-size:22px; margin:0 0 15px 0;">Hi ${name},</h2>
+                    <p style="color:#4b5563; font-size:16px; line-height:1.6; margin:0 0 30px 0;">
+                        ${messageText}
+                    </p>
+                    <div class="otp-container">
+                        <span class="otp-code">${otp}</span>
+                    </div>
+                    <p style="color:#6b7280; font-size:14px; margin:35px 0 0 0;">
+                        This code will expire in 10 minutes.<br/>
+                        If you didn't request this, you can safely ignore this email. Your password will remain unchanged.
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding:20px; text-align:center; background-color:#f9fafb; color:#9ca3af; font-size:12px;">
+                    LAMS Security System &copy; 2026<br/>
+                    Time of request: ${new Date().toLocaleString()}
+                </td>
+            </tr>
+        </table>
+    </center>
+</body>
+</html>`;
+        } else {
+            htmlContent = `
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Welcome to LAMS</title>
+    <style>
+        table, td, div, h1, p { font-family: 'Segoe UI', Inter, Arial, sans-serif; }
+        body { margin: 0; padding: 0; background-color: #f3f4f6; }
+        .wrapper { width: 100%; table-layout: fixed; background-color: #f3f4f6; padding-bottom: 60px; }
+        .main-card {
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0,0,0,0.05);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+        .header-bg {
+            background: linear-gradient(-45deg, #059669, #10b981, #047857, #34d399);
+            background-size: 400% 400%;
+            animation: gradientBG 10s ease infinite;
+            padding: 45px 20px;
+            text-align: center;
+        }
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .otp-container {
+            margin: 35px auto;
+            background: #ecfdf5;
+            border: 2px dashed #10b981;
+            border-radius: 12px;
+            padding: 24px;
+            width: 80%;
+            max-width: 320px;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+            transition: transform 0.3s ease;
+        }
+        .otp-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.25);
+        }
+        .otp-code {
+            font-size: 42px;
+            font-weight: 800;
+            color: #047857;
+            letter-spacing: 8px;
+            display: block;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body style="margin:0;padding:0;">
+    <center class="wrapper">
+        <div style="background-color: #f3f4f6; padding: 40px 0;">
+            <table align="center" width="600" border="0" cellpadding="0" cellspacing="0" style="width:600px; margin:0 auto;" class="main-card">
+                <tr>
+                    <td class="header-bg">
+                        <h1 style="color:#ffffff; margin:0; font-size:32px; font-weight:800; letter-spacing:2px;">LAMS</h1>
+                        <p style="color:#d1fae5; margin:10px 0 0 0; font-size:15px; font-weight:500; letter-spacing: 1px;">SECURE VERIFICATION</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:45px 50px; text-align:center;">
+                        <h2 style="color:#111827; font-size:26px; font-weight:700; margin:0 0 12px 0;">Hello, ${name}!</h2>
+                        <p style="color:#4b5563; font-size:16px; line-height:1.6; margin:0 0 30px 0;">
+                            ${messageText}
+                        </p>
+                        <div class="otp-container">
+                            <span class="otp-code">${otp}</span>
+                        </div>
+                        <p style="color:#6b7280; font-size:14px; margin:0;">
+                            This code securely expires in <strong style="color:#111827;">10 minutes</strong>.
+                        </p>
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top:35px;">
+                            <tr>
+                                <td style="background-color:#fff1f2; border-left: 4px solid #e11d48; border-radius:4px 8px 8px 4px; padding:16px; text-align:left;">
+                                    <p style="color:#be123c; font-size:13px; margin:0; line-height:1.5;">
+                                        <strong>Security Alert:</strong> LAMS staff will never ask for this code. Do not share it with anyone.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:24px; text-align:center; background-color:#f9fafb; color:#9ca3af; font-size:13px; border-top:1px solid #f3f4f6;">
+                        Lab Assignment Management System &copy; 2026<br/>
+                        Time of request: ${new Date().toLocaleString()}
+                    </td>
+                </tr>
+            </table>
         </div>
-        `;
+    </center>
+</body>
+</html>`;
+        }
 
         await sendEmail({
             to: email,
