@@ -71,41 +71,6 @@ export default async function handler(req, res) {
         const auth = getAuth();
 
         // ---------------------------------------------------------------------------
-        // PRE-FLIGHT SECURITY CHECKS
-        // ---------------------------------------------------------------------------
-        
-        // 1. Check if EmpID is taken
-        const lookupDoc = await db.collection('emp_lookups').doc(finalEmpId).get();
-        if (lookupDoc.exists && lookupDoc.data().uid) {
-            return res.status(400).json({ error: "This Employee ID is already registered. Please login or contact Admin." });
-        }
-
-        // 2. Check if Faculty exists and validate official email
-        let isFaculty = false;
-        let facultySnap = await db.collection('faculty').where('empId', '==', finalEmpId).get();
-        
-        if (facultySnap.empty) {
-            facultySnap = await db.collection('faculty').where('email', '==', normalizedEmail).get();
-        }
-        
-        if (!facultySnap.empty) {
-            const facDoc = facultySnap.docs[0];
-            const facData = facDoc.data();
-            
-            // STRICT SECURITY: If Admin has NOT set an email, block the hijack attempt!
-            if (!facData.email) {
-                return res.status(400).json({ error: "This Faculty profile is locked because no official email is assigned. Please ask Admin to update your email in Master Data before you can register." });
-            }
-            
-            // STRICT SECURITY: If Admin has set an email, the signup email MUST match!
-            if (facData.email.toLowerCase() !== normalizedEmail) {
-                return res.status(400).json({ error: "This Employee ID is securely linked to a different official email. Please use the correct email or contact Admin." });
-            }
-            
-            isFaculty = true;
-        }
-
-        // ---------------------------------------------------------------------------
         // OTP VERIFICATION (Transactional)
         // ---------------------------------------------------------------------------
         const otpRef = db.collection('otps').doc(normalizedEmail);
@@ -152,6 +117,41 @@ export default async function handler(req, res) {
 
         if (!otpResult.success) {
             return res.status(400).json({ error: otpResult.error });
+        }
+
+        // ---------------------------------------------------------------------------
+        // PRE-FLIGHT SECURITY CHECKS (Executed ONLY after OTP is valid)
+        // ---------------------------------------------------------------------------
+        
+        // 1. Check if EmpID is taken
+        const lookupDoc = await db.collection('emp_lookups').doc(finalEmpId).get();
+        if (lookupDoc.exists && lookupDoc.data().uid) {
+            return res.status(400).json({ error: "This Employee ID is already registered. Please login or contact Admin." });
+        }
+
+        // 2. Check if Faculty exists and validate official email
+        let isFaculty = false;
+        let facultySnap = await db.collection('faculty').where('empId', '==', finalEmpId).get();
+        
+        if (facultySnap.empty) {
+            facultySnap = await db.collection('faculty').where('email', '==', normalizedEmail).get();
+        }
+        
+        if (!facultySnap.empty) {
+            const facDoc = facultySnap.docs[0];
+            const facData = facDoc.data();
+            
+            // STRICT SECURITY: If Admin has NOT set an email, block the hijack attempt!
+            if (!facData.email) {
+                return res.status(400).json({ error: "This Faculty profile is locked because no official email is assigned. Please ask Admin to update your email in Master Data before you can register." });
+            }
+            
+            // STRICT SECURITY: If Admin has set an email, the signup email MUST match!
+            if (facData.email.toLowerCase() !== normalizedEmail) {
+                return res.status(400).json({ error: "This Employee ID is securely linked to a different official email. Please use the correct email or contact Admin." });
+            }
+            
+            isFaculty = true;
         }
 
         // ---------------------------------------------------------------------------
