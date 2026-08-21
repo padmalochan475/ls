@@ -1337,7 +1337,7 @@ const AdminPanel = () => {
                                                             display: 'inline-flex', alignItems: 'center', gap: '0.35rem', letterSpacing: '0.5px'
                                                         }}>
                                                             {isApproved ? <CheckCircle size={14} /> : <Activity size={14} />}
-                                                            {uStatus.toUpperCase()}
+                                                            {uStatus?.toUpperCase() || ''}
                                                         </span>
                                                     );
                                                 })()}
@@ -1469,7 +1469,7 @@ const AdminPanel = () => {
                                 background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6',
                                 borderRadius: '99px', fontSize: '0.9rem', fontWeight: 600
                             }}>
-                                {selectedUser.role.toUpperCase()}
+                                {selectedUser.role?.toUpperCase() || ''}
                             </span>
                         </div>
                         <div style={{ display: 'grid', gap: '1rem' }}>
@@ -1488,7 +1488,7 @@ const AdminPanel = () => {
                             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', borderLeft: getUserStatus(selectedUser) === 'approved' ? '3px solid #10b981' : '3px solid #fbbf24' }}>
                                 <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>ACCOUNT STATUS</label>
                                 <div style={{ fontSize: '1.1rem', color: getUserStatus(selectedUser) === 'approved' ? '#6ee7b7' : '#fcd34d', fontWeight: 600 }}>
-                                    {getUserStatus(selectedUser).toUpperCase()}
+                                    {getUserStatus(selectedUser)?.toUpperCase() || ''}
                                 </div>
                             </div>
                             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', borderLeft: (selectedUser.whatsappEnabled !== false) ? '3px solid #10b981' : '3px solid #ef4444' }}>
