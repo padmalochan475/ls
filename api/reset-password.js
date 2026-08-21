@@ -1,7 +1,6 @@
 /* eslint-env node */
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
 import crypto from 'crypto';
 
 // Singleton Initialization
@@ -111,6 +110,7 @@ export default async function handler(req, res) {
 
         if (otpValid) {
             // Update password using Admin SDK
+            const { getAuth } = await import('firebase-admin/auth');
             const auth = getAuth();
             
             try {
