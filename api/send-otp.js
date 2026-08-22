@@ -209,136 +209,181 @@ export default async function handler(req, res) {
 
         let htmlContent = `
 <!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>LAMS Secure Verification</title>
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Welcome to LAMS</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap');
-        
-        body, table, td, div, p, span, h1, h2, h3 {
-            font-family: 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
+        table,
+        td,
+        div,
+        h1,
+        p {
+            font-family: 'Segoe UI', Arial, sans-serif;
         }
 
+        /* Desktop Base */
         body {
-            background-color: #020617; /* Very dark slate */
-            -webkit-font-smoothing: antialiased;
+            margin: 0;
+            padding: 0;
+            background-color: #f0fdf4;
         }
 
         .wrapper {
             width: 100%;
-            background: #020617;
-            background-image: radial-gradient(circle at top right, #1e1b4b, #020617), radial-gradient(circle at bottom left, #064e3b, #020617);
-            padding: 60px 0;
+            table-layout: fixed;
+            background-color: #f0fdf4;
+            padding-bottom: 60px;
         }
 
+        /* The "Premium" Card Look */
         .main-card {
-            background-color: #0f172a;
-            border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
-            border: 1px solid #1e293b;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
             overflow: hidden;
-            /* Entrance Animation */
-            animation: slideUp 1s ease-out forwards;
+            border: 1px solid rgba(0, 0, 0, 0.02);
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(40px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
+        /* Header Gradient */
         .header-bg {
-            background: linear-gradient(-45deg, #2563eb, #7c3aed, #db2777, #059669);
-            background-size: 300% 300%;
-            animation: gradientSpin 8s ease infinite;
-            padding: 50px 20px;
+            background: linear-gradient(-45deg, #059669, #10b981, #047857, #34d399);
+            background-size: 400% 400%;
+            animation: gradientBG 10s ease infinite;
+            padding: 40px;
             text-align: center;
         }
 
-        @keyframes gradientSpin {
+        @keyframes gradientBG {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
 
-        .brand-logo {
-            color: #ffffff;
-            font-size: 46px;
-            font-weight: 800;
-            letter-spacing: 8px;
-            margin: 0;
-            text-shadow: 0 4px 20px rgba(255,255,255,0.4);
-            animation: logoGlow 2.5s ease-in-out infinite alternate;
-        }
-
-        @keyframes logoGlow {
-            0% { text-shadow: 0 4px 15px rgba(255,255,255,0.3); transform: scale(1); }
-            100% { text-shadow: 0 4px 35px rgba(255,255,255,0.8); transform: scale(1.02); }
-        }
-
         .otp-container {
-            margin: 40px auto;
-            background: #1e293b;
-            border-radius: 16px;
-            padding: 30px;
+            margin: 30px auto;
+            background: #ecfdf5;
+            border: 2px dashed #34d399;
+            border-radius: 12px;
+            padding: 20px;
             width: 80%;
-            max-width: 320px;
-            position: relative;
-            /* Neon Border Pulse */
-            box-shadow: 0 0 0 2px #3b82f6, 0 0 20px rgba(59, 130, 246, 0.4);
-            animation: neonPulse 2s infinite alternate;
+            max-width: 300px;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        @keyframes neonPulse {
-            0% { box-shadow: 0 0 0 2px #3b82f6, 0 0 15px rgba(59, 130, 246, 0.3); }
-            100% { box-shadow: 0 0 0 2px #8b5cf6, 0 0 35px rgba(139, 92, 246, 0.7); }
+        .otp-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.25);
         }
 
         .otp-code {
-            font-size: 48px;
+            font-size: 36px;
             font-weight: 800;
-            color: #f8fafc;
-            letter-spacing: 12px;
+            color: #064e3b;
+            letter-spacing: 5px;
             display: block;
             text-align: center;
-            /* Text gradient fallback */
-            background: -webkit-linear-gradient(45deg, #60a5fa, #c084fc, #f472b6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.05);
         }
 
-        .warning-box {
-            background-color: rgba(225, 29, 72, 0.1);
-            border-left: 4px solid #e11d48;
-            border-radius: 6px 12px 12px 6px;
-            padding: 16px 20px;
-            margin-top: 40px;
+        /* Mobile Responsive Styles */
+        @media only screen and (max-width: 600px) {
+            .wrapper {
+                padding-bottom: 0;
+                background-color: #ffffff;
+            }
+
+            /* Remove body bg on mobile */
+            .main-content {
+                width: 100% !important;
+            }
+
+            .main-card {
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+            }
+
+            .header-bg {
+                padding: 30px 20px !important;
+            }
+
+            .body-padding {
+                padding: 20px !important;
+            }
+
+            .otp-container {
+                width: 100% !important;
+                max-width: none !important;
+                box-sizing: border-box;
+            }
+
+            .otp-code {
+                font-size: 32px !important;
+                letter-spacing: 3px !important;
+            }
+
+            h1 {
+                font-size: 24px !important;
+            }
+
+            .greeting-text {
+                font-size: 20px !important;
+            }
         }
     </style>
 </head>
+
 <body style="margin:0;padding:0;">
     <center class="wrapper">
-        <div style="width: 100%; padding: 40px 0;">
-            <table role="presentation" class="main-content" align="center" width="600" border="0" cellpadding="0" cellspacing="0" style="width:600px; margin:0 auto;">
+        <div style="background-color: #f0fdf4; height: 100%; width: 100%;">
+
+            <!-- Spacer for Desktop -->
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+                style="background-color: #f0fdf4;" class="desktop-spacer">
+                <tr>
+                    <td height="40" style="font-size:40px; line-height:40px;">&nbsp;</td>
+                </tr>
+            </table>
+
+            <!-- Main Container -->
+            <table role="presentation" class="main-content" align="center" width="600" border="0" cellpadding="0"
+                cellspacing="0" style="width:600px; margin:0 auto;">
                 <tr>
                     <td align="center" class="main-card">
-                        
+
                         <!-- Header -->
                         <div class="header-bg">
-                            <h1 class="brand-logo">LAMS</h1>
-                            <p style="color:rgba(255,255,255,0.8); font-size:14px; letter-spacing:3px; margin-top:10px; font-weight:600; text-transform:uppercase;">Secure Verification</p>
+                            <h1
+                                style="color:#ffffff; margin:0; font-size:28px; letter-spacing:1px; text-transform: uppercase;">
+                                LAMS</h1>
                         </div>
 
-                        <!-- Content Area -->
+                        <!-- Content -->
                         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                             <tr>
-                                <td style="padding:50px; text-align:center;">
-                                    <h2 style="color:#f8fafc; font-size:26px; font-weight:800; margin:0 0 15px 0;">Hello, ${name} ✨</h2>
-                                    
-                                    <p style="color:#94a3b8; font-size:16px; line-height:1.7; margin:0 0 30px 0;">
+                                <td class="body-padding" style="padding:40px 50px; text-align:center;">
+
+                                    <h2 class="greeting-text" style="color:#064e3b; font-size:24px; margin:0 0 10px 0;">
+                                        Hello, ${name}! 👋</h2>
+                                    <p
+                                        style="color:#059669; font-size:14px; font-weight:600; text-transform:uppercase; letter-spacing:1px; margin:0 0 25px 0;">
+                                        Welcome to LAMS</p>
+
+                                    <p style="color:#4b5563; font-size:16px; line-height:1.6; margin:0 0 30px 0;">
                                         ${messageText}
                                     </p>
 
@@ -347,16 +392,19 @@ export default async function handler(req, res) {
                                         <span class="otp-code">${otp}</span>
                                     </div>
 
-                                    <p style="color:#64748b; font-size:14px; margin:0; font-weight:600;">
-                                        This highly secure passcode expires in <span style="color:#f8fafc;">10 minutes</span>.
+                                    <p style="color:#6b7280; font-size:14px; margin:0;">
+                                        This code expires in <strong>10 minutes</strong>.
                                     </p>
 
-                                    <!-- Warning Alert -->
-                                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="warning-box">
+                                    <!-- Warning -->
+                                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+                                        style="margin-top:30px;">
                                         <tr>
-                                            <td style="text-align:left;">
-                                                <p style="color:#fb7185; font-size:13px; margin:0; line-height:1.6;">
-                                                    <strong style="color:#f43f5e;">⚠️ Security Alert:</strong> LAMS staff will NEVER ask for this code. If you verify this email, you are confirming you own this LAMS account. Do not share this code.
+                                            <td
+                                                style="background-color:#fff1f2; border-radius:8px; padding:15px; text-align:left;">
+                                                <p style="color:#9f1239; font-size:13px; margin:0; line-height:1.5;">
+                                                    <strong>⚠️ Security Alert:</strong> If you verify this email, you
+                                                    are confirming you own this LAMS account. Do not share this code.
                                                 </p>
                                             </td>
                                         </tr>
@@ -367,12 +415,13 @@ export default async function handler(req, res) {
                         </table>
 
                         <!-- Footer -->
-                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#020617; border-top:1px solid #1e293b;">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+                            style="background-color:#f9fafb; border-top:1px solid #e5e7eb;">
                             <tr>
-                                <td style="padding:25px; text-align:center; color:#475569; font-size:12px; font-weight:600;">
-                                    <p style="margin:0 0 8px 0; letter-spacing:1px; text-transform:uppercase;">Sent securely by LAMS</p>
-                                    <p style="margin:0;">&copy; 2026 Lab Assignment Management System</p>
-                                    <p style="margin:8px 0 0 0; color:#334155;">Time of request: ${new Date().toLocaleString()}</p>
+                                <td style="padding:20px; text-align:center; color:#9ca3af; font-size:12px;">
+                                    <p style="margin:0 0 10px 0;">Sent securely by LAMS - Lab Assignment Management
+                                        System</p>
+                                    <p style="margin:0;">&copy; 2026 LAMS Inc.</p>
                                 </td>
                             </tr>
                         </table>
@@ -380,9 +429,18 @@ export default async function handler(req, res) {
                     </td>
                 </tr>
             </table>
+
+            <!-- Spacer for Desktop -->
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+                style="background-color: #f0fdf4;">
+                <tr>
+                    <td height="40" style="font-size:40px; line-height:40px;">&nbsp;</td>
+                </tr>
+            </table>
         </div>
     </center>
 </body>
+
 </html>`;
 
         await sendEmail({
