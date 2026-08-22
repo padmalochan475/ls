@@ -259,9 +259,17 @@ export default async function handler(req, res) {
 
         /* Header Gradient */
         .header-bg {
-            background: linear-gradient(120deg, #059669 0%, #10b981 100%);
+            background: linear-gradient(-45deg, #059669, #10b981, #047857, #34d399);
+            background-size: 400% 400%;
+            animation: gradientBG 10s ease infinite;
             padding: 40px;
             text-align: center;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
         .otp-container {
@@ -272,6 +280,13 @@ export default async function handler(req, res) {
             padding: 20px;
             width: 80%;
             max-width: 300px;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .otp-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.25);
         }
 
         .otp-code {
@@ -281,6 +296,7 @@ export default async function handler(req, res) {
             letter-spacing: 5px;
             display: block;
             text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.05);
         }
 
         /* Mobile Responsive Styles */
